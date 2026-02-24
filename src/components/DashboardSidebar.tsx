@@ -37,7 +37,7 @@ export function DashboardSidebar() {
             <Zap className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground tracking-tight">Horus Pulse</h1>
+            <h1 className="text-lg font-bold text-foreground tracking-tight">Pulse Engine</h1>
             <p className="text-xs text-muted-foreground font-mono">ADMIN DASHBOARD</p>
           </div>
         </div>
