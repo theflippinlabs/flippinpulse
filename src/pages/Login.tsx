@@ -10,19 +10,28 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isSignup, setIsSignup] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setError("Identifiants invalides. Vérifiez votre email et mot de passe.");
-      setLoading(false);
-      return;
+    if (isSignup) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError("Identifiants invalides. Vérifiez votre email et mot de passe.");
+        setLoading(false);
+        return;
+      }
     }
 
     navigate("/");
@@ -40,7 +49,7 @@ export default function Login() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="glass rounded-2xl p-8 space-y-6 animate-slide-up border border-border">
+        <form onSubmit={handleSubmit} className="glass rounded-2xl p-8 space-y-6 animate-slide-up border border-border">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Email</label>
             <input
@@ -85,8 +94,15 @@ export default function Login() {
             disabled={loading}
             className="w-full h-11 gradient-logo rounded-lg font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {loading ? "Connexion..." : "Se connecter"}
+            {loading ? "Chargement..." : isSignup ? "Créer le compte" : "Se connecter"}
           </button>
+
+          <p className="text-center text-sm text-muted-foreground">
+            {isSignup ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
+            <button type="button" onClick={() => { setIsSignup(!isSignup); setError(""); }} className="text-primary hover:underline">
+              {isSignup ? "Se connecter" : "Créer un compte"}
+            </button>
+          </p>
         </form>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
