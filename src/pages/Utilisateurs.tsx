@@ -86,6 +86,7 @@ export default function Utilisateurs() {
                 <th className="text-left py-3 px-4 text-muted-foreground font-medium">Utilisateur</th>
                 <th className="text-left py-3 px-4 text-muted-foreground font-medium">Rang</th>
                 <th className="text-right py-3 px-4 text-muted-foreground font-medium">Points</th>
+                <th className="text-right py-3 px-4 text-muted-foreground font-medium">PULSE</th>
                 <th className="text-right py-3 px-4 text-muted-foreground font-medium">Streak</th>
               </tr>
             </thead>
@@ -109,12 +110,13 @@ export default function Utilisateurs() {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-primary">{user.points_total}</td>
+                  <td className="py-3 px-4 text-right font-mono font-bold text-warning">{user.balance_pulse}</td>
                   <td className="py-3 px-4 text-right font-mono text-muted-foreground">{user.streak}j</td>
                 </tr>
               ))}
               {(!filtered || filtered.length === 0) && (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-muted-foreground text-sm">
+                  <td colSpan={6} className="py-12 text-center text-muted-foreground text-sm">
                     Aucun utilisateur trouvé
                   </td>
                 </tr>
@@ -137,9 +139,9 @@ export default function Utilisateurs() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-xs text-muted-foreground">Points total</p>
                   <p className="text-lg font-bold text-primary font-mono">{selected.points_total}</p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3">
@@ -153,6 +155,25 @@ export default function Utilisateurs() {
                 <div className="bg-muted/50 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Streak</p>
                   <p className="text-lg font-bold text-warning font-mono">{selected.streak}j</p>
+                </div>
+              </div>
+
+              {/* PULSE Wallet */}
+              <div className="bg-warning/5 border border-warning/20 rounded-lg p-3 mb-4">
+                <p className="text-xs font-medium text-warning mb-2">💰 Portefeuille PULSE</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Solde</p>
+                    <p className="text-sm font-bold text-warning font-mono">{selected.balance_pulse}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Gagné</p>
+                    <p className="text-sm font-bold text-success font-mono">{selected.lifetime_earned_pulse}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Dépensé</p>
+                    <p className="text-sm font-bold text-destructive font-mono">{selected.lifetime_spent_pulse}</p>
+                  </div>
                 </div>
               </div>
 

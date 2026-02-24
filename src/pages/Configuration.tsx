@@ -63,9 +63,10 @@ export default function Configuration() {
 
   const configSections = [
     { key: "points_config", label: "Barème des points", description: "Points attribués pour chaque type d'action" },
+    { key: "economy", label: "Économie PULSE", description: "Caps, gains et multiplicateurs des Pulse Tokens (Community Token)" },
     { key: "anti_spam", label: "Anti-spam", description: "Protection contre le farming de points" },
     { key: "decay", label: "Decay (perte d'inactivité)", description: "Perte de points en cas d'inactivité prolongée" },
-    { key: "pulse_hour", label: "Pulse Hour", description: "Événement multiplicateur de points récurrent" },
+    { key: "pulse_hour", label: "Pulse Hour", description: "Événement multiplicateur de points et PULSE récurrent" },
     { key: "flash_missions", label: "Flash Missions", description: "Missions surprises automatiques" },
   ];
 
