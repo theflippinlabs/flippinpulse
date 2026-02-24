@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
-import { MessageSquare, Mic, Target, Users, Zap, TrendingUp, Clock, Trophy } from "lucide-react";
+import { MessageSquare, Mic, Target, Users, Zap, TrendingUp, Clock, Trophy, Coins } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -45,6 +45,22 @@ export default function Overview() {
     },
   });
 
+  const { data: shopItemsCount } = useQuery({
+    queryKey: ["shop-items-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("shop_items").select("*", { count: "exact", head: true }).eq("is_active", true);
+      return count || 0;
+    },
+  });
+
+  const { data: pendingOrders } = useQuery({
+    queryKey: ["pending-orders-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "PENDING");
+      return count || 0;
+    },
+  });
+
   const { data: settings } = useQuery({
     queryKey: ["pulse-hour-settings"],
     queryFn: async () => {
@@ -58,7 +74,7 @@ export default function Overview() {
   return (
     <DashboardLayout title="Vue globale" subtitle="Tableau de bord Pulse Engine">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <StatCard
           title="Membres trackés"
           value={usersCount ?? 0}
@@ -72,15 +88,27 @@ export default function Overview() {
           variant="accent"
         />
         <StatCard
+          title="Items boutique"
+          value={shopItemsCount ?? 0}
+          icon={<Coins className="w-5 h-5" />}
+          variant="warning"
+        />
+        <StatCard
+          title="Commandes en attente"
+          value={pendingOrders ?? 0}
+          icon={<Zap className="w-5 h-5" />}
+          variant="success"
+        />
+        <StatCard
           title="Messages aujourd'hui"
           value="—"
-          subtitle="Connectez le bot pour voir"
+          subtitle="Bot requis"
           icon={<MessageSquare className="w-5 h-5" />}
         />
         <StatCard
           title="Vocal aujourd'hui"
           value="—"
-          subtitle="Connectez le bot pour voir"
+          subtitle="Bot requis"
           icon={<Mic className="w-5 h-5" />}
         />
       </div>

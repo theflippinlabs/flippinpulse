@@ -7,6 +7,9 @@ import {
   ScrollText,
   Zap,
   LogOut,
+  ShoppingBag,
+  ArrowLeftRight,
+  Package,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +18,9 @@ const navItems = [
   { path: "/", label: "Vue globale", icon: LayoutDashboard },
   { path: "/configuration", label: "Configuration", icon: Settings },
   { path: "/missions", label: "Missions", icon: Target },
+  { path: "/boutique", label: "Boutique", icon: ShoppingBag },
+  { path: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { path: "/commandes", label: "Commandes", icon: Package },
   { path: "/utilisateurs", label: "Utilisateurs", icon: Users },
   { path: "/logs", label: "Logs", icon: ScrollText },
 ];

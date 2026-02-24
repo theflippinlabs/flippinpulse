@@ -85,11 +85,14 @@ export type Database = {
       discord_users: {
         Row: {
           avatar_url: string | null
+          balance_pulse: number
           created_at: string
           discord_id: string
           id: string
           joined_at: string | null
           last_activity_at: string | null
+          lifetime_earned_pulse: number
+          lifetime_spent_pulse: number
           points_month: number
           points_total: number
           points_week: number
@@ -100,11 +103,14 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          balance_pulse?: number
           created_at?: string
           discord_id: string
           id?: string
           joined_at?: string | null
           last_activity_at?: string | null
+          lifetime_earned_pulse?: number
+          lifetime_spent_pulse?: number
           points_month?: number
           points_total?: number
           points_week?: number
@@ -115,11 +121,14 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          balance_pulse?: number
           created_at?: string
           discord_id?: string
           id?: string
           joined_at?: string | null
           last_activity_at?: string | null
+          lifetime_earned_pulse?: number
+          lifetime_spent_pulse?: number
           points_month?: number
           points_total?: number
           points_week?: number
@@ -214,6 +223,50 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          discord_id: string
+          id: string
+          item_id: string
+          notes: string | null
+          pulse_spent: number
+          status: Database["public"]["Enums"]["order_status"]
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          discord_id: string
+          id?: string
+          item_id: string
+          notes?: string | null
+          pulse_spent?: number
+          status?: Database["public"]["Enums"]["order_status"]
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          discord_id?: string
+          id?: string
+          item_id?: string
+          notes?: string | null
+          pulse_spent?: number
+          status?: Database["public"]["Enums"]["order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -235,6 +288,39 @@ export type Database = {
           id?: string
           user_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      pulse_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          discord_id: string
+          id: string
+          reason: string | null
+          ref_id: string | null
+          type: Database["public"]["Enums"]["pulse_tx_type"]
+        }
+        Insert: {
+          amount: number
+          balance_after?: number
+          created_at?: string
+          discord_id: string
+          id?: string
+          reason?: string | null
+          ref_id?: string | null
+          type: Database["public"]["Enums"]["pulse_tx_type"]
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          discord_id?: string
+          id?: string
+          reason?: string | null
+          ref_id?: string | null
+          type?: Database["public"]["Enums"]["pulse_tx_type"]
         }
         Relationships: []
       }
@@ -280,6 +366,104 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_items: {
+        Row: {
+          auto_apply: boolean
+          available_from: string | null
+          available_until: string | null
+          category: Database["public"]["Enums"]["shop_item_category"]
+          cooldown_hours: number | null
+          created_at: string
+          description: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          is_limited_drop: boolean
+          max_per_user: number | null
+          metadata_json: Json | null
+          name: string
+          price_pulse: number
+          stock_remaining: number | null
+          stock_total: number | null
+          updated_at: string
+        }
+        Insert: {
+          auto_apply?: boolean
+          available_from?: string | null
+          available_until?: string | null
+          category?: Database["public"]["Enums"]["shop_item_category"]
+          cooldown_hours?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_limited_drop?: boolean
+          max_per_user?: number | null
+          metadata_json?: Json | null
+          name: string
+          price_pulse?: number
+          stock_remaining?: number | null
+          stock_total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          auto_apply?: boolean
+          available_from?: string | null
+          available_until?: string | null
+          category?: Database["public"]["Enums"]["shop_item_category"]
+          cooldown_hours?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_limited_drop?: boolean
+          max_per_user?: number | null
+          metadata_json?: Json | null
+          name?: string
+          price_pulse?: number
+          stock_remaining?: number | null
+          stock_total?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_purchases: {
+        Row: {
+          discord_id: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          item_id: string
+          purchased_at: string
+        }
+        Insert: {
+          discord_id: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          item_id: string
+          purchased_at?: string
+        }
+        Update: {
+          discord_id?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          item_id?: string
+          purchased_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_purchases_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -313,6 +497,16 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      order_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
+      pulse_tx_type:
+        | "EARN_MISSION"
+        | "EARN_VOICE"
+        | "EARN_EVENT"
+        | "ADMIN_GRANT"
+        | "ADMIN_REVOKE"
+        | "SPEND_SHOP"
+        | "REFUND"
+      shop_item_category: "role" | "perk" | "ticket" | "cosmetic" | "irl"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -441,6 +635,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      order_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
+      pulse_tx_type: [
+        "EARN_MISSION",
+        "EARN_VOICE",
+        "EARN_EVENT",
+        "ADMIN_GRANT",
+        "ADMIN_REVOKE",
+        "SPEND_SHOP",
+        "REFUND",
+      ],
+      shop_item_category: ["role", "perk", "ticket", "cosmetic", "irl"],
     },
   },
 } as const
