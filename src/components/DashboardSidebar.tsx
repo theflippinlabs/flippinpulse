@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   ArrowLeftRight,
   Package,
+  Gamepad2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +22,7 @@ const navItems = [
   { path: "/boutique", label: "Boutique", icon: ShoppingBag },
   { path: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { path: "/commandes", label: "Commandes", icon: Package },
+  { path: "/mini-jeux", label: "Mini-Jeux", icon: Gamepad2 },
   { path: "/utilisateurs", label: "Utilisateurs", icon: Users },
   { path: "/logs", label: "Logs", icon: ScrollText },
 ];
