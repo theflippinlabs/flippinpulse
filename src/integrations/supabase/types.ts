@@ -139,6 +139,135 @@ export type Database = {
         }
         Relationships: []
       }
+      game_players: {
+        Row: {
+          bet_amount: number
+          discord_id: string
+          id: string
+          joined_at: string
+          payout: number
+          session_id: string
+        }
+        Insert: {
+          bet_amount?: number
+          discord_id: string
+          id?: string
+          joined_at?: string
+          payout?: number
+          session_id: string
+        }
+        Update: {
+          bet_amount?: number
+          discord_id?: string
+          id?: string
+          joined_at?: string
+          payout?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_players_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_results: {
+        Row: {
+          created_at: string
+          id: string
+          outcome_json: Json
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          outcome_json?: Json
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          outcome_json?: Json
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_results_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_sessions: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          ended_at: string | null
+          game_key: string
+          id: string
+          started_at: string
+          state_json: Json
+          status: Database["public"]["Enums"]["game_session_status"]
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          ended_at?: string | null
+          game_key: string
+          id?: string
+          started_at?: string
+          state_json?: Json
+          status?: Database["public"]["Enums"]["game_session_status"]
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          ended_at?: string | null
+          game_key?: string
+          id?: string
+          started_at?: string
+          state_json?: Json
+          status?: Database["public"]["Enums"]["game_session_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_sessions_game_key_fkey"
+            columns: ["game_key"]
+            isOneToOne: false
+            referencedRelation: "games_config"
+            referencedColumns: ["game_key"]
+          },
+        ]
+      }
+      games_config: {
+        Row: {
+          config_json: Json
+          created_at: string
+          game_key: string
+          is_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          config_json?: Json
+          created_at?: string
+          game_key: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          config_json?: Json
+          created_at?: string
+          game_key?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mission_completions: {
         Row: {
           completed_at: string | null
@@ -324,6 +453,39 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_questions: {
+        Row: {
+          category: string
+          choices_json: Json
+          correct_index: number
+          created_at: string
+          difficulty: string
+          id: string
+          is_active: boolean
+          question: string
+        }
+        Insert: {
+          category?: string
+          choices_json?: Json
+          correct_index?: number
+          created_at?: string
+          difficulty?: string
+          id?: string
+          is_active?: boolean
+          question: string
+        }
+        Update: {
+          category?: string
+          choices_json?: Json
+          correct_index?: number
+          created_at?: string
+          difficulty?: string
+          id?: string
+          is_active?: boolean
+          question?: string
+        }
+        Relationships: []
+      }
       roles_config: {
         Row: {
           color: string | null
@@ -429,6 +591,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_game_limits: {
+        Row: {
+          count: number
+          discord_id: string
+          id: string
+          limit_key: string
+          reset_at: string
+        }
+        Insert: {
+          count?: number
+          discord_id: string
+          id?: string
+          limit_key: string
+          reset_at?: string
+        }
+        Update: {
+          count?: number
+          discord_id?: string
+          id?: string
+          limit_key?: string
+          reset_at?: string
+        }
+        Relationships: []
+      }
       user_purchases: {
         Row: {
           discord_id: string
@@ -497,6 +683,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      game_session_status: "waiting" | "active" | "completed" | "cancelled"
       order_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       pulse_tx_type:
         | "EARN_MISSION"
@@ -635,6 +822,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      game_session_status: ["waiting", "active", "completed", "cancelled"],
       order_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       pulse_tx_type: [
         "EARN_MISSION",

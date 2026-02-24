@@ -11,6 +11,7 @@ import Missions from "./pages/Missions";
 import Boutique from "./pages/Boutique";
 import Transactions from "./pages/Transactions";
 import Commandes from "./pages/Commandes";
+import MiniJeux from "./pages/MiniJeux";
 import Utilisateurs from "./pages/Utilisateurs";
 import Logs from "./pages/Logs";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/boutique" element={<AuthGuard><Boutique /></AuthGuard>} />
           <Route path="/transactions" element={<AuthGuard><Transactions /></AuthGuard>} />
           <Route path="/commandes" element={<AuthGuard><Commandes /></AuthGuard>} />
+          <Route path="/mini-jeux" element={<AuthGuard><MiniJeux /></AuthGuard>} />
           <Route path="/utilisateurs" element={<AuthGuard><Utilisateurs /></AuthGuard>} />
           <Route path="/logs" element={<AuthGuard><Logs /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
