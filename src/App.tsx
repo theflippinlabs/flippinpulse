@@ -3,7 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { AuthGuard } from "@/components/AuthGuard";
+import Login from "./pages/Login";
+import Overview from "./pages/Overview";
+import Configuration from "./pages/Configuration";
+import Missions from "./pages/Missions";
+import Utilisateurs from "./pages/Utilisateurs";
+import Logs from "./pages/Logs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -15,8 +21,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<AuthGuard><Overview /></AuthGuard>} />
+          <Route path="/configuration" element={<AuthGuard><Configuration /></AuthGuard>} />
+          <Route path="/missions" element={<AuthGuard><Missions /></AuthGuard>} />
+          <Route path="/utilisateurs" element={<AuthGuard><Utilisateurs /></AuthGuard>} />
+          <Route path="/logs" element={<AuthGuard><Logs /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
