@@ -5,7 +5,6 @@ import {
   Target,
   Users,
   ScrollText,
-  Zap,
   LogOut,
   ShoppingBag,
   ArrowLeftRight,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import logo from "@/assets/logo.png";
 
 const navItems = [
   { path: "/", label: "Vue globale", icon: LayoutDashboard },
@@ -37,14 +37,12 @@ export function DashboardSidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50">
       {/* Logo */}
-      <div className="p-6 border-b border-sidebar-border">
+      <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center glow-primary">
-            <Zap className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src={logo} alt="Pulse Engine" className="w-11 h-11 rounded-lg object-contain" />
           <div>
-            <h1 className="text-lg font-bold text-foreground tracking-tight">Pulse Engine</h1>
-            <p className="text-xs text-muted-foreground font-mono">ADMIN DASHBOARD</p>
+            <h1 className="text-lg font-bold text-gradient-logo tracking-tight">Pulse Engine</h1>
+            <p className="text-[10px] text-muted-foreground font-mono tracking-widest">by The Flippin' Labs</p>
           </div>
         </div>
       </div>

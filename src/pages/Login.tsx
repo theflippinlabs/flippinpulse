@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Zap, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -32,11 +33,10 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8 animate-slide-up">
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center glow-primary mx-auto mb-4">
-            <Zap className="w-8 h-8 text-primary-foreground" />
-          </div>
-          <h1 className="text-3xl font-bold text-gradient-primary">Pulse Engine</h1>
-          <p className="text-muted-foreground text-sm mt-2">Administration Dashboard</p>
+          <img src={logo} alt="Pulse Engine" className="w-24 h-24 mx-auto mb-4 object-contain" />
+          <h1 className="text-3xl font-bold text-gradient-logo">Pulse Engine</h1>
+          <p className="text-muted-foreground text-sm mt-1">by The Flippin' Labs</p>
+          <p className="text-muted-foreground text-xs mt-2 font-mono tracking-wider">ADMINISTRATION DASHBOARD</p>
         </div>
 
         {/* Form */}
@@ -83,7 +83,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-11 gradient-primary rounded-lg font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="w-full h-11 gradient-logo rounded-lg font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {loading ? "Connexion..." : "Se connecter"}
           </button>
