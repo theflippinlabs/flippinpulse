@@ -80,7 +80,7 @@ export default function Configuration() {
   }
 
   return (
-    <DashboardLayout title="Configuration" subtitle="Paramètres du système Horus Pulse">
+    <DashboardLayout title="Configuration" subtitle="Paramètres du système Pulse Engine">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {configSections.map((section) => (
           <div key={section.key} className="glass rounded-xl border border-border p-6 animate-slide-up">

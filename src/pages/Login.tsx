@@ -35,7 +35,7 @@ export default function Login() {
           <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center glow-primary mx-auto mb-4">
             <Zap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold text-gradient-primary">Horus Pulse</h1>
+          <h1 className="text-3xl font-bold text-gradient-primary">Pulse Engine</h1>
           <p className="text-muted-foreground text-sm mt-2">Administration Dashboard</p>
         </div>
 
@@ -90,7 +90,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Flippin' Pulse — Système de gamification Discord
+          Pulse Engine — Système de gamification Discord
         </p>
       </div>
     </div>

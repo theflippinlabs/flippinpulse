@@ -56,7 +56,7 @@ export default function Overview() {
   const dayNames = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
   return (
-    <DashboardLayout title="Vue globale" subtitle="Tableau de bord Flippin' Pulse">
+    <DashboardLayout title="Vue globale" subtitle="Tableau de bord Pulse Engine">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
