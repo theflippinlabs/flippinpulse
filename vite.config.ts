@@ -4,17 +4,28 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src")
-    }
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
-  preview: {
-    host: true,
-    port: Number(process.env.PORT) || 4173
-  },
+
   server: {
     host: true,
-    port: Number(process.env.PORT) || 5173
-  }
+    port: 5173,
+  },
+
+  preview: {
+    host: true,
+    port: Number(process.env.PORT) || 4173,
+    strictPort: true,
+
+    allowedHosts: [
+      "flippinpulse-production.up.railway.app",
+      ".railway.app",
+      "localhost",
+      "127.0.0.1"
+    ],
+  },
 });
