@@ -1,48 +1,8 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthGuard } from "@/components/AuthGuard";
-import { LanguageProvider } from "@/i18n/LanguageContext";
-import Login from "./pages/Login";
-import Overview from "./pages/Overview";
-import Configuration from "./pages/Configuration";
-import Missions from "./pages/Missions";
-import Boutique from "./pages/Boutique";
-import Transactions from "./pages/Transactions";
-import Commandes from "./pages/Commandes";
-import MiniJeux from "./pages/MiniJeux";
-import Utilisateurs from "./pages/Utilisateurs";
-import Logs from "./pages/Logs";
-import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<AuthGuard><Overview /></AuthGuard>} />
-            <Route path="/configuration" element={<AuthGuard><Configuration /></AuthGuard>} />
-            <Route path="/missions" element={<AuthGuard><Missions /></AuthGuard>} />
-            <Route path="/boutique" element={<AuthGuard><Boutique /></AuthGuard>} />
-            <Route path="/transactions" element={<AuthGuard><Transactions /></AuthGuard>} />
-            <Route path="/commandes" element={<AuthGuard><Commandes /></AuthGuard>} />
-            <Route path="/mini-jeux" element={<AuthGuard><MiniJeux /></AuthGuard>} />
-            <Route path="/utilisateurs" element={<AuthGuard><Utilisateurs /></AuthGuard>} />
-            <Route path="/logs" element={<AuthGuard><Logs /></AuthGuard>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </LanguageProvider>
-  </QueryClientProvider>
-);
-
-export default App;
+export default function App() {
+  return (
+    <div style={{ padding: 24, fontFamily: "system-ui" }}>
+      <h1>FlippinPulse ✅</h1>
+      <p>Déployé sur Railway.</p>
+    </div>
+  );
+}
