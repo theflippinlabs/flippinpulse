@@ -1,19 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
   preview: {
-    allowedHosts: [
-      "flippinpulse-production.up.railway.app",
-      ".up.railway.app",
-      "localhost",
-    ],
-  },
+    allowedHosts: ["flippinpulse-production.up.railway.app"],
+    host: true,
+    port: Number(process.env.PORT) || 4173
+  }
 });
