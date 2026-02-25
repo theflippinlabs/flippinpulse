@@ -4,19 +4,20 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
 
-  // Pour "vite preview" (prod)
+  // 🔥 Serveur de dev local
+  server: {
+    host: true,
+    port: Number(process.env.PORT) || 8080,
+    strictPort: true
+  },
+
+  // 🚀 Preview utilisé par Railway (TRÈS IMPORTANT)
   preview: {
     host: true,
     port: Number(process.env.PORT) || 8080,
     strictPort: true,
-    allowedHosts: ['.railway.app']
-  },
 
-  // Pour "vite" (dev) au cas où
-  server: {
-    host: true,
-    port: Number(process.env.PORT) || 8080,
-    strictPort: true,
+    // ✅ Autorise Railway
     allowedHosts: ['.railway.app']
   }
 })
