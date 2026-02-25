@@ -7,7 +7,7 @@ export default defineConfig({
     host: true,
     port: Number(process.env.PORT) || 8080,
     strictPort: true,
-    allowedHosts: ['.railway.app']
+    allowedHosts: true
   },
   server: {
     host: true,
