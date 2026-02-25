@@ -3,8 +3,13 @@ import { StatCard } from "@/components/StatCard";
 import { MessageSquare, Mic, Target, Users, Zap, TrendingUp, Clock, Trophy, Coins } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { translations } from "@/i18n/translations";
 
 export default function Overview() {
+  const { t, locale } = useLanguage();
+  const L = translations.overview;
+
   const { data: usersCount } = useQuery({
     queryKey: ["discord-users-count"],
     queryFn: async () => {
@@ -69,48 +74,18 @@ export default function Overview() {
     },
   });
 
-  const dayNames = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+  const dayName = (d: number) => t(translations.days[d as keyof typeof translations.days]);
 
   return (
-    <DashboardLayout title="Vue globale" subtitle="Tableau de bord Pulse Engine">
+    <DashboardLayout title={t(L.title)} subtitle={t(L.subtitle)}>
       {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
-        <StatCard
-          title="Membres trackés"
-          value={usersCount ?? 0}
-          icon={<Users className="w-5 h-5" />}
-          variant="primary"
-        />
-        <StatCard
-          title="Missions actives"
-          value={activeMissions ?? 0}
-          icon={<Target className="w-5 h-5" />}
-          variant="accent"
-        />
-        <StatCard
-          title="Items boutique"
-          value={shopItemsCount ?? 0}
-          icon={<Coins className="w-5 h-5" />}
-          variant="warning"
-        />
-        <StatCard
-          title="Commandes en attente"
-          value={pendingOrders ?? 0}
-          icon={<Zap className="w-5 h-5" />}
-          variant="success"
-        />
-        <StatCard
-          title="Messages aujourd'hui"
-          value="—"
-          subtitle="Bot requis"
-          icon={<MessageSquare className="w-5 h-5" />}
-        />
-        <StatCard
-          title="Vocal aujourd'hui"
-          value="—"
-          subtitle="Bot requis"
-          icon={<Mic className="w-5 h-5" />}
-        />
+        <StatCard title={t(L.trackedMembers)} value={usersCount ?? 0} icon={<Users className="w-5 h-5" />} variant="primary" />
+        <StatCard title={t(L.activeMissions)} value={activeMissions ?? 0} icon={<Target className="w-5 h-5" />} variant="accent" />
+        <StatCard title={t(L.shopItems)} value={shopItemsCount ?? 0} icon={<Coins className="w-5 h-5" />} variant="warning" />
+        <StatCard title={t(L.pendingOrders)} value={pendingOrders ?? 0} icon={<Zap className="w-5 h-5" />} variant="success" />
+        <StatCard title={t(L.messagesToday)} value="—" subtitle={t(L.botRequired)} icon={<MessageSquare className="w-5 h-5" />} />
+        <StatCard title={t(L.voiceToday)} value="—" subtitle={t(L.botRequired)} icon={<Mic className="w-5 h-5" />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -118,7 +93,7 @@ export default function Overview() {
         <div className="lg:col-span-2 glass rounded-xl border border-border p-6">
           <div className="flex items-center gap-2 mb-6">
             <Trophy className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Top membres</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t(L.topMembers)}</h2>
           </div>
           {topUsers && topUsers.length > 0 ? (
             <div className="space-y-3">
@@ -143,8 +118,8 @@ export default function Overview() {
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Aucun membre tracké</p>
-              <p className="text-xs mt-1">Les données apparaîtront quand le bot sera actif</p>
+              <p className="text-sm">{t(L.noMember)}</p>
+              <p className="text-xs mt-1">{t(L.dataWillAppear)}</p>
             </div>
           )}
         </div>
@@ -155,25 +130,25 @@ export default function Overview() {
           <div className="glass rounded-xl border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <Zap className="w-5 h-5 text-warning" />
-              <h2 className="text-lg font-semibold text-foreground">Pulse Hour</h2>
+              <h2 className="text-lg font-semibold text-foreground">{t(L.pulseHour)}</h2>
             </div>
             {settings?.enabled ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-sm text-success font-medium">Activé</span>
+                  <span className="text-sm text-success font-medium">{t(L.enabled)}</span>
                 </div>
                 <div className="space-y-2">
                   {settings.schedule?.map((s, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {dayNames[s.day]} à {s.hour}h00
+                      {dayName(s.day)} {locale === "fr" ? "à" : "at"} {s.hour}h00
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Non configuré</p>
+              <p className="text-sm text-muted-foreground">{t(L.notConfigured)}</p>
             )}
           </div>
 
@@ -181,7 +156,7 @@ export default function Overview() {
           <div className="glass rounded-xl border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-accent" />
-              <h2 className="text-lg font-semibold text-foreground">Activité récente</h2>
+              <h2 className="text-lg font-semibold text-foreground">{t(L.recentActivity)}</h2>
             </div>
             {recentActivity && recentActivity.length > 0 ? (
               <div className="space-y-2">
@@ -193,7 +168,7 @@ export default function Overview() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Aucune activité récente</p>
+              <p className="text-sm text-muted-foreground">{t(L.noRecentActivity)}</p>
             )}
           </div>
         </div>

@@ -3,20 +3,18 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowUpRight, ArrowDownRight, Coins, Download, Search } from "lucide-react";
-
-const TX_LABELS: Record<string, { label: string; color: string }> = {
-  EARN_MISSION: { label: "Mission", color: "text-success" },
-  EARN_VOICE: { label: "Vocal", color: "text-primary" },
-  EARN_EVENT: { label: "Événement", color: "text-accent" },
-  ADMIN_GRANT: { label: "Grant admin", color: "text-warning" },
-  ADMIN_REVOKE: { label: "Revoke admin", color: "text-destructive" },
-  SPEND_SHOP: { label: "Achat boutique", color: "text-destructive" },
-  REFUND: { label: "Remboursement", color: "text-success" },
-};
+import { useLanguage } from "@/i18n/LanguageContext";
+import { translations } from "@/i18n/translations";
 
 export default function Transactions() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const { t, locale } = useLanguage();
+  const L = translations.tx;
+
+  const txLabels = Object.fromEntries(
+    Object.entries(L.types).map(([k, v]) => [k, { label: t(v), color: k.startsWith("EARN") ? "text-success" : k === "ADMIN_GRANT" ? "text-warning" : k === "ADMIN_REVOKE" || k === "SPEND_SHOP" ? "text-destructive" : k === "REFUND" ? "text-success" : "text-primary" }])
+  );
 
   const { data: transactions } = useQuery({
     queryKey: ["pulse-transactions"],
@@ -40,7 +38,7 @@ export default function Transactions() {
     if (!filtered) return;
     const headers = "Date,Discord ID,Type,Montant,Solde après,Raison,Référence\n";
     const rows = filtered.map((tx) =>
-      `${new Date(tx.created_at).toLocaleString("fr-FR")},${tx.discord_id},${tx.type},${tx.amount},${tx.balance_after},${tx.reason ?? ""},${tx.ref_id ?? ""}`
+      `${new Date(tx.created_at).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")},${tx.discord_id},${tx.type},${tx.amount},${tx.balance_after},${tx.reason ?? ""},${tx.ref_id ?? ""}`
     ).join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -52,23 +50,23 @@ export default function Transactions() {
   };
 
   return (
-    <DashboardLayout title="Transactions" subtitle="Ledger Pulse Token (PULSE) · Community Token">
+    <DashboardLayout title={t(L.title)} subtitle={t(L.subtitle)}>
       {/* Filters */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher..." className="h-10 pl-10 pr-4 bg-input border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring w-64" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t(L.search)} className="h-10 pl-10 pr-4 bg-input border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring w-64" />
           </div>
           <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="h-10 px-3 bg-input border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            <option value="all">Tous les types</option>
-            {Object.entries(TX_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
+            <option value="all">{t(L.allTypes)}</option>
+            {Object.entries(L.types).map(([k, v]) => (
+              <option key={k} value={k}>{t(v)}</option>
             ))}
           </select>
         </div>
         <button onClick={exportCSV} className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-muted transition-colors">
-          <Download className="w-4 h-4" /> Export CSV
+          <Download className="w-4 h-4" /> {t(L.exportCsv)}
         </button>
       </div>
 
@@ -77,22 +75,22 @@ export default function Transactions() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium">Date</th>
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium">Discord ID</th>
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium">Type</th>
-              <th className="text-right py-3 px-4 text-muted-foreground font-medium">Montant</th>
-              <th className="text-right py-3 px-4 text-muted-foreground font-medium">Solde après</th>
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium">Raison</th>
+              <th className="text-left py-3 px-4 text-muted-foreground font-medium">{t(L.date)}</th>
+              <th className="text-left py-3 px-4 text-muted-foreground font-medium">{t(L.discordId)}</th>
+              <th className="text-left py-3 px-4 text-muted-foreground font-medium">{t(L.type)}</th>
+              <th className="text-right py-3 px-4 text-muted-foreground font-medium">{t(L.amount)}</th>
+              <th className="text-right py-3 px-4 text-muted-foreground font-medium">{t(L.balanceAfter)}</th>
+              <th className="text-left py-3 px-4 text-muted-foreground font-medium">{t(L.reason)}</th>
             </tr>
           </thead>
           <tbody>
             {filtered?.map((tx) => {
-              const meta = TX_LABELS[tx.type] || { label: tx.type, color: "text-muted-foreground" };
+              const meta = txLabels[tx.type] || { label: tx.type, color: "text-muted-foreground" };
               const isCredit = tx.amount > 0;
               return (
                 <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                   <td className="py-3 px-4 text-xs text-muted-foreground font-mono">
-                    {new Date(tx.created_at).toLocaleString("fr-FR")}
+                    {new Date(tx.created_at).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}
                   </td>
                   <td className="py-3 px-4 font-mono text-xs text-muted-foreground">{tx.discord_id}</td>
                   <td className="py-3 px-4">
@@ -113,7 +111,7 @@ export default function Transactions() {
               <tr>
                 <td colSpan={6} className="py-12 text-center text-muted-foreground text-sm">
                   <Coins className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  Aucune transaction enregistrée
+                  {t(L.noTransactions)}
                 </td>
               </tr>
             )}

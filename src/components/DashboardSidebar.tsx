@@ -17,23 +17,26 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
-
-const navItems = [
-  { path: "/", label: "Vue globale", icon: LayoutDashboard },
-  { path: "/configuration", label: "Configuration", icon: Settings },
-  { path: "/missions", label: "Missions", icon: Target },
-  { path: "/boutique", label: "Boutique", icon: ShoppingBag },
-  { path: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { path: "/commandes", label: "Commandes", icon: Package },
-  { path: "/mini-jeux", label: "Mini-Jeux", icon: Gamepad2 },
-  { path: "/utilisateurs", label: "Utilisateurs", icon: Users },
-  { path: "/logs", label: "Logs", icon: ScrollText },
-];
+import { useLanguage } from "@/i18n/LanguageContext";
+import { translations } from "@/i18n/translations";
 
 export function DashboardSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
+
+  const navItems = [
+    { path: "/", label: t(translations.nav.overview), icon: LayoutDashboard },
+    { path: "/configuration", label: t(translations.nav.configuration), icon: Settings },
+    { path: "/missions", label: t(translations.nav.missions), icon: Target },
+    { path: "/boutique", label: t(translations.nav.shop), icon: ShoppingBag },
+    { path: "/transactions", label: t(translations.nav.transactions), icon: ArrowLeftRight },
+    { path: "/commandes", label: t(translations.nav.orders), icon: Package },
+    { path: "/mini-jeux", label: t(translations.nav.miniGames), icon: Gamepad2 },
+    { path: "/utilisateurs", label: t(translations.nav.users), icon: Users },
+    { path: "/logs", label: t(translations.nav.logs), icon: ScrollText },
+  ];
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -107,7 +110,7 @@ export function DashboardSidebar() {
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200 w-full"
           >
             <LogOut className="w-4 h-4" />
-            Déconnexion
+            {t(translations.nav.logout)}
           </button>
         </div>
       </aside>
