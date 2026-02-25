@@ -1,8 +1,11 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { translations } from "@/i18n/translations";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -10,7 +13,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+  const { t } = useLanguage();
+  const L = translations.login;
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +25,7 @@ export default function Login() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setError("Identifiants invalides. Vérifiez votre email et mot de passe.");
+      setError(t(L.error));
       setLoading(false);
       return;
     }
@@ -29,20 +34,23 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8 animate-slide-up">
           <img src={logo} alt="Pulse Engine" className="w-24 h-24 mx-auto mb-4 object-contain" />
-          <h1 className="text-3xl font-bold text-gradient-logo">Pulse Engine</h1>
-          <p className="text-muted-foreground text-sm mt-1">by The Flippin' Labs</p>
-          <p className="text-muted-foreground text-xs mt-2 font-mono tracking-wider">ADMINISTRATION DASHBOARD</p>
+          <h1 className="text-3xl font-bold text-gradient-logo">{t(L.title)}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t(L.subtitle)}</p>
+          <p className="text-muted-foreground text-xs mt-2 font-mono tracking-wider">{t(L.dashboardLabel)}</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-8 space-y-6 animate-slide-up border border-border">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Email</label>
+            <label className="text-sm font-medium text-foreground">{t(L.email)}</label>
             <input
               type="email"
               value={email}
@@ -54,7 +62,7 @@ export default function Login() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Mot de passe</label>
+            <label className="text-sm font-medium text-foreground">{t(L.password)}</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -85,12 +93,12 @@ export default function Login() {
             disabled={loading}
             className="w-full h-11 gradient-logo rounded-lg font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {loading ? "Chargement..." : "Se connecter"}
+            {loading ? t(L.loading) : t(L.submit)}
           </button>
         </form>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Pulse Engine — Système de gamification Discord
+          {t(L.footer)}
         </p>
       </div>
     </div>

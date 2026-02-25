@@ -1,20 +1,24 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, Check, X, Truck, Clock } from "lucide-react";
 import { toast } from "sonner";
-
-const STATUS_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  PENDING: { label: "En attente", color: "bg-warning/10 text-warning border-warning/20", icon: <Clock className="w-3 h-3" /> },
-  APPROVED: { label: "Approuvée", color: "bg-primary/10 text-primary border-primary/20", icon: <Check className="w-3 h-3" /> },
-  REJECTED: { label: "Refusée", color: "bg-destructive/10 text-destructive border-destructive/20", icon: <X className="w-3 h-3" /> },
-  FULFILLED: { label: "Livrée", color: "bg-success/10 text-success border-success/20", icon: <Truck className="w-3 h-3" /> },
-};
+import { useLanguage } from "@/i18n/LanguageContext";
+import { translations } from "@/i18n/translations";
 
 export default function Commandes() {
   const queryClient = useQueryClient();
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const { t, locale } = useLanguage();
+  const L = translations.orders;
+
+  const STATUS_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+    PENDING: { label: t(L.statuses.PENDING), color: "bg-warning/10 text-warning border-warning/20", icon: <Clock className="w-3 h-3" /> },
+    APPROVED: { label: t(L.statuses.APPROVED), color: "bg-primary/10 text-primary border-primary/20", icon: <Check className="w-3 h-3" /> },
+    REJECTED: { label: t(L.statuses.REJECTED), color: "bg-destructive/10 text-destructive border-destructive/20", icon: <X className="w-3 h-3" /> },
+    FULFILLED: { label: t(L.statuses.FULFILLED), color: "bg-success/10 text-success border-success/20", icon: <Truck className="w-3 h-3" /> },
+  };
 
   const { data: orders } = useQuery({
     queryKey: ["orders"],
@@ -37,19 +41,19 @@ export default function Commandes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
-      toast.success("Statut mis à jour !");
+      toast.success(t(L.statusUpdated));
     },
-    onError: () => toast.error("Erreur"),
+    onError: () => toast.error(t(L.error)),
   });
 
   const filtered = orders?.filter((o) => filterStatus === "all" || o.status === filterStatus);
 
   return (
-    <DashboardLayout title="Commandes" subtitle="Fulfillment des achats manuels">
+    <DashboardLayout title={t(L.title)} subtitle={t(L.subtitle)}>
       {/* Filters */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
         <button onClick={() => setFilterStatus("all")} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterStatus === "all" ? "gradient-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-          Toutes
+          {t(L.all)}
         </button>
         {Object.entries(STATUS_META).map(([k, v]) => (
           <button key={k} onClick={() => setFilterStatus(k)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterStatus === k ? "gradient-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
@@ -62,7 +66,7 @@ export default function Commandes() {
       <div className="space-y-3">
         {filtered?.map((order) => {
           const meta = STATUS_META[order.status] || STATUS_META.PENDING;
-          const itemName = (order.shop_items as { name: string; category: string } | null)?.name ?? "Item inconnu";
+          const itemName = (order.shop_items as { name: string; category: string } | null)?.name ?? t(L.unknownItem);
           return (
             <div key={order.id} className="glass rounded-xl border border-border p-5 animate-slide-up">
               <div className="flex items-start justify-between flex-wrap gap-4">
@@ -72,7 +76,7 @@ export default function Commandes() {
                       {meta.icon} {meta.label}
                     </span>
                     <span className="text-xs text-muted-foreground font-mono">
-                      {new Date(order.created_at).toLocaleString("fr-FR")}
+                      {new Date(order.created_at).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}
                     </span>
                   </div>
                   <h4 className="font-semibold text-foreground">{itemName}</h4>
@@ -91,13 +95,13 @@ export default function Commandes() {
                         onClick={() => updateStatus.mutate({ id: order.id, status: "APPROVED" })}
                         className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors flex items-center gap-1"
                       >
-                        <Check className="w-3 h-3" /> Approuver
+                        <Check className="w-3 h-3" /> {t(L.approve)}
                       </button>
                       <button
                         onClick={() => updateStatus.mutate({ id: order.id, status: "REJECTED" })}
                         className="px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20 transition-colors flex items-center gap-1"
                       >
-                        <X className="w-3 h-3" /> Refuser
+                        <X className="w-3 h-3" /> {t(L.reject)}
                       </button>
                     </>
                   )}
@@ -106,7 +110,7 @@ export default function Commandes() {
                       onClick={() => updateStatus.mutate({ id: order.id, status: "FULFILLED" })}
                       className="px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20 transition-colors flex items-center gap-1"
                     >
-                      <Truck className="w-3 h-3" /> Marquer livré
+                      <Truck className="w-3 h-3" /> {t(L.markDelivered)}
                     </button>
                   )}
                 </div>
@@ -117,7 +121,7 @@ export default function Commandes() {
         {(!filtered || filtered.length === 0) && (
           <div className="text-center py-16 text-muted-foreground">
             <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Aucune commande</p>
+            <p className="text-sm">{t(L.noOrders)}</p>
           </div>
         )}
       </div>
