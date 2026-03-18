@@ -32,10 +32,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const lines = users.map((u, i) => {
+  const lines = users.map((u: Record<string, unknown>, i: number) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-    const pts = (u as Record<string, unknown>)[column] ?? 0;
-    return `${medal} **${u.username ?? u.discord_id}** — ${pts} pts ${u.rank_name ? `(${u.rank_name})` : ''}`;
+    const pts = (u[column] as number) ?? 0;
+    const username = (u.username as string) ?? (u.discord_id as string);
+    const rankName = u.rank_name as string | null;
+    return `${medal} **${username}** — ${pts} pts ${rankName ? `(${rankName})` : ''}`;
   });
 
   const embed = pulseEmbed(`Leaderboard — ${periodLabel}`)

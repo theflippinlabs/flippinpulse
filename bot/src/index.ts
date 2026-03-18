@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { registerEvents } from './events/index.js';
 import { loadSettings, startSettingsRefresh } from './services/settings.js';
 import { loadRanks } from './services/ranks.js';
+import { loadGameConfigs } from './services/games.js';
 import { log } from './utils/logger.js';
 
 const client = new Client({
@@ -22,8 +23,9 @@ client.once('ready', async () => {
   log('INFO', `Bot online as ${client.user?.tag}`);
   await loadSettings();
   await loadRanks();
+  await loadGameConfigs();
   startSettingsRefresh();
-  log('INFO', 'Settings and ranks loaded. Bot is ready.');
+  log('INFO', 'Settings, ranks, and game configs loaded. Bot is ready.');
 });
 
 client.login(config.DISCORD_TOKEN).catch(err => {

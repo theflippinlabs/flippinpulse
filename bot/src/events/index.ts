@@ -7,7 +7,9 @@ import { handleInteractionCreate } from './interactionCreate.js';
 
 export function registerEvents(client: Client): void {
   client.on(Events.MessageCreate, handleMessageCreate);
-  client.on(Events.MessageReactionAdd, handleMessageReactionAdd);
+  client.on(Events.MessageReactionAdd, (reaction, user) => {
+    handleMessageReactionAdd(reaction, user);
+  });
   client.on(Events.VoiceStateUpdate, handleVoiceStateUpdate);
   client.on(Events.GuildMemberAdd, handleGuildMemberAdd);
   client.on(Events.InteractionCreate, handleInteractionCreate);
