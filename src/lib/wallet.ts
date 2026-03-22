@@ -1,6 +1,14 @@
 import { supabase } from './supabase';
 import type { Wallet, WalletNFTStatus, AccessStatus, NFTAccessRule } from '../types';
 
+export const CHAIN_NAMES: Record<number, string> = {
+  1: 'Ethereum Mainnet',
+  137: 'Polygon',
+  42161: 'Arbitrum One',
+  8453: 'Base',
+  10: 'Optimism',
+};
+
 // ─── Wallet Management ────────────────────────────────────────────────────────
 
 export async function linkWallet(
@@ -8,14 +16,6 @@ export async function linkWallet(
   address: string,
   chainId: number = 1
 ): Promise<{ data: Wallet | null; error: Error | null }> {
-  const chainNames: Record<number, string> = {
-    1: 'Ethereum Mainnet',
-    137: 'Polygon',
-    42161: 'Arbitrum One',
-    8453: 'Base',
-    10: 'Optimism',
-  };
-
   const { data: existing } = await supabase
     .from('wallets')
     .select('id')
@@ -26,7 +26,7 @@ export async function linkWallet(
   if (existing) {
     const { data, error } = await supabase
       .from('wallets')
-      .update({ chain_id: chainId, chain_name: chainNames[chainId] || 'Unknown' })
+      .update({ chain_id: chainId, chain_name: CHAIN_NAMES[chainId] ?? 'Unknown' })
       .eq('id', existing.id)
       .select()
       .single();
@@ -39,7 +39,7 @@ export async function linkWallet(
       user_id: userId,
       address: address.toLowerCase(),
       chain_id: chainId,
-      chain_name: chainNames[chainId] || 'Unknown',
+      chain_name: CHAIN_NAMES[chainId] ?? 'Unknown',
       is_primary: true,
     })
     .select()
@@ -73,30 +73,24 @@ export async function getNFTAccessRules(): Promise<NFTAccessRule[]> {
     .from('nft_access_rules')
     .select('*')
     .eq('is_active', true);
-  return data || [];
+  return data ?? [];
 }
 
 export async function verifyNFTOwnership(
   walletAddress: string,
-  chainId: number = 1
+  _chainId: number = 1
 ): Promise<WalletNFTStatus[]> {
-  // Production: call on-chain RPC or NFT indexer API (e.g. Alchemy, Moralis)
-  // For now, we return mock results that can be replaced with real provider calls
-
+  // Production: replace with real on-chain RPC or NFT indexer (Alchemy, Moralis)
   const rules = await getNFTAccessRules();
-
-  // Mock verification — replace with real provider calls
-  const results: WalletNFTStatus[] = rules.map((rule) => ({
+  return rules.map((rule) => ({
     id: `mock-${rule.id}`,
     wallet_id: walletAddress,
     rule_id: rule.id,
-    is_eligible: false, // real logic: check on-chain
+    is_eligible: false,
     token_ids: [],
     last_verified_at: new Date().toISOString(),
     rule,
   }));
-
-  return results;
 }
 
 export async function getWalletNFTStatus(walletId: string): Promise<WalletNFTStatus[]> {
@@ -104,53 +98,38 @@ export async function getWalletNFTStatus(walletId: string): Promise<WalletNFTSta
     .from('wallet_nft_status')
     .select('*, nft_access_rules(*)')
     .eq('wallet_id', walletId);
-  return data || [];
+  return data ?? [];
 }
 
 // ─── Access Tier Resolution ────────────────────────────────────────────────────
 
 export async function resolveAccessStatus(userId: string): Promise<AccessStatus> {
-  const { data: wallets } = await supabase
-    .from('wallets')
-    .select('id, address')
-    .eq('user_id', userId);
+  // Fetch wallets and check NFT eligibility in two parallel queries
+  const [walletsResult, eligibilityResult] = await Promise.all([
+    supabase.from('wallets').select('id, address').eq('user_id', userId),
+    supabase
+      .from('wallet_nft_status')
+      .select('wallet_id, wallets!inner(user_id)')
+      .eq('wallets.user_id', userId)
+      .eq('is_eligible', true)
+      .limit(1),
+  ]);
 
-  const hasWallet = (wallets?.length ?? 0) > 0;
-  let nftVerified = false;
+  const wallets = walletsResult.data ?? [];
+  const hasWallet = wallets.length > 0;
+  const nftVerified = (eligibilityResult.data?.length ?? 0) > 0;
 
-  if (hasWallet && wallets) {
-    for (const wallet of wallets) {
-      const { data: statuses } = await supabase
-        .from('wallet_nft_status')
-        .select('is_eligible')
-        .eq('wallet_id', wallet.id)
-        .eq('is_eligible', true);
-
-      if (statuses && statuses.length > 0) {
-        nftVerified = true;
-        break;
-      }
-    }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('subscription_tier_id, subscription_tiers(name, monthly_generation_limit)')
-    .eq('id', userId)
-    .single();
-
-  const tier = nftVerified ? 'nft_verified' : 'free';
-  const limit = 5; // default free tier
+  const FREE_LIMIT = 5;
 
   return {
-    tier,
+    tier: nftVerified ? 'nft_verified' : 'free',
     walletConnected: hasWallet,
     nftVerified,
     unlockedFeatures: nftVerified
       ? ['hd_export', 'unlimited_generations', 'priority_queue', 'all_styles', 'brand_overlay']
       : ['preview_generation'],
-    generationsRemaining: nftVerified ? 999 : limit,
-    generationsTotal: nftVerified ? 999 : limit,
+    generationsRemaining: nftVerified ? 999 : FREE_LIMIT,
+    generationsTotal: nftVerified ? 999 : FREE_LIMIT,
   };
 }
 
@@ -167,27 +146,16 @@ export async function connectBrowserWallet(): Promise<WalletConnectionResult> {
     throw new Error('No Ethereum wallet detected. Install MetaMask or another Web3 wallet.');
   }
 
-  const accounts: string[] = await window.ethereum.request({
-    method: 'eth_requestAccounts',
-  });
-
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
   if (!accounts.length) throw new Error('No accounts returned from wallet.');
 
-  const chainIdHex: string = await window.ethereum.request({ method: 'eth_chainId' });
+  const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' }) as string;
   const chainId = parseInt(chainIdHex, 16);
-
-  const chainNames: Record<number, string> = {
-    1: 'Ethereum Mainnet',
-    137: 'Polygon',
-    42161: 'Arbitrum One',
-    8453: 'Base',
-    10: 'Optimism',
-  };
 
   return {
     address: accounts[0],
     chainId,
-    chainName: chainNames[chainId] || `Chain ${chainId}`,
+    chainName: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
   };
 }
 

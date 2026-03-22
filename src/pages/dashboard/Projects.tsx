@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -51,15 +51,16 @@ export default function Projects() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     getProjects(user.id).then(({ data }) => {
-      setProjects(data || []);
+      setProjects(data ?? []);
       setLoading(false);
     });
-  }, [user]);
+  }, [user?.id]);
 
-  const filtered = projects.filter((p) =>
-    p.title.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () => projects.filter((p) => p.title.toLowerCase().includes(search.toLowerCase())),
+    [projects, search]
   );
 
   const handleDuplicate = async (projectId: string) => {
@@ -176,7 +177,7 @@ export default function Projects() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className="text-xs border-border/50 text-muted-foreground/70">
-                    {VISUAL_STYLE_LABELS[project.visual_style] || project.visual_style}
+                    {VISUAL_STYLE_LABELS[project.visual_style] ?? project.visual_style}
                   </Badge>
                   <ProjectStatusBadge status={project.status} />
                 </div>

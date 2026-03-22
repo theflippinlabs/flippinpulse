@@ -22,6 +22,14 @@ const AuthContext = createContext<AuthContextValue>({
   refreshAccessStatus: async () => {},
 });
 
+async function loadUserData(userId: string) {
+  const [profileResult, accessResult] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', userId).single(),
+    resolveAccessStatus(userId).catch(() => null),
+  ]);
+  return { profile: profileResult.data as Profile | null, accessStatus: accessResult };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -29,34 +37,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessStatus, setAccessStatus] = useState<AccessStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (data) setProfile(data as Profile);
-  };
-
   const refreshAccessStatus = async () => {
     if (!user) return;
-    try {
-      const status = await resolveAccessStatus(user.id);
-      setAccessStatus(status);
-    } catch {
-      // ignore
-    }
+    const status = await resolveAccessStatus(user.id).catch(() => null);
+    if (status) setAccessStatus(status);
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
-        resolveAccessStatus(session.user.id)
-          .then(setAccessStatus)
-          .catch(() => {});
+        const { profile, accessStatus } = await loadUserData(session.user.id);
+        setProfile(profile);
+        setAccessStatus(accessStatus);
       }
       setLoading(false);
     });
@@ -66,9 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
-          const status = await resolveAccessStatus(session.user.id).catch(() => null);
-          setAccessStatus(status);
+          const { profile, accessStatus } = await loadUserData(session.user.id);
+          setProfile(profile);
+          setAccessStatus(accessStatus);
         } else {
           setProfile(null);
           setAccessStatus(null);

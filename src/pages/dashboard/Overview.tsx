@@ -17,11 +17,11 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent } from '../../components/ui/card';
 import { Progress } from '../../components/ui/progress';
+import { JobStatusBadge } from '../../components/JobStatusBadge';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProjects } from '../../lib/projects';
 import { getRecentJobs } from '../../lib/jobs';
 import type { Project, GenerationJob } from '../../types';
-import { JOB_STATUS_LABELS } from '../../types';
 import { cn } from '../../lib/utils';
 
 function StatCard({
@@ -59,42 +59,23 @@ function StatCard({
   );
 }
 
-function JobStatusBadge({ status }: { status: string }) {
-  const variants: Record<string, string> = {
-    queued: 'border-border text-muted-foreground',
-    analyzing_audio: 'border-primary/30 text-primary bg-primary/5',
-    segmenting_track: 'border-primary/30 text-primary bg-primary/5',
-    generating_scenes: 'border-warning/30 text-warning bg-warning/5',
-    assembling_edit: 'border-warning/30 text-warning bg-warning/5',
-    rendering_export: 'border-primary/30 text-primary bg-primary/5 animate-pulse',
-    completed: 'border-success/30 text-success bg-success/5',
-    failed: 'border-destructive/30 text-destructive bg-destructive/5',
-    cancelled: 'border-border text-muted-foreground',
-  };
-
-  return (
-    <Badge variant="outline" className={cn('text-xs', variants[status] || 'border-border text-muted-foreground')}>
-      {JOB_STATUS_LABELS[status as keyof typeof JOB_STATUS_LABELS] || status}
-    </Badge>
-  );
-}
 
 export default function DashboardOverview() {
   const navigate = useNavigate();
   const { user, profile, accessStatus } = useAuth();
+  type JobWithProject = GenerationJob & { projects?: { title: string } };
   const [projects, setProjects] = useState<Project[]>([]);
-  const [recentJobs, setRecentJobs] = useState<(GenerationJob & { projects?: { title: string } })[]>([]);
+  const [recentJobs, setRecentJobs] = useState<JobWithProject[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     Promise.all([
       getProjects(user.id).then(({ data }) => setProjects(data || [])),
-      getRecentJobs(user.id, 5).then(({ data }) => setRecentJobs((data || []) as any)),
+      getRecentJobs(user.id, 5).then(({ data }) => setRecentJobs((data ?? []) as JobWithProject[])),
     ]).finally(() => setLoading(false));
   }, [user]);
 
-  const completedJobs = recentJobs.filter((j) => j.status === 'completed').length;
   const activeJobs = recentJobs.filter((j) =>
     !['completed', 'failed', 'cancelled'].includes(j.status)
   ).length;

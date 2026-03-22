@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,28 +31,27 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getProject, duplicateProject, deleteProject } from '../../lib/projects';
 import { createGenerationJob } from '../../lib/jobs';
 import { VISUAL_STYLE_LABELS, MOOD_LABELS, PACING_LABELS } from '../../lib/presets';
-import type { Project, GenerationJob } from '../../types';
-import { JOB_STATUS_LABELS, JOB_STATUS_PROGRESS } from '../../types';
+import { JobStatusBadge } from '../../components/JobStatusBadge';
+import type { Project, ProjectConfig } from '../../types';
+import { JOB_STATUS_LABELS } from '../../types';
 import { cn } from '../../lib/utils';
 
-function JobStatusBadge({ status }: { status: string }) {
-  const variants: Record<string, string> = {
-    queued: 'border-border text-muted-foreground',
-    analyzing_audio: 'border-primary/30 text-primary bg-primary/5',
-    segmenting_track: 'border-primary/30 text-primary bg-primary/5',
-    generating_scenes: 'border-warning/30 text-warning bg-warning/5',
-    assembling_edit: 'border-warning/30 text-warning bg-warning/5',
-    rendering_export: 'border-primary/30 text-primary bg-primary/5 animate-pulse',
-    completed: 'border-success/30 text-success bg-success/5',
-    failed: 'border-destructive/30 text-destructive bg-destructive/5',
-    cancelled: 'border-border text-muted-foreground',
+function extractJobConfig(project: Project): ProjectConfig {
+  return {
+    concept_prompt: project.concept_prompt,
+    visual_style: project.visual_style,
+    mood: project.mood,
+    pacing: project.pacing,
+    aspect_ratio: project.aspect_ratio,
+    duration_seconds: project.duration_seconds,
+    scene_density: project.scene_density,
+    realism_level: project.realism_level,
+    camera_language: project.camera_language,
+    editing_intensity: project.editing_intensity,
+    negative_prompt: project.negative_prompt,
+    has_brand_overlay: project.has_brand_overlay,
+    has_subtitles: project.has_subtitles,
   };
-
-  return (
-    <Badge variant="outline" className={cn('text-xs', variants[status] || 'border-border text-muted-foreground')}>
-      {JOB_STATUS_LABELS[status as keyof typeof JOB_STATUS_LABELS] || status}
-    </Badge>
-  );
 }
 
 export default function ProjectDetail() {
@@ -74,25 +73,8 @@ export default function ProjectDetail() {
   const handleRegenerate = async () => {
     if (!user || !project) return;
     setRegenerating(true);
-
-    const version = (project.generation_jobs?.length || 0) + 1;
-
-    await createGenerationJob(project.id, user.id, {
-      concept_prompt: project.concept_prompt,
-      visual_style: project.visual_style,
-      mood: project.mood,
-      pacing: project.pacing,
-      aspect_ratio: project.aspect_ratio,
-      duration_seconds: project.duration_seconds,
-      scene_density: project.scene_density,
-      realism_level: project.realism_level,
-      camera_language: project.camera_language,
-      editing_intensity: project.editing_intensity,
-      negative_prompt: project.negative_prompt,
-      has_brand_overlay: project.has_brand_overlay,
-      has_subtitles: project.has_subtitles,
-    }, version);
-
+    const version = (project.generation_jobs?.length ?? 0) + 1;
+    await createGenerationJob(project.id, user.id, extractJobConfig(project), version);
     navigate('/dashboard/jobs');
     setRegenerating(false);
   };
@@ -132,8 +114,11 @@ export default function ProjectDetail() {
     );
   }
 
-  const jobs = (project.generation_jobs || []).sort((a, b) =>
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  const jobs = useMemo(
+    () => [...(project.generation_jobs ?? [])].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    ),
+    [project.generation_jobs]
   );
 
   return (

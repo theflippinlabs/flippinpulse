@@ -15,12 +15,16 @@ import {
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
-import { Separator } from '../../components/ui/separator';
+import { JobStatusBadge } from '../../components/JobStatusBadge';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRecentJobs, cancelJob } from '../../lib/jobs';
 import type { GenerationJob } from '../../types';
 import { JOB_STATUS_LABELS } from '../../types';
 import { cn } from '../../lib/utils';
+
+type JobWithProject = GenerationJob & { projects?: { title: string } };
+
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
 const STATUS_ORDER = [
   'queued',
@@ -91,12 +95,12 @@ function JobCard({
   onCancel,
   highlighted,
 }: {
-  job: GenerationJob & { projects?: { title: string } };
+  job: JobWithProject;
   onCancel: (id: string) => void;
   highlighted: boolean;
 }) {
   const navigate = useNavigate();
-  const isActive = !['completed', 'failed', 'cancelled'].includes(job.status);
+  const isActive = !TERMINAL_STATUSES.has(job.status);
 
   return (
     <div className={cn(
@@ -109,26 +113,17 @@ function JobCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <p className="font-medium text-sm text-foreground truncate">
-              {(job as any).projects?.title || 'Untitled Project'}
+              {job.projects?.title ?? 'Untitled Project'}
             </p>
             <Badge variant="outline" className="text-xs font-mono border-border/50">
               v{job.version}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={cn(
-                'text-xs',
-                job.status === 'completed' ? 'border-success/30 text-success bg-success/5' :
-                job.status === 'failed' ? 'border-destructive/30 text-destructive bg-destructive/5' :
-                job.status === 'cancelled' ? 'border-border text-muted-foreground' :
-                'border-primary/30 text-primary bg-primary/5'
-              )}
-            >
-              {isActive && <Loader2 className="inline-block w-2.5 h-2.5 mr-1 animate-spin" />}
-              {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS] || job.status}
-            </Badge>
+            <div className="flex items-center gap-1">
+              {isActive && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
+              <JobStatusBadge status={job.status} />
+            </div>
             <span className="text-xs text-muted-foreground/60 font-mono flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {new Date(job.created_at).toLocaleString()}
@@ -155,7 +150,7 @@ function JobCard({
       {isActive && (
         <div>
           <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-            <span>{JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}</span>
+            <span>{JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS] ?? job.status}</span>
             <span className="font-mono">{job.progress}%</span>
           </div>
           <Progress value={job.progress} className="h-1.5" />
@@ -210,20 +205,26 @@ export default function Jobs() {
   const [searchParams] = useSearchParams();
   const highlightedJobId = searchParams.get('jobId');
 
-  const [jobs, setJobs] = useState<(GenerationJob & { projects?: { title: string } })[]>([]);
+  const [jobs, setJobs] = useState<JobWithProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'failed'>('all');
 
   const loadJobs = useCallback(async () => {
     if (!user) return;
     const { data } = await getRecentJobs(user.id, 50);
-    setJobs((data || []) as any);
+    const incoming = (data ?? []) as JobWithProject[];
+    setJobs((prev) => {
+      // Skip re-render if nothing changed
+      if (prev.length === incoming.length && prev.every((j, i) => j.status === incoming[i].status && j.progress === incoming[i].progress)) {
+        return prev;
+      }
+      return incoming;
+    });
     setLoading(false);
   }, [user]);
 
   useEffect(() => {
     loadJobs();
-    // Poll for active jobs
     const interval = setInterval(loadJobs, 10000);
     return () => clearInterval(interval);
   }, [loadJobs]);
@@ -235,13 +236,13 @@ export default function Jobs() {
   };
 
   const filtered = jobs.filter((job) => {
-    if (filter === 'active') return !['completed', 'failed', 'cancelled'].includes(job.status);
+    if (filter === 'active') return !TERMINAL_STATUSES.has(job.status);
     if (filter === 'completed') return job.status === 'completed';
     if (filter === 'failed') return ['failed', 'cancelled'].includes(job.status);
     return true;
   });
 
-  const activeCount = jobs.filter(j => !['completed', 'failed', 'cancelled'].includes(j.status)).length;
+  const activeCount = jobs.filter(j => !TERMINAL_STATUSES.has(j.status)).length;
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">

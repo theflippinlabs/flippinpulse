@@ -61,10 +61,8 @@ export default function WalletPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      loadWallets();
-    }
-  }, [user]);
+    if (user?.id) loadWallets();
+  }, [user?.id]);
 
   const loadWallets = async () => {
     if (!user) return;
@@ -110,9 +108,7 @@ export default function WalletPage() {
     setError(null);
 
     try {
-      for (const wallet of wallets) {
-        await verifyNFTOwnership(wallet.address, wallet.chain_id);
-      }
+      await Promise.all(wallets.map((w) => verifyNFTOwnership(w.address, w.chain_id)));
       await refreshAccessStatus();
       setSuccess('NFT verification completed.');
     } catch {

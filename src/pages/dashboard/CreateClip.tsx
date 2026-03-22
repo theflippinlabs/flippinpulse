@@ -54,10 +54,11 @@ function OptionGrid<T extends string>({
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
-  columns?: number;
+  columns?: 1 | 2 | 3;
 }) {
+  const colClass = columns === 1 ? 'grid-cols-1' : columns === 2 ? 'grid-cols-2' : 'grid-cols-3';
   return (
-    <div className={cn('grid gap-2', `grid-cols-${columns}`)}>
+    <div className={cn('grid gap-2', colClass)}>
       {options.map((opt) => (
         <button
           key={opt.value}

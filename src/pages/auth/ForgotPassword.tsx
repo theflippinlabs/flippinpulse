@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { LogoMark } from '../../components/LogoMark';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -32,9 +33,7 @@ export default function ForgotPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center p-8">
       <div className="w-full max-w-sm">
         <Link to="/" className="flex items-center gap-2 mb-10">
-          <div className="w-7 h-7 rounded bg-primary/15 border border-primary/25 flex items-center justify-center">
-            <Film className="w-4 h-4 text-primary" />
-          </div>
+          <LogoMark />
           <span className="font-display font-semibold text-foreground tracking-tight">CineForge</span>
         </Link>
 

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Alert, AlertDescription } from '../../components/ui/alert';
+import { LogoMark } from '../../components/LogoMark';
 import { signIn } from '../../lib/auth';
 
 export default function Login() {
@@ -39,9 +40,7 @@ export default function Login() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10 group">
-            <div className="w-7 h-7 rounded bg-primary/15 border border-primary/25 flex items-center justify-center">
-              <Film className="w-4 h-4 text-primary" />
-            </div>
+            <LogoMark />
             <span className="font-display font-semibold text-foreground tracking-tight">CineForge</span>
           </Link>
 

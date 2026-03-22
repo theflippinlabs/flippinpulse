@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Film, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { LogoMark } from '../../components/LogoMark';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -75,9 +76,7 @@ export default function Signup() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10 group">
-            <div className="w-7 h-7 rounded bg-primary/15 border border-primary/25 flex items-center justify-center">
-              <Film className="w-4 h-4 text-primary" />
-            </div>
+            <LogoMark />
             <span className="font-display font-semibold text-foreground tracking-tight">CineForge</span>
           </Link>
 
