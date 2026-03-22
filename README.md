@@ -1,73 +1,119 @@
-# Welcome to your Lovable project
+# CineForge
 
-## Project info
+**AI-powered music video creation platform.**
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Generate premium cinematic video clips from audio, prompts, and creative direction — with speed, control, and style.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS + shadcn/ui
+- **Backend**: Supabase (Auth, Postgres, Storage, RLS)
+- **Wallet**: Ethereum-compatible wallet connection (MetaMask / WalletConnect)
+- **NFT Gating**: On-chain ownership verification for premium access
+- **Job Queue**: Supabase-powered generation job table with polling architecture
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## Getting Started
 
-**Use your preferred IDE**
+### 1. Clone and install
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+npm install
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 2. Set up environment
 
-Follow these steps:
+```bash
+cp .env.example .env.local
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Fill in your Supabase URL and anon key.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 3. Set up Supabase database
 
-# Step 3: Install the necessary dependencies.
-npm i
+Run the migration in `supabase/migrations/20260322000001_cineforge_schema.sql` against your Supabase project.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+This creates all tables, RLS policies, triggers, and seed data.
+
+### 4. Run locally
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Feature Overview
 
-**Use GitHub Codespaces**
+| Feature | Description |
+|---|---|
+| Auth | Email/password sign up + login via Supabase Auth |
+| Wallet Connect | MetaMask / EIP-1193 wallet connection |
+| NFT Gating | Verify NFT ownership for premium tier unlock |
+| Create Clip | Full creative parameter control + one-click generation |
+| Generation Jobs | Background job queue with status polling |
+| Projects | Versioned project history + duplicate / delete |
+| Settings | Profile management + password change |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+## Routes
 
-This project is built with:
+| Route | Page |
+|---|---|
+| `/` | Landing page |
+| `/auth/login` | Sign in |
+| `/auth/signup` | Create account |
+| `/auth/forgot-password` | Password reset |
+| `/dashboard` | Overview |
+| `/dashboard/create` | Create new clip |
+| `/dashboard/projects` | Project list |
+| `/dashboard/projects/:id` | Project detail |
+| `/dashboard/jobs` | Generation jobs |
+| `/dashboard/wallet` | Wallet & NFT access |
+| `/dashboard/settings` | Account settings |
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## Database Schema
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+See `supabase/migrations/20260322000001_cineforge_schema.sql` for the full schema.
 
-## Can I connect a custom domain to my Lovable project?
+Key tables:
+- `profiles` — user profiles (auto-created on signup)
+- `wallets` — linked Ethereum wallets
+- `nft_access_rules` — configurable NFT gating rules
+- `wallet_nft_status` — verified NFT ownership per wallet
+- `projects` — user projects with all creative parameters
+- `generation_jobs` — background job queue with status tracking
+- `generation_outputs` — rendered video outputs
+- `prompt_presets` — curated preset library
+- `render_profiles` — output quality profiles by tier
+- `usage_events` — usage metering and analytics
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Production Architecture Notes
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### AI/Media Pipeline
+
+The generation pipeline is designed as a modular adapter architecture. The job queue triggers a worker that orchestrates:
+
+1. **AudioAnalysisService** — BPM detection, structure analysis, beat grid
+2. **ScenePlannerService** — Track segmentation, scene count calculation
+3. **PromptExpansionService** — Convert concept prompt → per-scene visual prompts
+4. **VideoGenerationProvider** — Pluggable adapter (Runway, Pika, Kling, etc.)
+5. **RenderAssemblerService** — FFmpeg-based clip stitching + transitions
+6. **ExportService** — Format conversion, compression, delivery
+
+Provider API keys are loaded from environment variables and can be swapped without changing core logic.
+
+### NFT Verification
+
+The `NFTAccessService` in `src/lib/wallet.ts` provides a mock-safe architecture. Replace the `verifyNFTOwnership` function body with real on-chain calls via:
+- **Alchemy NFT API** (`/getNFTs`)
+- **Moralis NFT API**
+- **Direct RPC** (ethers.js / viem `ownerOf` calls)

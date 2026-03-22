@@ -46,10 +46,6 @@ module.exports = {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
-        energy: {
-          DEFAULT: "hsl(var(--energy))",
-          foreground: "hsl(var(--energy-foreground))",
-        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -74,8 +70,24 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["Space Grotesk", "sans-serif"],
+        sans: ["Inter", "Space Grotesk", "sans-serif"],
+        display: ["Space Grotesk", "Inter", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
+      },
+      fontSize: {
+        "2xs": ["0.625rem", { lineHeight: "0.875rem" }],
+      },
+      animation: {
+        "slide-up": "slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in": "fade-in 0.4s ease-out",
+        "scale-in": "scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        "shimmer": "shimmer 2s ease-in-out infinite",
+        "progress-pulse": "progress-pulse 2s ease-in-out infinite",
+        "spin-slow": "spin 3s linear infinite",
+      },
+      backgroundImage: {
+        "gradient-cinematic": "linear-gradient(160deg, hsl(220 15% 5%) 0%, hsl(220 20% 8%) 50%, hsl(220 15% 5%) 100%)",
+        "gradient-hero": "radial-gradient(ellipse 80% 50% at 50% -20%, hsl(204 100% 60% / 0.15), transparent), radial-gradient(ellipse 60% 40% at 80% 60%, hsl(280 55% 60% / 0.08), transparent), hsl(220 15% 5%)",
       },
     },
   },

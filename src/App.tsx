@@ -1,45 +1,130 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
-import { LanguageProvider } from "@/i18n/LanguageContext";
-import { AuthGuard } from "@/components/AuthGuard";
-import Login from "@/pages/Login";
-import Overview from "@/pages/Overview";
-import Configuration from "@/pages/Configuration";
-import Missions from "@/pages/Missions";
-import Boutique from "@/pages/Boutique";
-import Transactions from "@/pages/Transactions";
-import Commandes from "@/pages/Commandes";
-import MiniJeux from "@/pages/MiniJeux";
-import Utilisateurs from "@/pages/Utilisateurs";
-import Logs from "@/pages/Logs";
-import NotFound from "@/pages/NotFound";
-import { Toaster as ShadToaster } from "@/components/ui/toaster";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 
-const queryClient = new QueryClient();
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthGuard } from './components/AuthGuard';
+import { AppLayout } from './components/layout/AppLayout';
+
+// Public pages
+import Landing from './pages/Landing';
+import Login from './pages/auth/Login';
+import Signup from './pages/auth/Signup';
+import ForgotPassword from './pages/auth/ForgotPassword';
+
+// Dashboard pages
+import DashboardOverview from './pages/dashboard/Overview';
+import CreateClip from './pages/dashboard/CreateClip';
+import Projects from './pages/dashboard/Projects';
+import ProjectDetail from './pages/dashboard/ProjectDetail';
+import Jobs from './pages/dashboard/Jobs';
+import WalletPage from './pages/dashboard/Wallet';
+import Settings from './pages/dashboard/Settings';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+    },
+  },
+});
+
+function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard>
+      <AppLayout>{children}</AppLayout>
+    </AuthGuard>
+  );
+}
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
+      <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<AuthGuard><Overview /></AuthGuard>} />
-            <Route path="/configuration" element={<AuthGuard><Configuration /></AuthGuard>} />
-            <Route path="/missions" element={<AuthGuard><Missions /></AuthGuard>} />
-            <Route path="/boutique" element={<AuthGuard><Boutique /></AuthGuard>} />
-            <Route path="/transactions" element={<AuthGuard><Transactions /></AuthGuard>} />
-            <Route path="/commandes" element={<AuthGuard><Commandes /></AuthGuard>} />
-            <Route path="/mini-jeux" element={<AuthGuard><MiniJeux /></AuthGuard>} />
-            <Route path="/utilisateurs" element={<AuthGuard><Utilisateurs /></AuthGuard>} />
-            <Route path="/logs" element={<AuthGuard><Logs /></AuthGuard>} />
-            <Route path="*" element={<NotFound />} />
+            {/* Public */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/signup" element={<Signup />} />
+            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+
+            {/* Dashboard */}
+            <Route
+              path="/dashboard"
+              element={
+                <DashboardLayout>
+                  <DashboardOverview />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/dashboard/create"
+              element={
+                <DashboardLayout>
+                  <CreateClip />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/dashboard/projects"
+              element={
+                <DashboardLayout>
+                  <Projects />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/dashboard/projects/:id"
+              element={
+                <DashboardLayout>
+                  <ProjectDetail />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/dashboard/jobs"
+              element={
+                <DashboardLayout>
+                  <Jobs />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/dashboard/wallet"
+              element={
+                <DashboardLayout>
+                  <WalletPage />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/dashboard/settings"
+              element={
+                <DashboardLayout>
+                  <Settings />
+                </DashboardLayout>
+              }
+            />
+
+            {/* Catch all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <Toaster richColors position="top-right" />
-          <ShadToaster />
+
+          <Toaster
+            richColors
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: 'hsl(220 14% 8%)',
+                border: '1px solid hsl(220 12% 16%)',
+                color: 'hsl(210 15% 88%)',
+              },
+            }}
+          />
         </BrowserRouter>
-      </LanguageProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
