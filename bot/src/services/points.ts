@@ -2,6 +2,8 @@ import { Guild, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getEconomyConfig } from './settings.js';
 import { checkRankUp } from './ranks.js';
+import { getPulseHourMultiplier } from './pulseHour.js';
+import { applyDailyCap } from './dailyCap.js';
 import { log } from '../utils/logger.js';
 
 interface AwardOptions {
@@ -38,7 +40,9 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
     const newMonth = currentMonth + points;
 
     const economyConfig = getEconomyConfig();
-    const pulseEarned = points * economyConfig.pulse_per_point;
+    const multiplier = getPulseHourMultiplier();
+    const rawPulse = Math.floor(points * economyConfig.pulse_per_point * multiplier);
+    const pulseEarned = await applyDailyCap(discordId, rawPulse);
     const newBalance = currentBalance + pulseEarned;
 
     // Upsert discord_users

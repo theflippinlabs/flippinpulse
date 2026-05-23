@@ -1,9 +1,16 @@
 import { getAntiSpamConfig } from './settings.js';
 
 const cooldowns = new Map<string, number>();
+const CLEANUP_INTERVAL_MS = 5 * 60_000;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 function key(discordId: string, type: string) {
   return `${discordId}:${type}`;
+}
+
+function maxCooldownMs(): number {
+  const config = getAntiSpamConfig();
+  return Math.max(config.message_cooldown_seconds, config.reaction_cooldown_seconds) * 1000;
 }
 
 export function isOnCooldown(discordId: string, type: 'message' | 'reaction'): boolean {
@@ -22,4 +29,21 @@ export function isOnCooldown(discordId: string, type: 'message' | 'reaction'): b
 
   cooldowns.set(k, now);
   return false;
+}
+
+export function startAntiSpamCleanup(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(() => {
+    const cutoff = Date.now() - maxCooldownMs();
+    for (const [k, ts] of cooldowns) {
+      if (ts < cutoff) cooldowns.delete(k);
+    }
+  }, CLEANUP_INTERVAL_MS);
+}
+
+export function stopAntiSpamCleanup(): void {
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
 }

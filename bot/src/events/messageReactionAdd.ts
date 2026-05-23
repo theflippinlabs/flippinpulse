@@ -2,6 +2,8 @@ import { MessageReaction, PartialMessageReaction, User, PartialUser } from 'disc
 import { isOnCooldown } from '../services/antiSpam.js';
 import { awardPoints } from '../services/points.js';
 import { getPointsConfig } from '../services/settings.js';
+import { findRoleForReaction } from '../services/reactionRoles.js';
+import { log } from '../utils/logger.js';
 
 export async function handleMessageReactionAdd(
   reaction: MessageReaction | PartialMessageReaction,
@@ -9,7 +11,6 @@ export async function handleMessageReactionAdd(
 ): Promise<void> {
   if (user.bot) return;
 
-  // Fetch partials if needed
   if (reaction.partial) {
     try { reaction = await reaction.fetch(); } catch { return; }
   }
@@ -20,16 +21,23 @@ export async function handleMessageReactionAdd(
   const guild = reaction.message.guild;
   if (!guild) return;
 
+  const member = await guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
+
+  const roleId = await findRoleForReaction(reaction as MessageReaction);
+  if (roleId) {
+    await member.roles.add(roleId).catch(err =>
+      log('ERROR', `Failed to add reaction role ${roleId} to ${user.id}`, err),
+    );
+  }
+
   const discordId = user.id;
   if (isOnCooldown(discordId, 'reaction')) return;
-
-  const member = await guild.members.fetch(discordId).catch(() => null);
-  if (!member) return;
 
   const config = getPointsConfig();
   await awardPoints({
     discordId,
-    username: user.username,
+    username: user.username ?? 'unknown',
     avatarUrl: user.displayAvatarURL({ size: 128 }),
     type: 'reaction',
     channelId: reaction.message.channelId,

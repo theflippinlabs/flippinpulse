@@ -11,6 +11,9 @@ import * as duel from './duel.js';
 import * as quiz from './quiz.js';
 import * as treasure from './treasure.js';
 import * as typingrace from './typingrace.js';
+import * as reactionrole from './reactionrole.js';
+import * as giveaway from './giveaway.js';
+import * as poll from './poll.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -20,6 +23,7 @@ export interface Command {
 const commandList: Command[] = [
   profile, balance, leaderboard, shop, buy, missions, daily,
   crash, duel, quiz, treasure, typingrace,
+  reactionrole, giveaway, poll,
 ];
 
 export const commands = new Map<string, Command>();

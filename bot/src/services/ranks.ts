@@ -1,11 +1,13 @@
-import { Guild, GuildMember } from 'discord.js';
+import { ChannelType, EmbedBuilder, Guild, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { getRankUpConfig } from './settings.js';
 import { log } from '../utils/logger.js';
 
 interface RankConfig {
   rank_name: string;
   threshold: number;
   discord_role_id: string | null;
+  color?: string | null;
 }
 
 let ranksCache: RankConfig[] = [];
@@ -13,7 +15,7 @@ let ranksCache: RankConfig[] = [];
 export async function loadRanks(): Promise<void> {
   const { data, error } = await supabase
     .from('roles_config')
-    .select('rank_name, threshold, discord_role_id')
+    .select('rank_name, threshold, discord_role_id, color')
     .order('sort_order', { ascending: true });
 
   if (error) {
@@ -82,4 +84,43 @@ export async function checkRankUp(
   } catch (err) {
     log('ERROR', `Failed to update Discord roles for ${discordId}`, err);
   }
+
+  await announceRankUp(guild, member, newRank, user?.rank_name ?? null).catch(err =>
+    log('ERROR', `Failed to announce rank-up for ${discordId}`, err),
+  );
+}
+
+function parseHexColor(input: string | null | undefined): number {
+  if (!input) return 0x38BDF8;
+  const num = parseInt(input.replace('#', ''), 16);
+  return Number.isFinite(num) ? num : 0x38BDF8;
+}
+
+async function announceRankUp(
+  guild: Guild,
+  member: GuildMember,
+  newRank: RankConfig,
+  previousRank: string | null,
+): Promise<void> {
+  const config = getRankUpConfig();
+  if (!config.enabled || !config.channel_id) return;
+
+  const channel = await guild.channels.fetch(config.channel_id).catch(() => null);
+  if (!channel || channel.type !== ChannelType.GuildText) return;
+
+  const embed = new EmbedBuilder()
+    .setColor(parseHexColor(newRank.color))
+    .setTitle('🚀 Rank up!')
+    .setDescription(
+      previousRank
+        ? `**${member.user.username}** just climbed from **${previousRank}** to **${newRank.rank_name}**.`
+        : `**${member.user.username}** reached **${newRank.rank_name}**.`,
+    )
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setTimestamp();
+
+  await channel.send({
+    content: config.ping_user ? `<@${member.id}>` : undefined,
+    embeds: [embed],
+  });
 }
