@@ -2,9 +2,13 @@ import { Message } from 'discord.js';
 import { isOnCooldown } from '../services/antiSpam.js';
 import { awardPoints } from '../services/points.js';
 import { getPointsConfig } from '../services/settings.js';
+import { runAutomod } from '../services/automod.js';
 
 export async function handleMessageCreate(message: Message): Promise<void> {
   if (message.author.bot || !message.guild || !message.member) return;
+
+  const blocked = await runAutomod(message);
+  if (blocked) return;
 
   const discordId = message.author.id;
   if (isOnCooldown(discordId, 'message')) return;

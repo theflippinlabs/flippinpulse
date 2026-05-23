@@ -8,6 +8,7 @@ import { startAntiSpamCleanup } from './services/antiSpam.js';
 import { rehydrateVoiceSessions, startVoiceSessionCleanup } from './events/voiceStateUpdate.js';
 import { startGiveawayScheduler } from './services/giveaways.js';
 import { startDecayScheduler } from './services/decay.js';
+import { startAutomodCleanup } from './services/automod.js';
 import { log } from './utils/logger.js';
 
 const client = new Client({
@@ -35,6 +36,7 @@ client.once('ready', async () => {
   startVoiceSessionCleanup(client);
   startGiveawayScheduler(client);
   startDecayScheduler(client);
+  startAutomodCleanup();
   log('INFO', 'Settings, ranks, game configs, schedulers loaded. Bot is ready.');
 });
 

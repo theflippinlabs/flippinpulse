@@ -61,6 +61,17 @@ export interface DecayConfig {
   notify: boolean;
 }
 
+export interface ModConfig {
+  mod_log_channel_id: string | null;
+  automod_enabled: boolean;
+  anti_spam: { enabled: boolean; max_messages: number; window_seconds: number; mute_seconds: number };
+  anti_mass_mentions: { enabled: boolean; max_mentions: number; action: 'delete' | 'warn' };
+  anti_invites: { enabled: boolean; action: 'delete' | 'warn' };
+  anti_links: { enabled: boolean; whitelist_domains: string[] };
+  anti_raid: { enabled: boolean; max_joins: number; window_seconds: number; lockdown_minutes: number };
+  auto_warn_threshold: number;
+}
+
 const defaults = {
   points_config: { message: 1, reaction: 1, voice_per_minute: 2, invite: 5, event: 3 } as PointsConfig,
   anti_spam: { message_cooldown_seconds: 10, reaction_cooldown_seconds: 5 } as AntiSpamConfig,
@@ -79,6 +90,16 @@ const defaults = {
   daily_cap_config: { enabled: false, cap_pulse: 500 } as DailyCapConfig,
   pulse_hour: { enabled: false, multiplier: 2, duration_minutes: 60, schedule: [] } as PulseHourConfig,
   decay: { enabled: false, inactive_hours: 72, decay_percent: 5, min_points: 0, notify: false } as DecayConfig,
+  mod_config: {
+    mod_log_channel_id: null,
+    automod_enabled: false,
+    anti_spam: { enabled: true, max_messages: 5, window_seconds: 5, mute_seconds: 600 },
+    anti_mass_mentions: { enabled: true, max_mentions: 5, action: 'delete' },
+    anti_invites: { enabled: false, action: 'delete' },
+    anti_links: { enabled: false, whitelist_domains: [] },
+    anti_raid: { enabled: false, max_joins: 10, window_seconds: 30, lockdown_minutes: 10 },
+    auto_warn_threshold: 3,
+  } as ModConfig,
 };
 
 const cache = new Map<string, unknown>();
@@ -129,6 +150,19 @@ export function getPulseHourConfig(): PulseHourConfig {
 
 export function getDecayConfig(): DecayConfig {
   return { ...defaults.decay, ...(cache.get('decay') as Partial<DecayConfig> ?? {}) };
+}
+
+export function getModConfig(): ModConfig {
+  const raw = (cache.get('mod_config') as Partial<ModConfig>) ?? {};
+  return {
+    ...defaults.mod_config,
+    ...raw,
+    anti_spam: { ...defaults.mod_config.anti_spam, ...(raw.anti_spam ?? {}) },
+    anti_mass_mentions: { ...defaults.mod_config.anti_mass_mentions, ...(raw.anti_mass_mentions ?? {}) },
+    anti_invites: { ...defaults.mod_config.anti_invites, ...(raw.anti_invites ?? {}) },
+    anti_links: { ...defaults.mod_config.anti_links, ...(raw.anti_links ?? {}) },
+    anti_raid: { ...defaults.mod_config.anti_raid, ...(raw.anti_raid ?? {}) },
+  };
 }
 
 let refreshInterval: ReturnType<typeof setInterval> | null = null;

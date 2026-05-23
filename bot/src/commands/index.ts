@@ -14,6 +14,19 @@ import * as typingrace from './typingrace.js';
 import * as reactionrole from './reactionrole.js';
 import * as giveaway from './giveaway.js';
 import * as poll from './poll.js';
+import * as slots from './slots.js';
+import * as roulette from './roulette.js';
+import * as blackjack from './blackjack.js';
+import * as rps from './rps.js';
+import * as wheel from './wheel.js';
+import * as warn from './warn.js';
+import * as warnings from './warnings.js';
+import * as mute from './mute.js';
+import * as unmute from './unmute.js';
+import * as kick from './kick.js';
+import * as ban from './ban.js';
+import * as unban from './unban.js';
+import * as clear from './clear.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -24,6 +37,8 @@ const commandList: Command[] = [
   profile, balance, leaderboard, shop, buy, missions, daily,
   crash, duel, quiz, treasure, typingrace,
   reactionrole, giveaway, poll,
+  slots, roulette, blackjack, rps, wheel,
+  warn, warnings, mute, unmute, kick, ban, unban, clear,
 ];
 
 export const commands = new Map<string, Command>();

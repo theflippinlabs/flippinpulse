@@ -1,6 +1,8 @@
 import { ChannelType, EmbedBuilder, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getWelcomeConfig } from '../services/settings.js';
+import { recordJoin } from '../services/automod.js';
+import { logAndAnnounce } from '../services/moderation.js';
 import { log } from '../utils/logger.js';
 
 function parseHexColor(input: string): number {
@@ -46,6 +48,19 @@ async function sendWelcomeMessage(member: GuildMember): Promise<void> {
 
 export async function handleGuildMemberAdd(member: GuildMember): Promise<void> {
   if (member.user.bot) return;
+
+  const raidState = recordJoin(member.guild.id);
+  if (raidState.lockdown) {
+    await logAndAnnounce(member.guild, {
+      guildId: member.guild.id,
+      type: 'automod',
+      targetId: member.id,
+      reason: `Raid lockdown active — join blocked (${raidState.joinsInWindow} recent joins)`,
+      metadata: { trigger: 'raid_lockdown' },
+    });
+    await member.kick('Automod: raid lockdown').catch(err => log('ERROR', 'Raid kick failed', err));
+    return;
+  }
 
   const { error } = await supabase.from('discord_users').upsert({
     discord_id: member.id,
