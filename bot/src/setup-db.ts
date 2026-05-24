@@ -1,18 +1,24 @@
-import { Client } from 'pg';
+import { Client, type ClientConfig } from 'pg';
 import { SCHEMA_SQL } from './dbSchema.js';
 import { log } from './utils/logger.js';
 
 export async function runDbSetup(): Promise<boolean> {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    log('ERROR', 'AUTO_DB_SETUP is on but DATABASE_URL is not set. Skipping DB setup.');
+  const config: ClientConfig = { ssl: { rejectUnauthorized: false } };
+
+  if (process.env.DATABASE_URL) {
+    config.connectionString = process.env.DATABASE_URL;
+  } else if (process.env.SUPABASE_DB_HOST && process.env.SUPABASE_DB_PASSWORD) {
+    config.host = process.env.SUPABASE_DB_HOST;
+    config.port = Number(process.env.SUPABASE_DB_PORT ?? 5432);
+    config.user = process.env.SUPABASE_DB_USER ?? 'postgres';
+    config.password = process.env.SUPABASE_DB_PASSWORD;
+    config.database = process.env.SUPABASE_DB_NAME ?? 'postgres';
+  } else {
+    log('ERROR', 'AUTO_DB_SETUP is on but no DB connection info found (set SUPABASE_DB_HOST + SUPABASE_DB_PASSWORD, or DATABASE_URL). Skipping DB setup.');
     return false;
   }
 
-  const client = new Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  });
+  const client = new Client(config);
 
   try {
     log('INFO', 'DB setup: connecting to Postgres…');
