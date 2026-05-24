@@ -9,6 +9,7 @@ import { rehydrateVoiceSessions, startVoiceSessionCleanup } from './events/voice
 import { startGiveawayScheduler } from './services/giveaways.js';
 import { startDecayScheduler } from './services/decay.js';
 import { startAutomodCleanup } from './services/automod.js';
+import { runDbSetup } from './setup-db.js';
 import { log } from './utils/logger.js';
 
 const client = new Client({
@@ -25,6 +26,13 @@ const client = new Client({
 
 registerEvents(client);
 
+async function main() {
+  if (process.env.AUTO_DB_SETUP === 'true') {
+    await runDbSetup();
+  }
+  await client.login(config.DISCORD_TOKEN);
+}
+
 client.once('ready', async () => {
   log('INFO', `Bot online as ${client.user?.tag}`);
   await loadSettings();
@@ -40,7 +48,7 @@ client.once('ready', async () => {
   log('INFO', 'Settings, ranks, game configs, schedulers loaded. Bot is ready.');
 });
 
-client.login(config.DISCORD_TOKEN).catch(err => {
-  log('ERROR', 'Failed to login', err);
+main().catch(err => {
+  log('ERROR', 'Failed to start bot', err);
   process.exit(1);
 });
