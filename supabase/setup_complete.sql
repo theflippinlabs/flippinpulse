@@ -7,6 +7,9 @@
 -- Decay and daily cap stay OFF.
 -- ============================================================
 
+-- Allow functions (e.g. has_role) to reference tables created later in this script.
+SET check_function_bodies = off;
+
 -- ---------- PART 0: types & helper functions ----------
 DO $$ BEGIN CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
