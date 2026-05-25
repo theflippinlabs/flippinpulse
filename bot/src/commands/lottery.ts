@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { buyTickets, getStatus, getLotteryConfig } from '../services/lottery.js';
+import { recordChallengeMetric } from '../services/challenges.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -35,6 +36,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       await interaction.editReply({ embeds: [errorEmbed(res.error ?? 'Could not buy tickets.')] });
       return;
     }
+    void recordChallengeMetric(interaction.client, interaction.user.id, interaction.user.username, 'lottery_tickets', count);
     await interaction.editReply({
       embeds: [successEmbed(
         `🎟️ Bought **${count}** ticket${count === 1 ? '' : 's'}!\n\n` +

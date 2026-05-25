@@ -3,6 +3,7 @@ import { isOnCooldown } from '../services/antiSpam.js';
 import { awardPoints } from '../services/points.js';
 import { getPointsConfig } from '../services/settings.js';
 import { findRoleForReaction } from '../services/reactionRoles.js';
+import { recordChallengeMetric } from '../services/challenges.js';
 import { log } from '../utils/logger.js';
 
 export async function handleMessageReactionAdd(
@@ -32,6 +33,7 @@ export async function handleMessageReactionAdd(
   }
 
   const discordId = user.id;
+  void recordChallengeMetric(reaction.client, discordId, user.username ?? 'unknown', 'reactions');
   if (isOnCooldown(discordId, 'reaction')) return;
 
   const config = getPointsConfig();

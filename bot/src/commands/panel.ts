@@ -24,12 +24,13 @@ import {
 } from '../services/settings.js';
 import { getAutoQuizConfig, launchQuiz } from '../services/communityQuiz.js';
 import { getPulsarConfig, pulsarPostNow } from '../services/pulsar.js';
+import { launchFlash, launchRiddle, launchObjective, listActiveChallenges, endAllChallenges } from '../services/challenges.js';
 import { grantPulse, revokePulse, setPulse } from '../services/economy.js';
 import { supabase } from '../supabase.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
-type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop' | 'pulsar';
+type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop' | 'pulsar' | 'missions';
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
 
 const SHOP_CATEGORIES = ['role', 'perk', 'ticket', 'cosmetic', 'irl'];
@@ -64,6 +65,7 @@ function navRow(): Row {
       { label: 'Give / remove PULSE', value: 'pulse', emoji: '🎁' },
       { label: 'Shop', value: 'shop', emoji: '🛒' },
       { label: 'Pulsar (AI host)', value: 'pulsar', emoji: '🤖' },
+      { label: 'Missions', value: 'missions', emoji: '🎯' },
     );
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(select);
 }
@@ -174,6 +176,34 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
         `**Welcomes:** ${c.welcome ? 'ON' : 'OFF'} · **Host events:** ${c.host_events ? 'ON' : 'OFF'} · **Recap (${c.recap_time_utc} UTC):** ${c.recap ? 'ON' : 'OFF'} · **Celebrate:** ${c.celebrate ? 'ON' : 'OFF'}\n` +
         `**Language:** ${c.language}\n\n` +
         `${process.env.ANTHROPIC_API_KEY ? 'Pulsar welcomes newcomers, hosts events, celebrates wins and keeps the vibe going. 🎉' : '⚠️ Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.'}`
+      )],
+      components: rows,
+    };
+  }
+
+  if (section === 'missions') {
+    const ch = getPulsarConfig().channel_id;
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('panel:missionflash').setLabel('Flash challenge').setEmoji('⚡').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('panel:missionriddle').setLabel('Riddle').setEmoji('🧩').setStyle(ButtonStyle.Primary),
+    ));
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('panel:missiondaily').setLabel('Daily objective').setEmoji('📅').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:missionweekly').setLabel('Weekly objective').setEmoji('🗓️').setStyle(ButtonStyle.Secondary),
+    ));
+    const c = getPulsarConfig();
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('panel:missionlist').setLabel('List active').setEmoji('📋').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:missionend').setLabel('End all').setEmoji('🛑').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('panel:missionauto').setLabel(`Auto-launch: ${c.missions ? 'ON' : 'OFF'}`).setEmoji('🔁').setStyle(ButtonStyle.Secondary),
+    ));
+    return {
+      embeds: [pulseEmbed('🎯 Missions').setDescription(
+        `Launch a mission now — it posts in Pulsar's channel ${ch ? `(<#${ch}>)` : '*(set one in the Pulsar section first)*'}.\n\n` +
+        `⚡ **Flash** — first 3 to claim win 50 PULSE (30 min)\n` +
+        `🧩 **Riddle** — first to solve wins 100 PULSE (needs AI key)\n` +
+        `📅 **Daily / 🗓️ Weekly** — auto-tracked goal (messages), credits PULSE on completion\n\n` +
+        `🔁 **Auto-launch:** ${c.missions ? `ON — Pulsar starts one about every ${c.mission_interval_hours}h` : 'OFF'} (needs Pulsar ON).`
       )],
       components: rows,
     };
@@ -326,6 +356,32 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
       if (!interaction.guild) { await interaction.reply({ embeds: [errorEmbed('Use this in a server.')], flags: MessageFlags.Ephemeral }); return; }
       await interaction.reply({ embeds: [successEmbed('Pulsar is posting now! 🤖')], flags: MessageFlags.Ephemeral });
       void pulsarPostNow(interaction.client, interaction.guild.id);
+      return;
+    }
+
+    // Missions
+    if (id.startsWith('panel:mission')) {
+      const ch = getPulsarConfig().channel_id;
+      if (id === 'panel:missionlist') {
+        const active = await listActiveChallenges();
+        const desc = active.length
+          ? active.map(m => `• **${m.title}** (${m.kind})${m.goal ? ` — goal ${m.goal}` : ''} · ${m.reward} PULSE`).join('\n')
+          : 'No active missions right now.';
+        await interaction.reply({ embeds: [pulseEmbed('🎯 Active missions').setDescription(desc.slice(0, 4000))], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      if (id === 'panel:missionend') {
+        const n = await endAllChallenges(interaction.client);
+        await interaction.reply({ embeds: [successEmbed(`Ended **${n}** active mission${n === 1 ? '' : 's'}.`)], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      if (id === 'panel:missionauto') { await patch('pulsar_config', { missions: !getPulsarConfig().missions }); await interaction.update(render('missions')); return; }
+      if (!ch) { await interaction.reply({ embeds: [errorEmbed('Set a Pulsar channel first (Pulsar section).')], flags: MessageFlags.Ephemeral }); return; }
+      await interaction.reply({ embeds: [successEmbed('Launching the mission now! 🎯')], flags: MessageFlags.Ephemeral });
+      if (id === 'panel:missionflash') void launchFlash(interaction.client, ch, { reward: 50, maxWinners: 3, durationMin: 30 });
+      else if (id === 'panel:missionriddle') void launchRiddle(interaction.client, ch, { reward: 100, durationMin: 60 });
+      else if (id === 'panel:missiondaily') void launchObjective(interaction.client, ch, { kind: 'daily', metric: 'messages', goal: 20, reward: 60 });
+      else if (id === 'panel:missionweekly') void launchObjective(interaction.client, ch, { kind: 'weekly', metric: 'messages', goal: 100, reward: 250 });
       return;
     }
 

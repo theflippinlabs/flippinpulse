@@ -447,6 +447,39 @@ INSERT INTO public.missions (type, title, description, reward_points, end_at, is
 SELECT 'daily', 'Daily check-in', 'Claim your daily PULSE reward.', 15, now() + interval '365 days', true
 WHERE NOT EXISTS (SELECT 1 FROM public.missions WHERE type = 'daily' AND is_active = true);
 
+-- ---------- PART 8b: Pulsar missions (challenges) ----------
+CREATE TABLE IF NOT EXISTS public.pulse_challenges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind TEXT NOT NULL,                 -- flash | riddle | daily | weekly
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  metric TEXT,                        -- messages | reactions | quiz_correct | lottery_tickets
+  goal INTEGER,
+  reward INTEGER NOT NULL DEFAULT 50,
+  max_winners INTEGER,
+  answer TEXT,
+  channel_id TEXT,
+  message_id TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  winners_count INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.pulse_challenges ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_pulse_challenges_status ON public.pulse_challenges(status);
+
+CREATE TABLE IF NOT EXISTS public.challenge_claims (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id UUID NOT NULL REFERENCES public.pulse_challenges(id) ON DELETE CASCADE,
+  discord_id TEXT NOT NULL,
+  progress INTEGER NOT NULL DEFAULT 0,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (challenge_id, discord_id)
+);
+ALTER TABLE public.challenge_claims ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_challenge_claims_cid ON public.challenge_claims(challenge_id);
+
 -- ---------- PART 9: ACTIVATE features (decay & cap stay OFF) ----------
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true'::jsonb) WHERE key = 'welcome_config';
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true'::jsonb) WHERE key = 'rank_up_config';

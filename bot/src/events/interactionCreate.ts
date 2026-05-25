@@ -9,6 +9,7 @@ import {
 } from '../services/giveaways.js';
 import { handleLobbyButton } from '../services/lobby.js';
 import { handlePanelInteraction } from '../commands/panel.js';
+import { handleChallengeInteraction } from '../services/challenges.js';
 import { log } from '../utils/logger.js';
 
 async function handleGiveawayButton(interaction: ButtonInteraction): Promise<void> {
@@ -46,6 +47,18 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handlePanelInteraction(interaction);
     } catch (err) {
       log('ERROR', 'Panel interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if (
+    (interaction.isButton() || interaction.isModalSubmit())
+    && interaction.customId.startsWith('challenge:')
+  ) {
+    try {
+      await handleChallengeInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Challenge interaction handler crashed', err);
     }
     return;
   }
