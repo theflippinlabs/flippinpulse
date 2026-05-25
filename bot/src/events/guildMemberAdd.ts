@@ -3,7 +3,15 @@ import { supabase } from '../supabase.js';
 import { getWelcomeConfig, type WelcomeConfig } from '../services/settings.js';
 import { recordJoin } from '../services/automod.js';
 import { logAndAnnounce } from '../services/moderation.js';
+import { pulsarWelcomeText, pulsarCelebrate } from '../services/pulsar.js';
 import { log } from '../utils/logger.js';
+
+// Round numbers worth a community celebration.
+function isMemberMilestone(count: number): boolean {
+  if (count <= 0) return false;
+  if (count < 100) return count % 25 === 0;
+  return count % 100 === 0;
+}
 
 function parseHexColor(input: string): number {
   const hex = input.replace('#', '');
@@ -47,6 +55,15 @@ async function sendWelcomeMessage(member: GuildMember): Promise<void> {
     return;
   }
 
+  // Let Pulsar write a personalized welcome when it's available; otherwise
+  // fall back to the configured embed so welcomes always go out.
+  const pulsarText = await pulsarWelcomeText(member).catch(() => null);
+  if (pulsarText) {
+    await channel.send({ content: pulsarText, allowedMentions: { users: [member.id], parse: [] } })
+      .catch(err => log('ERROR', 'Failed to send Pulsar welcome', err));
+    return;
+  }
+
   await channel.send(buildWelcomePayload(member, config))
     .catch(err => log('ERROR', 'Failed to send welcome message', err));
 }
@@ -81,4 +98,8 @@ export async function handleGuildMemberAdd(member: GuildMember): Promise<void> {
   }
 
   await sendWelcomeMessage(member);
+
+  if (isMemberMilestone(member.guild.memberCount)) {
+    void pulsarCelebrate(member.client, `the server just reached ${member.guild.memberCount} members`);
+  }
 }
