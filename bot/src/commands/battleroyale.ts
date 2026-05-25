@@ -90,10 +90,7 @@ registerLobbyResolver('battle_royale', async ({ message, sessionId, players, pot
 
   await delay(2200);
 
-  let round = 0;
   while (alive.length > 1) {
-    round++;
-
     // Occasional atmosphere beat (not when we're down to the final 2).
     if (alive.length > 2 && Math.random() < 0.33) {
       const two = shuffle(alive).slice(0, 2);
