@@ -23,12 +23,13 @@ import {
   getDailyCapConfig, getStreakConfig, getDecayConfig, getEconomyConfig, getPointsConfig,
 } from '../services/settings.js';
 import { getAutoQuizConfig, launchQuiz } from '../services/communityQuiz.js';
+import { getPulsarConfig, pulsarPostNow } from '../services/pulsar.js';
 import { grantPulse, revokePulse, setPulse } from '../services/economy.js';
 import { supabase } from '../supabase.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
-type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop';
+type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop' | 'pulsar';
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
 
 const SHOP_CATEGORIES = ['role', 'perk', 'ticket', 'cosmetic', 'irl'];
@@ -62,6 +63,7 @@ function navRow(): Row {
       { label: 'Economy', value: 'economy', emoji: '💰' },
       { label: 'Give / remove PULSE', value: 'pulse', emoji: '🎁' },
       { label: 'Shop', value: 'shop', emoji: '🛒' },
+      { label: 'Pulsar (AI host)', value: 'pulsar', emoji: '🤖' },
     );
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(select);
 }
@@ -98,7 +100,8 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
         `👋 Welcome: ${w ? `<#${w}>` : '*(not set)*'}\n` +
         `🚀 Rank-up: ${r ? `<#${r}>` : '*(not set)*'}\n` +
         `🛡️ Mod-log: ${ml ? `<#${ml}>` : '*(not set)*'}\n` +
-        `🧠 Auto-quiz: ${q ? `<#${q}>` : '*(not set)*'}`
+        `🧠 Auto-quiz: ${q ? `<#${q}>` : '*(not set)*'}\n\n` +
+        `*Pulsar's channel is set in the **Pulsar** section.*`
       )],
       components: rows,
     };
@@ -144,6 +147,31 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
     };
   }
 
+  if (section === 'pulsar') {
+    const c = getPulsarConfig();
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ChannelSelectMenuBuilder().setCustomId('panel:chan:pulsar').addChannelTypes(ChannelType.GuildText).setPlaceholder('🤖 Pulsar channel')));
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('panel:pulsartoggle').setLabel(c.enabled ? 'Turn OFF' : 'Turn ON').setEmoji(c.enabled ? '⛔' : '✅').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('panel:pulsartag').setLabel(`Tag members: ${c.tag_active_members ? 'ON' : 'OFF'}`).setEmoji('🏷️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:pulsarreply').setLabel(`Replies: ${c.reply_to_mentions ? 'ON' : 'OFF'}`).setEmoji('💬').setStyle(ButtonStyle.Secondary),
+    ));
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('panel:pulsartune').setLabel('Settings').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:pulsarnow').setLabel('Post now').setEmoji('🤖').setStyle(ButtonStyle.Primary),
+    ));
+    return {
+      embeds: [pulseEmbed('🤖 Pulsar — AI community host').setDescription(
+        `**Status:** ${c.enabled ? 'ON ✅' : 'OFF ⛔'} · **Channel:** ${c.channel_id ? `<#${c.channel_id}>` : '*(pick one above)*'}\n` +
+        `**Posts spontaneously:** about every **${c.interval_hours}h** (only when the channel is active)\n` +
+        `**Tags active members:** ${c.tag_active_members ? 'ON' : 'OFF'} · **Replies when mentioned:** ${c.reply_to_mentions ? 'ON' : 'OFF'}\n` +
+        `**Language:** ${c.language}\n\n` +
+        `${process.env.ANTHROPIC_API_KEY ? 'Pulsar asks questions, checks in on members and keeps the vibe going. 🎉' : '⚠️ Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.'}`
+      )],
+      components: rows,
+    };
+  }
+
   if (section === 'pulse') return renderPulse();
   if (section === 'shop') return renderShop();
 
@@ -157,8 +185,8 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
     embeds: [pulseEmbed('🛠️ Pulse Engine — Admin Panel').setDescription(
       'Use the **section menu** above to configure everything.\n\n' +
       `**Modules:** ${modLines}\n` +
-      `**Auto-quiz:** ${getAutoQuizConfig().enabled ? 'ON ✅' : 'OFF ⛔'}\n\n` +
-      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop.*'
+      `**Auto-quiz:** ${getAutoQuizConfig().enabled ? 'ON ✅' : 'OFF ⛔'} · **Pulsar:** ${getPulsarConfig().enabled ? 'ON ✅' : 'OFF ⛔'}\n\n` +
+      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop · Pulsar.*'
     )],
     components: rows,
   };
@@ -245,7 +273,8 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     else if (which === 'rankup') await patch('rank_up_config', { channel_id: id });
     else if (which === 'modlog') await patch('mod_config', { mod_log_channel_id: id });
     else if (which === 'autoquiz') await patch('auto_quiz', { channel_id: id });
-    await interaction.update(render('channels'));
+    else if (which === 'pulsar') await patch('pulsar_config', { channel_id: id });
+    await interaction.update(render(which === 'pulsar' ? 'pulsar' : 'channels'));
     return;
   }
 
@@ -273,6 +302,21 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     if (id === 'panel:quiztopics') { await interaction.showModal(topicsModal()); return; }
     if (id === 'panel:quiznums') { await interaction.showModal(numsModal()); return; }
     if (id === 'panel:ecotune') { await interaction.showModal(ecoModal()); return; }
+
+    // Pulsar
+    if (id === 'panel:pulsartoggle') { await patch('pulsar_config', { enabled: !getPulsarConfig().enabled }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsartag') { await patch('pulsar_config', { tag_active_members: !getPulsarConfig().tag_active_members }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsarreply') { await patch('pulsar_config', { reply_to_mentions: !getPulsarConfig().reply_to_mentions }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsartune') { await interaction.showModal(pulsarModal()); return; }
+    if (id === 'panel:pulsarnow') {
+      const cfg = getPulsarConfig();
+      if (!cfg.channel_id) { await interaction.reply({ embeds: [errorEmbed('Pick a Pulsar channel first.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!process.env.ANTHROPIC_API_KEY) { await interaction.reply({ embeds: [errorEmbed('Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!interaction.guild) { await interaction.reply({ embeds: [errorEmbed('Use this in a server.')], flags: MessageFlags.Ephemeral }); return; }
+      await interaction.reply({ embeds: [successEmbed('Pulsar is posting now! 🤖')], flags: MessageFlags.Ephemeral });
+      void pulsarPostNow(interaction.client, interaction.guild.id);
+      return;
+    }
 
     // PULSE actions: panel:pulse:<action>:<userId>
     if (id.startsWith('panel:pulse:')) {
@@ -340,6 +384,16 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
         await patch('economy', { pulse_per_point: num('ppp', e.pulse_per_point) });
         await patch('points_config', { message: num('m', p.message), reaction: num('re', p.reaction), voice_per_minute: num('v', p.voice_per_minute) });
         await interaction.reply({ embeds: [successEmbed('Economy updated.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      if (id === 'panel:modal:pulsar') {
+        const c = getPulsarConfig();
+        const hrs = Number(interaction.fields.getTextInputValue('h'));
+        await patch('pulsar_config', {
+          interval_hours: Number.isFinite(hrs) && hrs >= 0.5 ? Math.min(24, hrs) : c.interval_hours,
+          language: interaction.fields.getTextInputValue('l').trim() || c.language,
+        });
+        await interaction.reply({ embeds: [successEmbed('Pulsar settings updated.')], flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -474,6 +528,15 @@ function shopNameModal(kind: string, title: string): ModalBuilder {
   return new ModalBuilder().setCustomId(`panel:modal:shop${kind}`).setTitle(title).addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder().setCustomId('name').setLabel('Item name').setStyle(TextInputStyle.Short).setRequired(true)));
+}
+
+function pulsarModal(): ModalBuilder {
+  const c = getPulsarConfig();
+  return new ModalBuilder().setCustomId('panel:modal:pulsar').setTitle('Pulsar settings').addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('h').setLabel('Hours between spontaneous posts (0.5-24)').setStyle(TextInputStyle.Short).setValue(String(c.interval_hours)).setRequired(true)),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('l').setLabel('Language (e.g. English, French)').setStyle(TextInputStyle.Short).setValue(c.language).setRequired(true)));
 }
 
 function shopPriceModal(): ModalBuilder {
