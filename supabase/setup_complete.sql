@@ -382,7 +382,9 @@ INSERT INTO public.games_config (game_key, config_json, is_enabled) VALUES
   ('blackjack', '{"min_bet": 10, "max_bet": 500, "fee_percent": 0, "cooldown_seconds": 15, "blackjack_payout_num": 3, "blackjack_payout_den": 2, "dealer_stand_min": 17}'::jsonb, true),
   ('rps', '{"min_bet": 5, "max_bet": 300, "fee_percent": 5, "cooldown_seconds": 10, "timeout_seconds": 60}'::jsonb, true),
   ('wheel', '{"min_bet": 10, "max_bet": 300, "fee_percent": 0, "cooldown_seconds": 10, "outcomes": [{"label": "💸 Bust", "multiplier": 0, "weight": 35, "color": "#6B7280"}, {"label": "🪙 Common", "multiplier": 1, "weight": 30, "color": "#9CA3AF"}, {"label": "🥉 Uncommon", "multiplier": 2, "weight": 20, "color": "#22C55E"}, {"label": "🥈 Rare", "multiplier": 3, "weight": 10, "color": "#3B82F6"}, {"label": "🥇 Epic", "multiplier": 5, "weight": 4, "color": "#A855F7"}, {"label": "💎 Legendary", "multiplier": 25, "weight": 1, "color": "#F59E0B"}]}'::jsonb, true),
-  ('higherlower', '{"min_bet": 10, "max_bet": 500, "fee_percent": 5, "cooldown_seconds": 5, "max_rounds": 10}'::jsonb, true)
+  ('higherlower', '{"min_bet": 10, "max_bet": 500, "fee_percent": 5, "cooldown_seconds": 5, "max_rounds": 10}'::jsonb, true),
+  ('battle_royale', '{"min_bet": 0, "max_bet": 1000, "fixed_reward": 50, "max_players": 15, "min_players": 2, "join_timeout_seconds": 45}'::jsonb, true),
+  ('dice_royale', '{"min_bet": 0, "max_bet": 1000, "fixed_reward": 50, "max_players": 15, "min_players": 2, "join_timeout_seconds": 45}'::jsonb, true)
 ON CONFLICT (game_key) DO NOTHING;
 
 -- A starter daily mission so /daily works immediately (valid 1 year)

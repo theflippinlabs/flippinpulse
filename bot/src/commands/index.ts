@@ -36,6 +36,8 @@ import * as seteconomy from './seteconomy.js';
 import * as shopadmin from './shopadmin.js';
 import * as higherlower from './higherlower.js';
 import * as lottery from './lottery.js';
+import * as battleroyale from './battleroyale.js';
+import * as diceroyale from './diceroyale.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -49,7 +51,7 @@ const commandList: Command[] = [
   slots, roulette, blackjack, rps, wheel,
   warn, warnings, mute, unmute, kick, ban, unban, clear,
   givepulse, removepulse, setpulse, pulseinfo, moduleCmd, seteconomy, shopadmin,
-  higherlower, lottery,
+  higherlower, lottery, battleroyale, diceroyale,
 ];
 
 export const commands = new Map<string, Command>();
