@@ -387,13 +387,38 @@ BEGIN
   SELECT p_guild_id, 'daily', 'Daily check-in', 'Claim your daily PULSE reward.', 15, now() + interval '365 days', true
   WHERE NOT EXISTS (SELECT 1 FROM public.missions WHERE guild_id = p_guild_id AND type = 'daily' AND is_active = true);
 
-  -- starter community quiz questions
+  -- starter quiz pack (cinema, music, Cronos, MainCity, community) — idempotent per question per guild
   INSERT INTO public.quiz_questions (guild_id, question, choices_json, correct_index, category)
   SELECT p_guild_id, v.question, v.choices_json::jsonb, v.correct_index, v.category
   FROM (VALUES
     ('What is the name of this server''s currency?', '["PULSE","Coins","Gems","Credits"]', 0, 'community'),
     ('Which command shows your PULSE balance?', '["/balance","/wallet","/money","/cash"]', 0, 'community'),
-    ('How do you earn PULSE automatically?', '["By being active (messages, reactions, voice)","By paying real money","Only by inviting friends","You cannot earn it"]', 0, 'community')
+    ('How do you earn PULSE automatically?', '["By being active (messages, reactions, voice)","By paying real money","Only by inviting friends","You cannot earn it"]', 0, 'community'),
+    ('What is the name of this community bot?', '["MEE6","Pulse Engine","Dyno","Carl-bot"]', 1, 'community'),
+    ('Who directed the 1975 film Jaws?', '["George Lucas","Steven Spielberg","Martin Scorsese","Ridley Scott"]', 1, 'cinema'),
+    ('In The Matrix, which color pill does Neo take?', '["Blue","Green","Red","Yellow"]', 2, 'cinema'),
+    ('Which actor played Jack in Titanic (1997)?', '["Brad Pitt","Tom Cruise","Leonardo DiCaprio","Johnny Depp"]', 2, 'cinema'),
+    ('Who played the Joker in The Dark Knight (2008)?', '["Jared Leto","Heath Ledger","Joaquin Phoenix","Jack Nicholson"]', 1, 'cinema'),
+    ('Which company created Mickey Mouse?', '["Disney","Pixar","Warner Bros","Universal"]', 0, 'cinema'),
+    ('Which Pixar film features a clownfish?', '["Moana","Finding Nemo","Shark Tale","Coco"]', 1, 'cinema'),
+    ('Which band performed Bohemian Rhapsody?', '["The Beatles","Queen","Led Zeppelin","Pink Floyd"]', 1, 'music'),
+    ('Who is known as the King of Pop?', '["Elvis Presley","Prince","Michael Jackson","Freddie Mercury"]', 2, 'music'),
+    ('How many strings does a standard guitar have?', '["4","5","6","7"]', 2, 'music'),
+    ('What instrument has 88 keys?', '["Organ","Piano","Harp","Accordion"]', 1, 'music'),
+    ('Smells Like Teen Spirit is a song by which band?', '["Pearl Jam","Green Day","Nirvana","Soundgarden"]', 2, 'music'),
+    ('What does BPM measure in music?', '["Beats per minute","Bars per measure","Bass per minute","Beats per measure"]', 0, 'music'),
+    ('Which company created the Cronos blockchain?', '["Binance","Coinbase","Crypto.com","Kraken"]', 2, 'cronos'),
+    ('What is the native token of Cronos?', '["CRO","CRON","CNS","CRX"]', 0, 'cronos'),
+    ('Cronos is compatible with which two ecosystems?', '["Solana and Polkadot","Ethereum (EVM) and Cosmos","Bitcoin and Litecoin","Tron and EOS"]', 1, 'cronos'),
+    ('In which year did the Cronos mainnet beta go live?', '["2018","2020","2021","2024"]', 2, 'cronos'),
+    ('Cronos is known for transaction fees of roughly how much?', '["About $0.001","About $1","About $10","About $50"]', 0, 'cronos'),
+    ('In 2024 Cronos launched a zero-knowledge Layer 2 called?', '["Cronos zkEVM","Cronos Turbo","Cronos Lightning","Cronos Mini"]', 0, 'cronos'),
+    ('On which blockchain is Loaded Lions: Mane City built?', '["Ethereum","Cronos","Solana","Polygon"]', 1, 'maincity'),
+    ('What kind of game is Mane City?', '["A city-building tycoon simulator","A first-person shooter","A racing game","A card battler"]', 0, 'maincity'),
+    ('Which company is behind Mane City?', '["Ubisoft","Crypto.com","EA","Riot Games"]', 1, 'maincity'),
+    ('What are the main in-game resources in Mane City?', '["Gold and Diamonds","Wood and Stone","Food and Water","Oil and Gas"]', 0, 'maincity'),
+    ('Which characters star in Mane City?', '["Bored Apes","Cool Cats","Loaded Lions and Cyber Cubs","Pudgy Penguins"]', 2, 'maincity'),
+    ('In Mane City, players build and decorate their...', '["Mane Mansions","Space stations","Castles","Farms"]', 0, 'maincity')
   ) AS v(question, choices_json, correct_index, category)
-  WHERE NOT EXISTS (SELECT 1 FROM public.quiz_questions WHERE guild_id = p_guild_id);
+  WHERE NOT EXISTS (SELECT 1 FROM public.quiz_questions q WHERE q.guild_id = p_guild_id AND q.question = v.question);
 END $$;
