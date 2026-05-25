@@ -41,6 +41,8 @@ import * as diceroyale from './diceroyale.js';
 import * as quizadmin from './quizadmin.js';
 import * as autoquiz from './autoquiz.js';
 import * as welcome from './welcome.js';
+import * as rankup from './rankup.js';
+import * as modlog from './modlog.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -55,7 +57,7 @@ const commandList: Command[] = [
   warn, warnings, mute, unmute, kick, ban, unban, clear,
   givepulse, removepulse, setpulse, pulseinfo, moduleCmd, seteconomy, shopadmin,
   higherlower, lottery, battleroyale, diceroyale,
-  quizadmin, autoquiz, welcome,
+  quizadmin, autoquiz, welcome, rankup, modlog,
 ];
 
 export const commands = new Map<string, Command>();
