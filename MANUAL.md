@@ -1,28 +1,54 @@
-# Pulse Engine — Bot Manual / Manuel du bot
+# Pulse Engine — Manuel complet / Full Manual
 
-`<...>` = required / obligatoire · `[...]` = optional / optionnel · 🔒 = Administrator only / Admin uniquement
+`<...>` = obligatoire / required · `[...]` = optionnel / optional · 🔒 = Admin uniquement / Administrator only
+
+> 💡 Le plus simple côté admin : tape **`/panel`**. Presque tout se règle depuis ce menu, sans retenir les commandes.
+
+---
+---
+
+# 🇫🇷 MANUEL (Français)
+
+## 1. Qu'est-ce que Pulse Engine ?
+
+Pulse Engine est un bot communautaire « tout-en-un » pour ton serveur Discord. Il tourne **tout seul, 24h/24**, et gère :
+
+- **💰 Une économie de points (PULSE)** : les membres gagnent des PULSE automatiquement en étant actifs (messages, réactions, minutes en vocal).
+- **🏆 Des rangs** qui montent avec l'activité, avec annonces.
+- **🎮 Une dizaine de jeux** (solo, duel et multijoueur) où l'on mise et gagne des PULSE.
+- **🛒 Une boutique** où dépenser ses PULSE (rôles, perks, tickets…).
+- **🎰 Une loterie** automatique avec jackpot et tirages.
+- **🧠 Des quiz communautaires** générés et lancés automatiquement par l'IA.
+- **🤖 Pulsar**, un animateur (community manager) IA qui fait vivre le serveur.
+- **🎯 Des missions** (défis) lancées automatiquement ou à la demande.
+- **🛡️ De la modération** manuelle et automatique (anti-spam, anti-raid…).
+- **👋 Des messages de bienvenue** et des annonces.
+
+Tout se pilote depuis le **panneau admin `/panel`**.
+
+> ⚙️ **Fonctions IA** (Pulsar, quiz auto, énigmes) : elles nécessitent une clé `ANTHROPIC_API_KEY` configurée dans Railway. Sans clé, le reste du bot fonctionne normalement.
 
 ---
 
-# 🇫🇷 Manuel (Français)
+## 2. Commandes pour les membres
 
-## 💰 Économie & profil (pour tout le monde)
+### 💰 Économie & profil
 | Commande | Description |
 |---|---|
 | `/balance` | Voir ton solde de PULSE |
-| `/profile [user]` | Voir ton profil (ou celui d'un membre) : points, rang, PULSE |
-| `/leaderboard` | Classement des meilleurs joueurs |
-| `/daily` | Réclamer ta récompense quotidienne |
+| `/profile [user]` | Ton profil (ou celui d'un membre) : points, rang, PULSE |
+| `/leaderboard` | Classement des meilleurs |
+| `/daily` | Réclamer ta récompense quotidienne (avec bonus de série 🔥) |
 | `/missions` | Voir les missions actives |
 | `/shop [catégorie]` | Parcourir la boutique |
-| `/buy <objet>` | Acheter un objet de la boutique |
+| `/buy <objet>` | Acheter un objet |
 
-> Tu gagnes des PULSE automatiquement en étant actif : messages, réactions, minutes en vocal.
+> Tu gagnes des PULSE **automatiquement** : messages, réactions, minutes en vocal.
 
-## 🎮 Jeux solo
+### 🎮 Jeux solo
 | Commande | Description |
 |---|---|
-| `/higherlower <mise>` | Plus ou Moins : devine si le nombre suivant est plus haut/bas, encaisse avant de te tromper |
+| `/higherlower <mise>` | Plus ou Moins — encaisse avant de te tromper |
 | `/crash <mise>` | Encaisse avant que le multiplicateur s'effondre |
 | `/slots <mise>` | Machine à sous |
 | `/roulette <mise> ...` | Roulette européenne |
@@ -30,28 +56,83 @@
 | `/wheel <mise>` | Roue gacha — gros multiplicateurs possibles |
 | `/quiz [difficulté]` | Quiz solo pour gagner des PULSE |
 
-## ⚔️ Jeux de duel & multijoueur
+### ⚔️ Jeux de duel & multijoueur
 | Commande | Description |
 |---|---|
-| `/duel <joueur> <mise>` | Défie un joueur en duel |
+| `/duel <joueur> <mise>` | Défie un joueur |
 | `/rps <joueur> <mise>` | Pierre-feuille-ciseaux |
 | `/typingrace [mise]` | Course de frappe (plusieurs joueurs) |
-| `/battleroyale [mise]` | Battle Royale : on rejoint le lobby, le dernier survivant rafle la cagnotte |
-| `/diceroyale [mise]` | Dé Royale : tout le monde lance les dés, le plus haut gagne |
+| `/battleroyale [mise]` | Battle Royale — le dernier survivant rafle la cagnotte |
+| `/diceroyale [mise]` | Dé Royale — le plus haut score gagne |
 
-> **Lobby multijoueur** (`/battleroyale`, `/diceroyale`) : clique **🙋 Rejoindre**. Seul l'hôte peut **▶️ Start** (min. 2 joueurs) ou **✖️ Cancel** (rembourse tout le monde). Aucune limite de temps ni de joueurs.
+> **Lobby multijoueur** (`/battleroyale`, `/diceroyale`) : clique **🙋 Rejoindre**. Seul l'hôte peut **▶️ Start** (min. 2 joueurs) ou **✖️ Annuler** (rembourse tout le monde). Aucune limite de temps ni de joueurs. La Battle Royale se déroule message par message, façon commentaire de match.
 
-## 🎰 Loterie & quiz communautaire
+### 🎰 Loterie
 | Commande | Description |
 |---|---|
-| `/lottery status` | Voir le jackpot, les tickets et le tirage |
-| `/lottery buy <tickets>` | Acheter des tickets de loterie |
+| `/lottery status` | Voir le jackpot, tes tickets et l'heure du tirage |
+| `/lottery buy <tickets>` | Acheter des tickets |
 
-> Le bot lance aussi **automatiquement** des quiz communautaires (si l'admin l'a activé) : tout le monde répond par boutons et gagne des PULSE par bonne réponse.
+> Le tirage est automatique. Plus tu as de tickets, plus tu as de chances. Pulsar/le bot rappelle le jackpot dans la journée.
+
+### 🧠 Quiz communautaire
+Les quiz sont lancés **automatiquement** (voir réglages admin). Quand un quiz démarre, tout le monde répond avec des boutons et gagne des PULSE par bonne réponse. Une question bonus peut valoir double.
 
 ---
 
-## 🛠️ Commandes Administrateur
+## 3. 🤖 Pulsar — l'animateur IA
+
+Pulsar est un « community manager » alimenté par l'IA. Quand il est activé, il :
+
+- **Anime le salon** : il poste régulièrement des questions, des brise-glaces et des messages d'ambiance — **même quand c'est calme**, pour relancer la discussion.
+- **Prend des nouvelles** : il tague de temps en temps un membre actif récemment pour lui demander comment ça va.
+- **Répond** quand on le mentionne ou qu'on répond à un de ses messages.
+- **Accueille les nouveaux** : message de bienvenue personnalisé (sinon, l'embed de bienvenue classique).
+- **Présente les événements** : il rédige les annonces de quiz et de loterie dans son style.
+- **Récap quotidien** : un résumé de la journée avec des shout-outs.
+- **Félicite** les montées de rang et les paliers de membres.
+- **Lance des missions** (voir section suivante).
+
+> Pulsar ne tague **jamais** @everyone ni les rôles, et n'invente pas d'infos (prix, promesses…).
+
+**Activer Pulsar** : `/panel → Pulsar` → choisis le salon → **Turn ON**. Boutons disponibles : langue/fréquence (Settings), Tag members, Replies, Welcomes, Host events, Daily recap, Celebrate, et **Post now** pour tester.
+
+---
+
+## 4. 🎯 Missions (défis)
+
+Pulsar peut lancer des missions, **automatiquement** (toutes les ~6h, réglable) **et** à la demande depuis `/panel → Missions`.
+
+| Type | Comment ça marche |
+|---|---|
+| ⚡ **Défi express** | Les premiers à cliquer **Claim** gagnent des PULSE (ex : les 3 premiers → 50 PULSE, 30 min) |
+| 🧩 **Énigme** | Pulsar pose une énigme (IA) ; le 1er qui trouve la bonne réponse (via bouton) gagne |
+| 📅 **Objectif du jour** | But auto-suivi (ex : envoyer 20 messages) → PULSE crédité automatiquement |
+| 🗓️ **Objectif de la semaine** | Idem, sur la semaine, plus grosse récompense (ex : jouer à 5 jeux) |
+
+**Objectifs auto-suivis** disponibles : envoyer des messages, ajouter des réactions, gagner des quiz, acheter des tickets de loterie, **jouer à des jeux**. Le PULSE est crédité dès l'objectif atteint.
+
+**Côté admin** (`/panel → Missions`) : boutons **Flash challenge**, **Riddle**, **Daily objective**, **Weekly objective**, plus **List active**, **End all** et **Auto-launch ON/OFF**.
+
+---
+
+## 5. 🛠️ Administration — le panneau `/panel`
+
+Tape **`/panel`** (réservé aux admins). Un menu déroulant donne accès à toutes les sections :
+
+| Section | Ce qu'on y règle |
+|---|---|
+| 🏠 **Home** | Vue d'ensemble + raccourcis |
+| ⚙️ **Modules** | Activer/désactiver : bienvenue, rank-up, automod, Pulse Hour, plafond quotidien, série, decay |
+| #️⃣ **Channels** | Salons : bienvenue, rank-up, logs de modération, quiz auto |
+| 🧠 **Auto-quiz** | On/off, horaires, sujets, nombre de questions, récompense, bonus, **annonce @everyone** |
+| 💰 **Economy** | PULSE par point, points par message/réaction/minute vocale |
+| 🎁 **Give / remove PULSE** | Choisir un membre → Donner / Retirer / Fixer le solde |
+| 🛒 **Shop** | Ajouter / Lister / Masquer / Changer le prix d'un article |
+| 🤖 **Pulsar** | Salon, on/off, langue, fréquence, et toutes ses missions (welcomes, events, recap, celebrate) |
+| 🎯 **Missions** | Lancer des missions et activer le mode auto |
+
+> Le panneau couvre l'essentiel. Les commandes ci-dessous restent disponibles pour un réglage fin.
 
 ### 💰 Gérer les PULSE
 | Commande | Description |
@@ -59,85 +140,105 @@
 | 🔒 `/givepulse <user> <montant> [raison]` | Donner des PULSE |
 | 🔒 `/removepulse <user> <montant> [raison]` | Retirer des PULSE |
 | 🔒 `/setpulse <user> <montant> [raison]` | Fixer un solde exact |
-| 🔒 `/pulseinfo <user>` | Voir les stats éco d'un membre |
+| 🔒 `/pulseinfo <user>` | Stats éco d'un membre |
 
 ### ⚙️ Réglages généraux
 | Commande | Description |
 |---|---|
-| 🔒 `/module <fonction> <on/off>` | Activer/désactiver : welcome, rankup, automod, pulsehour, dailycap, streak, decay |
-| 🔒 `/seteconomy <réglage> <valeur>` | Régler PULSE par point, points par message/réaction/vocal/invitation/événement |
+| 🔒 `/module <fonction> <on/off>` | welcome, rankup, automod, pulsehour, dailycap, streak, decay |
+| 🔒 `/seteconomy <réglage> <valeur>` | PULSE/point, points par message/réaction/vocal/invitation/événement |
 | 🔒 `/shopadmin add\|remove\|setprice\|toggle\|list` | Gérer la boutique |
 
 ### 👋 Messages & annonces
 | Commande | Description |
 |---|---|
-| 🔒 `/welcome channel\|title\|message\|color\|options\|toggle\|test\|status` | Configurer le message de bienvenue |
-| 🔒 `/rankup channel\|toggle\|pinguser\|status` | Configurer les annonces de montée de rang |
-| 🔒 `/modlog channel\|clear\|status` | Configurer le salon des logs de modération |
+| 🔒 `/welcome channel\|title\|message\|color\|options\|toggle\|test\|status` | Message de bienvenue |
+| 🔒 `/rankup channel\|toggle\|pinguser\|status` | Annonces de montée de rang |
+| 🔒 `/modlog channel\|clear\|status` | Salon des logs de modération |
 
 > Variables de texte (welcome) : `{username}`, `{mention}`, `{server}`, `{member_count}`.
 
 ### 🧠 Quiz communautaire automatique
 | Commande | Description |
 |---|---|
-| 🔒 `/quizadmin add` | Ajouter une question (question, bonne réponse, mauvaises réponses, catégorie) |
+| 🔒 `/quizadmin add` | Ajouter une question (question, bonne/mauvaises réponses, catégorie) |
+| 🔒 `/quizadmin generate <sujet> <nombre>` | Générer des questions avec l'IA |
 | 🔒 `/quizadmin list [catégorie]` | Lister les questions |
 | 🔒 `/quizadmin remove <contient>` | Supprimer une question |
-| 🔒 `/autoquiz channel <#salon>` | Salon où poster les quiz |
-| 🔒 `/autoquiz interval <heures>` | Fréquence des quiz auto |
-| 🔒 `/autoquiz settings` | Questions/manche, secondes/question, récompense, catégorie |
-| 🔒 `/autoquiz toggle <on/off>` | Activer/désactiver les quiz auto |
-| 🔒 `/autoquiz now` | Lancer un quiz immédiatement |
-| 🔒 `/autoquiz status` | Voir la configuration |
+| 🔒 `/autoquiz channel\|interval\|times\|topics\|settings\|toggle\|now\|status` | Tout le réglage des quiz auto |
 
 ### 🔨 Modération
 | Commande | Description |
 |---|---|
-| 🔒 `/ban <user> [raison] [jours]` | Bannir un membre |
+| 🔒 `/ban <user> [raison] [jours]` | Bannir |
 | 🔒 `/unban <id>` | Débannir par ID |
-| 🔒 `/kick <user> [raison]` | Expulser un membre |
+| 🔒 `/kick <user> [raison]` | Expulser |
 | 🔒 `/mute <user> [durée] [raison]` | Rendre muet (timeout) |
 | 🔒 `/unmute <user>` | Lever le mute |
-| 🔒 `/warn <user> [raison]` | Avertir un membre |
+| 🔒 `/warn <user> [raison]` | Avertir |
 | 🔒 `/warnings <user>` | Voir les avertissements |
 | 🔒 `/clear <nombre>` | Supprimer des messages en masse |
 
-### 🧰 Utilitaires (admin)
+> **Automod** (réglable dans `/panel → Modules` + base de données) : anti-spam, anti-mentions de masse, anti-liens/invitations, anti-raid (lockdown automatique).
+
+### 🧰 Utilitaires
 | Commande | Description |
 |---|---|
-| 🔒 `/poll <question> <options>` | Lancer un sondage |
-| 🔒 `/giveaway ...` | Lancer un tirage au sort |
+| 🔒 `/poll <question> <options>` | Sondage |
+| 🔒 `/giveaway ...` | Tirage au sort |
 | 🔒 `/reactionrole add\|remove` | Rôles par réaction |
 
 ### ⭐ Mise en route conseillée
-1. `/welcome channel` puis `/welcome message`, puis `/welcome toggle enabled:true`
-2. `/rankup channel` puis `/rankup toggle enabled:true`
-3. `/modlog channel`
-4. `/quizadmin add` (catégorie ex. `kronos`, `main_city`), puis `/autoquiz channel`, `/autoquiz toggle enabled:true`
-5. `/shopadmin add` pour remplir la boutique
+1. `/panel → Channels` : règle les salons (bienvenue, rank-up, logs, quiz).
+2. `/panel → Modules` : active bienvenue, rank-up, automod.
+3. `/panel → Auto-quiz` : choisis le salon, les horaires, puis **Turn ON**.
+4. `/panel → Pulsar` : choisis le salon, **Turn ON** (clé IA requise).
+5. `/panel → Shop` : ajoute des articles.
+6. `/panel → Economy` : ajuste les gains si besoin.
 
 ---
 ---
 
-# 🇬🇧 Manual (English)
+# 🇬🇧 MANUAL (English)
 
-## 💰 Economy & profile (everyone)
+## 1. What is Pulse Engine?
+
+An all-in-one community bot that runs **24/7 on its own** and handles:
+
+- **💰 A points economy (PULSE)** earned automatically by activity (messages, reactions, voice minutes).
+- **🏆 Ranks** that climb with activity, with announcements.
+- **🎮 ~12 games** (solo, duel, multiplayer) where you bet and win PULSE.
+- **🛒 A shop** to spend PULSE.
+- **🎰 An automatic lottery** with a jackpot and draws.
+- **🧠 Community quizzes** auto-generated and launched by AI.
+- **🤖 Pulsar**, an AI community-manager that keeps the server alive.
+- **🎯 Missions** launched automatically or on demand.
+- **🛡️ Moderation**, manual and automatic (anti-spam, anti-raid…).
+- **👋 Welcome messages** and announcements.
+
+Everything is controlled from the **`/panel`** admin menu.
+
+> ⚙️ **AI features** (Pulsar, auto-quiz, riddles) need an `ANTHROPIC_API_KEY` set in Railway. Without it, the rest of the bot works normally.
+
+## 2. Member commands
+
+### 💰 Economy & profile
 | Command | Description |
 |---|---|
 | `/balance` | Check your PULSE balance |
-| `/profile [user]` | View your profile (or a member's): points, rank, PULSE |
-| `/leaderboard` | Top players ranking |
-| `/daily` | Claim your daily reward |
+| `/profile [user]` | Your (or a member's) profile: points, rank, PULSE |
+| `/leaderboard` | Top players |
+| `/daily` | Claim your daily reward (with streak bonus 🔥) |
 | `/missions` | View active missions |
 | `/shop [category]` | Browse the shop |
-| `/buy <item>` | Buy an item from the shop |
+| `/buy <item>` | Buy an item |
 
-> You earn PULSE automatically by being active: messages, reactions, voice minutes.
+> You earn PULSE **automatically** by being active: messages, reactions, voice minutes.
 
-## 🎮 Solo games
+### 🎮 Solo games
 | Command | Description |
 |---|---|
-| `/higherlower <bet>` | Higher or Lower: guess the next number, cash out before you miss |
+| `/higherlower <bet>` | Higher or Lower — cash out before you miss |
 | `/crash <bet>` | Cash out before the multiplier crashes |
 | `/slots <bet>` | Slot machine |
 | `/roulette <bet> ...` | European roulette |
@@ -145,88 +246,111 @@
 | `/wheel <bet>` | Gacha wheel — big multipliers possible |
 | `/quiz [difficulty]` | Solo quiz to earn PULSE |
 
-## ⚔️ Duel & multiplayer games
+### ⚔️ Duel & multiplayer games
 | Command | Description |
 |---|---|
-| `/duel <player> <bet>` | Challenge a player to a duel |
+| `/duel <player> <bet>` | Challenge a player |
 | `/rps <player> <bet>` | Rock Paper Scissors |
 | `/typingrace [bet]` | Typing race (multiple players) |
-| `/battleroyale [bet]` | Battle Royale: join the lobby, last one standing takes the pot |
-| `/diceroyale [bet]` | Dice Royale: everyone rolls, highest wins |
+| `/battleroyale [bet]` | Battle Royale — last one standing takes the pot |
+| `/diceroyale [bet]` | Dice Royale — highest roll wins |
 
-> **Multiplayer lobby** (`/battleroyale`, `/diceroyale`): click **🙋 Join**. Only the host can **▶️ Start** (min. 2 players) or **✖️ Cancel** (refunds everyone). No time or player limit.
+> **Multiplayer lobby**: click **🙋 Join**. Only the host can **▶️ Start** (min. 2) or **✖️ Cancel** (refunds all). No time/player limit. Battle Royale plays out message-by-message, like match commentary.
 
-## 🎰 Lottery & community quiz
+### 🎰 Lottery
 | Command | Description |
 |---|---|
-| `/lottery status` | See the jackpot, tickets and draw time |
-| `/lottery buy <tickets>` | Buy lottery tickets |
+| `/lottery status` | See jackpot, your tickets and draw time |
+| `/lottery buy <tickets>` | Buy tickets |
 
-> The bot also **auto-launches** community quizzes (if the admin enabled it): everyone answers with buttons and earns PULSE per correct answer.
+> The draw is automatic; more tickets = better odds. The bot reminds the jackpot through the day.
 
----
+### 🧠 Community quiz
+Quizzes auto-launch (admin-configured). Everyone answers with buttons and earns PULSE per correct answer; a bonus question can be worth double.
 
-## 🛠️ Administrator commands
+## 3. 🤖 Pulsar — the AI host
 
-### 💰 Manage PULSE
+When enabled, Pulsar:
+- **Animates the channel** with questions, icebreakers and hype — **even when it's quiet**, to revive the chat.
+- **Checks in** on recently active members.
+- **Replies** when mentioned or replied to.
+- **Welcomes** newcomers with a personalized message (else the classic welcome embed).
+- **Hosts events**: writes the quiz and lottery announcements in its voice.
+- **Daily recap** with shout-outs.
+- **Celebrates** rank-ups and member milestones.
+- **Launches missions** (next section).
+
+> Pulsar never pings @everyone/roles and never invents facts.
+
+**Enable**: `/panel → Pulsar` → pick the channel → **Turn ON**. Toggles: Settings (language/frequency/recap time), Tag members, Replies, Welcomes, Host events, Daily recap, Celebrate, and **Post now**.
+
+## 4. 🎯 Missions
+
+Launched automatically (~every 6h, configurable) **and** on demand via `/panel → Missions`.
+
+| Type | How it works |
+|---|---|
+| ⚡ **Flash** | First N to tap **Claim** win PULSE (e.g. first 3 → 50 PULSE, 30 min) |
+| 🧩 **Riddle** | AI riddle; first correct answer (via button) wins |
+| 📅 **Daily objective** | Auto-tracked goal (e.g. send 20 messages) → PULSE auto-credited |
+| 🗓️ **Weekly objective** | Same, weekly, bigger reward (e.g. play 5 games) |
+
+Auto-tracked metrics: messages, reactions, quiz wins, lottery tickets, **games played**.
+
+Admin (`/panel → Missions`): **Flash / Riddle / Daily / Weekly** buttons, plus **List active**, **End all**, **Auto-launch ON/OFF**.
+
+## 5. 🛠️ Administration — the `/panel`
+
+Type **`/panel`** (admins only). Sections: Home, Modules, Channels, Auto-quiz, Economy, Give/remove PULSE, Shop, Pulsar, Missions.
+
+### Manage PULSE
 | Command | Description |
 |---|---|
 | 🔒 `/givepulse <user> <amount> [reason]` | Give PULSE |
 | 🔒 `/removepulse <user> <amount> [reason]` | Remove PULSE |
 | 🔒 `/setpulse <user> <amount> [reason]` | Set an exact balance |
-| 🔒 `/pulseinfo <user>` | View a member's economy stats |
+| 🔒 `/pulseinfo <user>` | A member's economy stats |
 
-### ⚙️ General settings
+### General settings
 | Command | Description |
 |---|---|
-| 🔒 `/module <feature> <on/off>` | Toggle: welcome, rankup, automod, pulsehour, dailycap, streak, decay |
-| 🔒 `/seteconomy <setting> <value>` | Tune PULSE per point, points per message/reaction/voice/invite/event |
+| 🔒 `/module <feature> <on/off>` | welcome, rankup, automod, pulsehour, dailycap, streak, decay |
+| 🔒 `/seteconomy <setting> <value>` | PULSE/point, points per message/reaction/voice/invite/event |
 | 🔒 `/shopadmin add\|remove\|setprice\|toggle\|list` | Manage the shop |
 
-### 👋 Messages & announcements
+### Messages & announcements
 | Command | Description |
 |---|---|
-| 🔒 `/welcome channel\|title\|message\|color\|options\|toggle\|test\|status` | Configure the welcome message |
-| 🔒 `/rankup channel\|toggle\|pinguser\|status` | Configure rank-up announcements |
-| 🔒 `/modlog channel\|clear\|status` | Configure the moderation log channel |
+| 🔒 `/welcome ...` | Welcome message |
+| 🔒 `/rankup ...` | Rank-up announcements |
+| 🔒 `/modlog ...` | Moderation log channel |
 
-> Welcome text placeholders: `{username}`, `{mention}`, `{server}`, `{member_count}`.
+> Welcome placeholders: `{username}`, `{mention}`, `{server}`, `{member_count}`.
 
-### 🧠 Automatic community quiz
+### Automatic community quiz
 | Command | Description |
 |---|---|
-| 🔒 `/quizadmin add` | Add a question (question, correct answer, wrong answers, category) |
-| 🔒 `/quizadmin list [category]` | List questions |
-| 🔒 `/quizadmin remove <contains>` | Remove a question |
-| 🔒 `/autoquiz channel <#channel>` | Channel where quizzes are posted |
-| 🔒 `/autoquiz interval <hours>` | How often quizzes auto-launch |
-| 🔒 `/autoquiz settings` | Questions/round, seconds/question, reward, category |
-| 🔒 `/autoquiz toggle <on/off>` | Enable/disable auto quizzes |
-| 🔒 `/autoquiz now` | Launch a quiz immediately |
-| 🔒 `/autoquiz status` | Show configuration |
+| 🔒 `/quizadmin add` | Add a question |
+| 🔒 `/quizadmin generate <topic> <count>` | AI-generate questions |
+| 🔒 `/quizadmin list\|remove` | List / remove questions |
+| 🔒 `/autoquiz channel\|interval\|times\|topics\|settings\|toggle\|now\|status` | Configure auto quizzes |
 
-### 🔨 Moderation
+### Moderation
 | Command | Description |
 |---|---|
-| 🔒 `/ban <user> [reason] [days]` | Ban a member |
-| 🔒 `/unban <id>` | Unban by ID |
-| 🔒 `/kick <user> [reason]` | Kick a member |
-| 🔒 `/mute <user> [duration] [reason]` | Time out a member |
-| 🔒 `/unmute <user>` | Remove a timeout |
-| 🔒 `/warn <user> [reason]` | Warn a member |
-| 🔒 `/warnings <user>` | View warnings |
-| 🔒 `/clear <count>` | Bulk-delete messages |
+| 🔒 `/ban` `/unban` `/kick` `/mute` `/unmute` `/warn` `/warnings` `/clear` | Standard moderation tools |
 
-### 🧰 Utilities (admin)
+> **Automod** (in `/panel → Modules`): anti-spam, anti-mass-mentions, anti-links/invites, anti-raid (auto lockdown).
+
+### Utilities
 | Command | Description |
 |---|---|
-| 🔒 `/poll <question> <options>` | Start a poll |
-| 🔒 `/giveaway ...` | Run a giveaway |
-| 🔒 `/reactionrole add\|remove` | Reaction roles |
+| 🔒 `/poll` `/giveaway` `/reactionrole` | Polls, giveaways, reaction roles |
 
 ### ⭐ Recommended setup
-1. `/welcome channel` then `/welcome message`, then `/welcome toggle enabled:true`
-2. `/rankup channel` then `/rankup toggle enabled:true`
-3. `/modlog channel`
-4. `/quizadmin add` (category e.g. `kronos`, `main_city`), then `/autoquiz channel`, `/autoquiz toggle enabled:true`
-5. `/shopadmin add` to stock the shop
+1. `/panel → Channels`: set channels.
+2. `/panel → Modules`: enable welcome, rank-up, automod.
+3. `/panel → Auto-quiz`: channel + times, then **Turn ON**.
+4. `/panel → Pulsar`: channel, then **Turn ON** (AI key required).
+5. `/panel → Shop`: stock items.
+6. `/panel → Economy`: adjust earn rates.
