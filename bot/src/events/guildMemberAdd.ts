@@ -1,6 +1,6 @@
 import { ChannelType, EmbedBuilder, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
-import { getWelcomeConfig } from '../services/settings.js';
+import { getWelcomeConfig, type WelcomeConfig } from '../services/settings.js';
 import { recordJoin } from '../services/automod.js';
 import { logAndAnnounce } from '../services/moderation.js';
 import { log } from '../utils/logger.js';
@@ -19,16 +19,7 @@ function applyTemplate(template: string, member: GuildMember): string {
     .replaceAll('{member_count}', String(member.guild.memberCount));
 }
 
-async function sendWelcomeMessage(member: GuildMember): Promise<void> {
-  const config = getWelcomeConfig();
-  if (!config.enabled || !config.channel_id) return;
-
-  const channel = await member.guild.channels.fetch(config.channel_id).catch(() => null);
-  if (!channel || channel.type !== ChannelType.GuildText) {
-    log('WARN', `Welcome channel ${config.channel_id} unavailable or not a text channel`);
-    return;
-  }
-
+export function buildWelcomePayload(member: GuildMember, config: WelcomeConfig): { content?: string; embeds: EmbedBuilder[] } {
   const embed = new EmbedBuilder()
     .setColor(parseHexColor(config.embed_color))
     .setTitle(applyTemplate(config.title, member))
@@ -40,10 +31,24 @@ async function sendWelcomeMessage(member: GuildMember): Promise<void> {
     embed.setFooter({ text: `Member #${member.guild.memberCount}` });
   }
 
-  await channel.send({
+  return {
     content: config.ping_user ? `<@${member.id}>` : undefined,
     embeds: [embed],
-  }).catch(err => log('ERROR', 'Failed to send welcome message', err));
+  };
+}
+
+async function sendWelcomeMessage(member: GuildMember): Promise<void> {
+  const config = getWelcomeConfig();
+  if (!config.enabled || !config.channel_id) return;
+
+  const channel = await member.guild.channels.fetch(config.channel_id).catch(() => null);
+  if (!channel || channel.type !== ChannelType.GuildText) {
+    log('WARN', `Welcome channel ${config.channel_id} unavailable or not a text channel`);
+    return;
+  }
+
+  await channel.send(buildWelcomePayload(member, config))
+    .catch(err => log('ERROR', 'Failed to send welcome message', err));
 }
 
 export async function handleGuildMemberAdd(member: GuildMember): Promise<void> {
