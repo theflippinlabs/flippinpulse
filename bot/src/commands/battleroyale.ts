@@ -46,8 +46,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const conf = (getGameConfig('battle_royale')?.config_json ?? {}) as {
-    min_bet: number; max_bet: number; fixed_reward: number;
-    max_players: number; min_players: number; join_timeout_seconds: number;
+    min_bet: number; max_bet: number; fixed_reward: number; min_players: number;
   };
   const minBet = conf.min_bet ?? 0;
   const maxBet = conf.max_bet ?? 1000;
@@ -64,9 +63,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     gameKey: 'battle_royale',
     title: '⚔️ Battle Royale',
     bet,
-    maxPlayers: conf.max_players ?? 15,
     minPlayers: conf.min_players ?? 2,
-    joinTimeoutMs: (conf.join_timeout_seconds ?? 45) * 1000,
     betReason: 'battleroyale_bet',
     refundReason: 'battleroyale_refund',
   });

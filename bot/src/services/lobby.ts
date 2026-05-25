@@ -28,9 +28,7 @@ export interface LobbyOptions {
   gameKey: string;
   title: string;
   bet: number;
-  maxPlayers: number;
   minPlayers: number;
-  joinTimeoutMs: number;
   betReason: string;
   refundReason: string;
 }
@@ -38,13 +36,13 @@ export interface LobbyOptions {
 export const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
 
 /**
- * Runs a shared join lobby: host buys in, others join with the same bet, the
- * host can start early or it auto-starts when the join timer ends. Returns the
- * final roster (bets already collected into the pot) or null if it was
- * cancelled (in which case bets are refunded and a message is shown).
+ * Runs a shared join lobby: host buys in, others join with the same bet, and
+ * only the host can start it (no time limit, no player cap). Returns the final
+ * roster (bets already collected into the pot) or null if it was cancelled (in
+ * which case bets are refunded and a message is shown).
  */
 export async function runLobby(opts: LobbyOptions): Promise<LobbyOutcome | null> {
-  const { interaction, gameKey, title, bet, maxPlayers, minPlayers, joinTimeoutMs } = opts;
+  const { interaction, gameKey, title, bet, minPlayers } = opts;
 
   if (bet > 0) {
     const bal = await getBalance(interaction.user.id);
@@ -69,19 +67,19 @@ export async function runLobby(opts: LobbyOptions): Promise<LobbyOutcome | null>
     .setDescription(
       `**${interaction.user.username}** is hosting!\n\n` +
       `${bet > 0 ? `💰 Entry: **${bet}** PULSE\n` : '🆓 Free entry\n'}` +
-      `👥 Players (${players.size}/${maxPlayers}): ${[...players.values()].join(', ')}\n\n` +
-      `Click **Join** to enter${minPlayers > 1 ? ` (need ${minPlayers}+ to start)` : ''}, ` +
-      `or the host clicks **Start** when ready.`
+      `👥 Players (${players.size}): ${[...players.values()].join(', ')}\n\n` +
+      `Click **Join** to enter. Only the host can **Start** (needs ${minPlayers}+ players). No time limit.`
     );
 
   const buildRow = () => new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`lobby_join_${sessionId}`).setLabel(`Join (${players.size}/${maxPlayers})`).setStyle(ButtonStyle.Primary).setEmoji('🙋'),
+    new ButtonBuilder().setCustomId(`lobby_join_${sessionId}`).setLabel(`Join (${players.size})`).setStyle(ButtonStyle.Primary).setEmoji('🙋'),
     new ButtonBuilder().setCustomId(`lobby_start_${sessionId}`).setLabel('Start').setStyle(ButtonStyle.Success).setEmoji('▶️'),
   );
 
   const reply = await interaction.reply({ embeds: [lobbyEmbed()], components: [buildRow()], fetchReply: true }) as Message;
 
-  const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, time: joinTimeoutMs });
+  // No `time` => the lobby waits indefinitely until the host starts it.
+  const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button });
   let started = false;
 
   await new Promise<void>((resolve) => {
@@ -90,7 +88,6 @@ export async function runLobby(opts: LobbyOptions): Promise<LobbyOutcome | null>
 
       if (btn.customId === `lobby_join_${sessionId}`) {
         if (players.has(btn.user.id)) { await btn.reply({ content: 'You already joined!', ephemeral: true }); return; }
-        if (players.size >= maxPlayers) { await btn.reply({ content: 'The lobby is full!', ephemeral: true }); return; }
         if (bet > 0) {
           const bal = await getBalance(btn.user.id);
           if (!bal || bal.balance < bet) { await btn.reply({ embeds: [errorEmbed(`You need ${bet} PULSE to join.`)], ephemeral: true }); return; }
@@ -99,13 +96,12 @@ export async function runLobby(opts: LobbyOptions): Promise<LobbyOutcome | null>
         players.set(btn.user.id, btn.user.username);
         await addGamePlayer(sessionId, btn.user.id, bet);
         await btn.update({ embeds: [lobbyEmbed()], components: [buildRow()] });
-        if (players.size >= maxPlayers) { started = true; collector.stop('full'); }
         return;
       }
 
       if (btn.customId === `lobby_start_${sessionId}`) {
-        if (btn.user.id !== interaction.user.id) { await btn.reply({ content: 'Only the host can start.', ephemeral: true }); return; }
-        if (players.size < minPlayers) { await btn.reply({ content: `Need at least ${minPlayers} players to start.`, ephemeral: true }); return; }
+        if (btn.user.id !== interaction.user.id) { await btn.reply({ content: 'Only the host can start the game.', ephemeral: true }); return; }
+        if (players.size < minPlayers) { await btn.reply({ content: `You need at least ${minPlayers} players to start.`, ephemeral: true }); return; }
         started = true;
         collector.stop('started');
         await btn.deferUpdate().catch(() => {});
@@ -138,3 +134,4 @@ export async function runLobby(opts: LobbyOptions): Promise<LobbyOutcome | null>
     message: reply,
   };
 }
+
