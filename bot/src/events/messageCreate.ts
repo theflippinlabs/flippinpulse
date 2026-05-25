@@ -5,6 +5,7 @@ import { awardPoints } from '../services/points.js';
 import { getPointsConfig } from '../services/settings.js';
 import { runAutomod } from '../services/automod.js';
 import { recordActivity, maybeReply } from '../services/pulsar.js';
+import { recordChallengeMetric } from '../services/challenges.js';
 
 export async function handleMessageCreate(message: Message): Promise<void> {
   if (message.author.bot || !message.guild || !message.member) return;
@@ -17,6 +18,7 @@ export async function handleMessageCreate(message: Message): Promise<void> {
 
     recordActivity(message);
     void maybeReply(message);
+    void recordChallengeMetric(message.client, message.author.id, message.author.username, 'messages');
 
     const discordId = message.author.id;
     if (isOnCooldown(discordId, 'message')) return;

@@ -11,6 +11,7 @@ import { startDecayScheduler } from './services/decay.js';
 import { startLotteryScheduler } from './services/lottery.js';
 import { startAutoQuizScheduler } from './services/communityQuiz.js';
 import { startPulsar } from './services/pulsar.js';
+import { startChallengeScheduler } from './services/challenges.js';
 import { startAutomodCleanup } from './services/automod.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
@@ -61,6 +62,7 @@ client.once('ready', async () => {
   startLotteryScheduler(client);
   startAutoQuizScheduler(client);
   startPulsar(client);
+  startChallengeScheduler(client);
   startAutomodCleanup();
   log('INFO', 'Settings, ranks, game configs, schedulers loaded. Bot is ready.');
 });

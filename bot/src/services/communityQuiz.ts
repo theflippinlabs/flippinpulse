@@ -12,6 +12,7 @@ import { creditPulse } from './economy.js';
 import { getRawSetting, setSetting } from './settings.js';
 import { generateQuizQuestions } from './aiQuiz.js';
 import { pulsarEventIntro } from './pulsar.js';
+import { recordChallengeMetric } from './challenges.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
@@ -161,6 +162,7 @@ export async function runCommunityQuiz(channel: GuildTextBasedChannel, opts: Run
         const s = scores.get(uid)!;
         s.correct++;
         s.points += points;
+        void recordChallengeMetric(channel.client, uid, s.name, 'quiz_correct');
       }
     }
 

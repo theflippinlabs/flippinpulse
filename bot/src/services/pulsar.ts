@@ -20,6 +20,8 @@ export interface PulsarConfig {
   celebrate: boolean;
   recap: boolean;
   recap_time_utc: string;
+  missions: boolean;
+  mission_interval_hours: number;
 }
 
 const DEFAULTS: PulsarConfig = {
@@ -34,10 +36,20 @@ const DEFAULTS: PulsarConfig = {
   celebrate: true,
   recap: true,
   recap_time_utc: '20:00',
+  missions: true,
+  mission_interval_hours: 6,
 };
 
 export function getPulsarConfig(): PulsarConfig {
   return { ...DEFAULTS, ...(getRawSetting<Partial<PulsarConfig>>('pulsar_config') ?? {}) };
+}
+
+// Generate a line of text in Pulsar's voice (used by the missions system).
+// Gated only on the API key so manual admin actions can use it even if
+// Pulsar's autonomous posting is off.
+export async function pulsarCompose(task: string, maxTokens = 220): Promise<string | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  return chat(persona(getPulsarConfig().language), task, maxTokens);
 }
 
 function persona(language: string): string {

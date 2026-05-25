@@ -321,6 +321,41 @@ CREATE TABLE IF NOT EXISTS public.lottery_tickets (
 CREATE INDEX IF NOT EXISTS idx_lottery_tickets_round ON public.lottery_tickets (round_id);
 ALTER TABLE public.lottery_tickets ENABLE ROW LEVEL SECURITY;
 
+-- ---------- Pulsar missions (challenges), per guild ----------
+CREATE TABLE IF NOT EXISTS public.pulse_challenges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guild_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  metric TEXT,
+  goal INTEGER,
+  reward INTEGER NOT NULL DEFAULT 50,
+  max_winners INTEGER,
+  answer TEXT,
+  channel_id TEXT,
+  message_id TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  winners_count INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pulse_challenges_guild ON public.pulse_challenges (guild_id, status);
+ALTER TABLE public.pulse_challenges ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.challenge_claims (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id UUID NOT NULL REFERENCES public.pulse_challenges(id) ON DELETE CASCADE,
+  guild_id TEXT NOT NULL,
+  discord_id TEXT NOT NULL,
+  progress INTEGER NOT NULL DEFAULT 0,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (challenge_id, discord_id)
+);
+CREATE INDEX IF NOT EXISTS idx_challenge_claims_cid ON public.challenge_claims (challenge_id);
+ALTER TABLE public.challenge_claims ENABLE ROW LEVEL SECURITY;
+
 -- ---------- updated_at triggers ----------
 DROP TRIGGER IF EXISTS update_discord_users_updated_at ON public.discord_users;
 CREATE TRIGGER update_discord_users_updated_at BEFORE UPDATE ON public.discord_users FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
