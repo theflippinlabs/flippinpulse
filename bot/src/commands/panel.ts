@@ -15,6 +15,7 @@ import {
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
+  UserSelectMenuBuilder,
 } from 'discord.js';
 import {
   getRawSetting, setSetting,
@@ -22,11 +23,15 @@ import {
   getDailyCapConfig, getStreakConfig, getDecayConfig, getEconomyConfig, getPointsConfig,
 } from '../services/settings.js';
 import { getAutoQuizConfig, launchQuiz } from '../services/communityQuiz.js';
+import { grantPulse, revokePulse, setPulse } from '../services/economy.js';
+import { supabase } from '../supabase.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
-type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy';
+type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop';
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
+
+const SHOP_CATEGORIES = ['role', 'perk', 'ticket', 'cosmetic', 'irl'];
 
 interface Module { label: string; emoji: string; settingKey: string; field: string; read: () => boolean; }
 
@@ -55,6 +60,8 @@ function navRow(): Row {
       { label: 'Channels', value: 'channels', emoji: '#️⃣' },
       { label: 'Auto-quiz', value: 'quiz', emoji: '🧠' },
       { label: 'Economy', value: 'economy', emoji: '💰' },
+      { label: 'Give / remove PULSE', value: 'pulse', emoji: '🎁' },
+      { label: 'Shop', value: 'shop', emoji: '🛒' },
     );
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(select);
 }
@@ -108,13 +115,15 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
       new ButtonBuilder().setCustomId('panel:quiztimes').setLabel('Set times').setEmoji('🕐').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('panel:quiztopics').setLabel('Set topics').setEmoji('🏷️').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('panel:quiznums').setLabel('Set numbers').setEmoji('🔢').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:quizping').setLabel(`@everyone: ${c.ping_everyone ? 'ON' : 'OFF'}`).setEmoji('📢').setStyle(ButtonStyle.Secondary),
     ));
     return {
       embeds: [pulseEmbed('🧠 Auto-quiz').setDescription(
         `**Status:** ${c.enabled ? 'ON ✅' : 'OFF ⛔'} · **Channel:** ${c.channel_id ? `<#${c.channel_id}>` : '*(set in Channels)*'}\n` +
         `**Daily times (UTC):** ${c.daily_times_utc.join(', ')}\n` +
         `**Questions:** ${c.questions_per_round}${c.bonus_enabled ? ' + 1 bonus (×2)' : ''} · **${c.seconds_per_question}s** · **+${c.reward_per_correct}** PULSE\n` +
-        `**AI:** ${c.auto_generate ? `ON (${c.language})` : 'OFF'} · **Topics:** ${c.topics.join(', ')}`
+        `**AI:** ${c.auto_generate ? `ON (${c.language})` : 'OFF'} · **Topics:** ${c.topics.join(', ')}\n` +
+        `**Announce:** ${c.ping_everyone ? `@everyone ${c.announce_lead_minutes} min before` : 'silent'}`
       )],
       components: rows,
     };
@@ -129,11 +138,14 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
       embeds: [pulseEmbed('💰 Economy').setDescription(
         `**PULSE per point:** ${e.pulse_per_point}\n` +
         `**Points — message:** ${p.message} · **reaction:** ${p.reaction} · **voice/min:** ${p.voice_per_minute}\n\n` +
-        `*Give/remove PULSE uses \`/givepulse\` etc. (member picker). Shop uses \`/shopadmin\`.*`
+        `*Use the **Give / remove PULSE** and **Shop** sections to manage members & items.*`
       )],
       components: rows,
     };
   }
+
+  if (section === 'pulse') return renderPulse();
+  if (section === 'shop') return renderShop();
 
   // home
   const modLines = Object.values(MODULES).map(m => `${m.read() ? '✅' : '⛔'} ${m.emoji}`).join('  ');
@@ -146,7 +158,50 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
       'Use the **section menu** above to configure everything.\n\n' +
       `**Modules:** ${modLines}\n` +
       `**Auto-quiz:** ${getAutoQuizConfig().enabled ? 'ON ✅' : 'OFF ⛔'}\n\n` +
-      '*Sections: Modules · Channels · Auto-quiz · Economy. Giving PULSE & shop stay on `/givepulse` / `/shopadmin`.*'
+      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop.*'
+    )],
+    components: rows,
+  };
+}
+
+function renderPulse(selectedUserId?: string): { embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] } {
+  const rows: Row[] = [navRow()];
+  rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new UserSelectMenuBuilder().setCustomId('panel:pulseuser').setPlaceholder('👤 Pick a member…').setMinValues(1).setMaxValues(1)));
+
+  if (selectedUserId) {
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(`panel:pulse:give:${selectedUserId}`).setLabel('Give').setEmoji('➕').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`panel:pulse:remove:${selectedUserId}`).setLabel('Remove').setEmoji('➖').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`panel:pulse:set:${selectedUserId}`).setLabel('Set exact').setEmoji('🎯').setStyle(ButtonStyle.Secondary),
+    ));
+  }
+
+  return {
+    embeds: [pulseEmbed('🎁 Give / remove PULSE').setDescription(
+      selectedUserId
+        ? `Selected: <@${selectedUserId}>\n\nChoose an action below — you'll be asked for an amount.`
+        : 'Pick a member, then choose **Give**, **Remove**, or **Set exact**.'
+    )],
+    components: rows,
+  };
+}
+
+function renderShop(): { embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] } {
+  const rows: Row[] = [navRow()];
+  rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId('panel:shop:add').setLabel('Add item').setEmoji('➕').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel:shop:list').setLabel('List items').setEmoji('📋').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel:shop:remove').setLabel('Hide item').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+  ));
+  rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId('panel:shop:price').setLabel('Set price').setEmoji('💱').setStyle(ButtonStyle.Secondary),
+  ));
+  return {
+    embeds: [pulseEmbed('🛒 Shop').setDescription(
+      `Manage the PULSE shop:\n\n` +
+      `➕ **Add item** · 📋 **List** · 🗑️ **Hide** · 💱 **Set price**\n\n` +
+      `Categories: ${SHOP_CATEGORIES.join(', ')}.`
     )],
     components: rows,
   };
@@ -176,6 +231,12 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     return;
   }
 
+  // PULSE member picker
+  if (interaction.isUserSelectMenu() && interaction.customId === 'panel:pulseuser') {
+    await interaction.update(renderPulse(interaction.values[0]));
+    return;
+  }
+
   // Channel pickers
   if (interaction.isChannelSelectMenu() && interaction.customId.startsWith('panel:chan:')) {
     const which = interaction.customId.split(':')[2];
@@ -195,6 +256,7 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
 
     if (id === 'panel:quiztoggle') { await patch('auto_quiz', { enabled: !getAutoQuizConfig().enabled }); await interaction.update(render('quiz')); return; }
     if (id === 'panel:quizbonus') { await patch('auto_quiz', { bonus_enabled: !getAutoQuizConfig().bonus_enabled }); await interaction.update(render('quiz')); return; }
+    if (id === 'panel:quizping') { await patch('auto_quiz', { ping_everyone: !getAutoQuizConfig().ping_everyone }); await interaction.update(render('quiz')); return; }
 
     if (id === 'panel:quiznow') {
       const channel = interaction.channel;
@@ -211,6 +273,33 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     if (id === 'panel:quiztopics') { await interaction.showModal(topicsModal()); return; }
     if (id === 'panel:quiznums') { await interaction.showModal(numsModal()); return; }
     if (id === 'panel:ecotune') { await interaction.showModal(ecoModal()); return; }
+
+    // PULSE actions: panel:pulse:<action>:<userId>
+    if (id.startsWith('panel:pulse:')) {
+      const [, , action, userId] = id.split(':');
+      await interaction.showModal(pulseModal(action, userId));
+      return;
+    }
+
+    // Shop actions
+    if (id === 'panel:shop:add') { await interaction.showModal(shopAddModal()); return; }
+    if (id === 'panel:shop:remove') { await interaction.showModal(shopNameModal('remove', 'Hide a shop item')); return; }
+    if (id === 'panel:shop:price') { await interaction.showModal(shopPriceModal()); return; }
+    if (id === 'panel:shop:list') {
+      const { data: items } = await supabase
+        .from('shop_items')
+        .select('name, price_pulse, category, is_active, stock_remaining')
+        .order('price_pulse', { ascending: true })
+        .limit(40);
+      const desc = !items?.length
+        ? 'No items yet. Use **Add item**.'
+        : items.map(i => {
+            const stock = i.stock_remaining !== null ? ` · ${i.stock_remaining} left` : '';
+            return `${i.is_active ? '🟢' : '⚫'} **${i.name}** — ${i.price_pulse} PULSE · ${i.category}${stock}`;
+          }).join('\n');
+      await interaction.reply({ embeds: [pulseEmbed('🛒 Shop items').setDescription(desc.slice(0, 4000))], flags: MessageFlags.Ephemeral });
+      return;
+    }
     return;
   }
 
@@ -253,6 +342,71 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
         await interaction.reply({ embeds: [successEmbed('Economy updated.')], flags: MessageFlags.Ephemeral });
         return;
       }
+
+      // PULSE give/remove/set: panel:modal:pulse:<action>:<userId>
+      if (id.startsWith('panel:modal:pulse:')) {
+        const [, , , action, userId] = id.split(':');
+        const amount = Number(interaction.fields.getTextInputValue('amt'));
+        const reason = (interaction.fields.getTextInputValue('reason') || 'Admin panel').trim();
+        if (!Number.isFinite(amount) || amount < (action === 'set' ? 0 : 1)) {
+          await interaction.reply({ embeds: [errorEmbed('Enter a valid amount.')], flags: MessageFlags.Ephemeral });
+          return;
+        }
+        const user = await interaction.client.users.fetch(userId).catch(() => null);
+        if (!user || user.bot) {
+          await interaction.reply({ embeds: [errorEmbed('That member could not be found.')], flags: MessageFlags.Ephemeral });
+          return;
+        }
+        const res = action === 'give'
+          ? await grantPulse(user.id, user.username, user.displayAvatarURL(), amount, reason, interaction.user.id)
+          : action === 'remove'
+            ? await revokePulse(user.id, amount, reason, interaction.user.id)
+            : await setPulse(user.id, user.username, user.displayAvatarURL(), amount, reason, interaction.user.id);
+        if (!res.success) {
+          await interaction.reply({ embeds: [errorEmbed(res.error ?? 'Failed.')], flags: MessageFlags.Ephemeral });
+          return;
+        }
+        const verb = action === 'give' ? 'Gave' : action === 'remove' ? 'Removed' : 'Set balance for';
+        await interaction.reply({ embeds: [successEmbed(`${verb} **${amount}** PULSE — <@${user.id}> now has **${res.newBalance}** PULSE.`)], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (id === 'panel:modal:shopadd') {
+        const name = interaction.fields.getTextInputValue('name').trim();
+        const price = Number(interaction.fields.getTextInputValue('price'));
+        let category = (interaction.fields.getTextInputValue('category') || 'perk').toLowerCase().trim();
+        if (!SHOP_CATEGORIES.includes(category)) category = 'perk';
+        const description = interaction.fields.getTextInputValue('description').trim();
+        const stockRaw = interaction.fields.getTextInputValue('stock').trim();
+        const stock = stockRaw ? Math.max(1, Math.floor(Number(stockRaw))) : null;
+        if (!name || !Number.isFinite(price) || price < 0) {
+          await interaction.reply({ embeds: [errorEmbed('Enter a name and a valid price.')], flags: MessageFlags.Ephemeral });
+          return;
+        }
+        const { error } = await supabase.from('shop_items').insert({
+          name, description, category, price_pulse: Math.floor(price),
+          stock_total: stock, stock_remaining: stock, max_per_user: 1, is_active: true,
+        });
+        if (error) { await interaction.reply({ embeds: [errorEmbed(`Could not add item: ${error.message}`)], flags: MessageFlags.Ephemeral }); return; }
+        await interaction.reply({ embeds: [successEmbed(`Added **${name}** — ${Math.floor(price)} PULSE (${category})${stock ? `, stock ${stock}` : ''}.`)], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (id === 'panel:modal:shopremove' || id === 'panel:modal:shopprice') {
+        const name = interaction.fields.getTextInputValue('name').trim();
+        const { data: item } = await supabase.from('shop_items').select('id, name').ilike('name', name).limit(1).maybeSingle();
+        if (!item) { await interaction.reply({ embeds: [errorEmbed(`No item named "${name}". Use **List items** to check.`)], flags: MessageFlags.Ephemeral }); return; }
+        if (id === 'panel:modal:shopremove') {
+          await supabase.from('shop_items').update({ is_active: false }).eq('id', item.id);
+          await interaction.reply({ embeds: [successEmbed(`**${item.name}** is now hidden from the shop.`)], flags: MessageFlags.Ephemeral });
+        } else {
+          const price = Number(interaction.fields.getTextInputValue('price'));
+          if (!Number.isFinite(price) || price < 0) { await interaction.reply({ embeds: [errorEmbed('Enter a valid price.')], flags: MessageFlags.Ephemeral }); return; }
+          await supabase.from('shop_items').update({ price_pulse: Math.floor(price) }).eq('id', item.id);
+          await interaction.reply({ embeds: [successEmbed(`**${item.name}** price set to **${Math.floor(price)}** PULSE.`)], flags: MessageFlags.Ephemeral });
+        }
+        return;
+      }
     } catch (err) {
       log('ERROR', 'Panel modal failed', err);
       if (!interaction.replied) await interaction.reply({ embeds: [errorEmbed('Failed to save.')], flags: MessageFlags.Ephemeral }).catch(() => {});
@@ -293,4 +447,39 @@ function ecoModal(): ModalBuilder {
     f('m', 'Points per message', String(p.message)),
     f('re', 'Points per reaction', String(p.reaction)),
     f('v', 'Points per voice minute', String(p.voice_per_minute)));
+}
+
+function pulseModal(action: string, userId: string): ModalBuilder {
+  const title = action === 'give' ? 'Give PULSE' : action === 'remove' ? 'Remove PULSE' : 'Set PULSE balance';
+  return new ModalBuilder().setCustomId(`panel:modal:pulse:${action}:${userId}`).setTitle(title).addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('amt').setLabel(action === 'set' ? 'Exact balance' : 'Amount').setStyle(TextInputStyle.Short).setRequired(true)),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('reason').setLabel('Reason (optional)').setStyle(TextInputStyle.Short).setRequired(false)));
+}
+
+function shopAddModal(): ModalBuilder {
+  const f = (cid: string, label: string, required: boolean, style = TextInputStyle.Short) =>
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId(cid).setLabel(label).setStyle(style).setRequired(required));
+  return new ModalBuilder().setCustomId('panel:modal:shopadd').setTitle('Add shop item').addComponents(
+    f('name', 'Item name', true),
+    f('price', 'Price in PULSE', true),
+    f('category', `Category (${SHOP_CATEGORIES.join('/')})`, false),
+    f('description', 'Description (optional)', false, TextInputStyle.Paragraph),
+    f('stock', 'Stock (blank = unlimited)', false));
+}
+
+function shopNameModal(kind: string, title: string): ModalBuilder {
+  return new ModalBuilder().setCustomId(`panel:modal:shop${kind}`).setTitle(title).addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('name').setLabel('Item name').setStyle(TextInputStyle.Short).setRequired(true)));
+}
+
+function shopPriceModal(): ModalBuilder {
+  return new ModalBuilder().setCustomId('panel:modal:shopprice').setTitle('Set item price').addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('name').setLabel('Item name').setStyle(TextInputStyle.Short).setRequired(true)),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('price').setLabel('New price in PULSE').setStyle(TextInputStyle.Short).setRequired(true)));
 }
