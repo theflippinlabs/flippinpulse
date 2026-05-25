@@ -8,6 +8,7 @@ import {
   getGiveawayByMessage,
 } from '../services/giveaways.js';
 import { handleLobbyButton } from '../services/lobby.js';
+import { handlePanelInteraction } from '../commands/panel.js';
 import { log } from '../utils/logger.js';
 
 async function handleGiveawayButton(interaction: ButtonInteraction): Promise<void> {
@@ -37,6 +38,15 @@ async function handleGiveawayButton(interaction: ButtonInteraction): Promise<voi
 }
 
 export async function handleInteractionCreate(interaction: Interaction): Promise<void> {
+  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith('panel:')) {
+    try {
+      await handlePanelInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Panel interaction handler crashed', err);
+    }
+    return;
+  }
+
   if (interaction.isButton()) {
     if (interaction.customId.startsWith('lobby_')) {
       try {
