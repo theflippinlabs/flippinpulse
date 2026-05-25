@@ -4,6 +4,7 @@ import { runWithGuild, currentGuildId } from '../guildContext.js';
 import { spendPulse } from './economy.js';
 import { earnPulse } from './games.js';
 import { getRawSetting, setSetting } from './settings.js';
+import { pulsarEventIntro } from './pulsar.js';
 import { log } from '../utils/logger.js';
 
 export interface LotteryConfig {
@@ -222,15 +223,17 @@ async function maybeAnnounce(client: Client, round: LotteryRound): Promise<void>
   await setSetting('lottery_announce_state', { last: Date.now() });
 
   const drawTs = Math.floor(new Date(round.draw_at).getTime() / 1000);
+  const hosted = await pulsarEventIntro('lottery jackpot reminder',
+    `current jackpot ${round.pot_pulse} PULSE, tickets ${round.ticket_price} PULSE each via /lottery buy, next draw <t:${drawTs}:R>`).catch(() => null);
   const embed = new EmbedBuilder()
     .setColor(0xF59E0B)
     .setTitle('🎰 Lottery Jackpot Reminder')
-    .setDescription(
+    .setDescription(hosted ?? (
       `The current jackpot is **${round.pot_pulse} PULSE**! 💰\n\n` +
       `🎟️ Tickets cost **${round.ticket_price} PULSE** each — buy in with \`/lottery buy\`.\n` +
       `⏰ Next draw <t:${drawTs}:R>.\n\n` +
       `The more tickets you hold, the better your odds. Good luck! 🍀`
-    )
+    ))
     .setTimestamp();
 
   await channel.send({

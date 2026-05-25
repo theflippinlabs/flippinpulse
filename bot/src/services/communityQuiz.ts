@@ -11,6 +11,7 @@ import { runWithGuild, currentGuildId } from '../guildContext.js';
 import { creditPulse } from './economy.js';
 import { getRawSetting, setSetting } from './settings.js';
 import { generateQuizQuestions } from './aiQuiz.js';
+import { pulsarEventIntro } from './pulsar.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
@@ -282,13 +283,16 @@ async function tickGuild(client: Client, guildId: string): Promise<void> {
 
       const channel = await fetchQuizChannel(client, cfg.channel_id);
       if (channel) {
+        const hosted = await pulsarEventIntro('community quiz',
+          `starts in about ${teaser.minutes} minute(s), ${cfg.questions_per_round} questions${cfg.bonus_enabled ? ' plus a bonus' : ''}, +${cfg.reward_per_correct} PULSE per correct answer`).catch(() => null);
+        const description = hosted ?? (
+          `Get ready — a **Community Quiz** starts in about **${teaser.minutes} minute${teaser.minutes === 1 ? '' : 's'}**! ⏳\n\n` +
+          `📋 ${cfg.questions_per_round} questions${cfg.bonus_enabled ? ' + a 🌟 bonus' : ''} · 💰 **+${cfg.reward_per_correct} PULSE** per correct answer\n\n` +
+          `Stick around and sharpen your brain! 🧠✨`
+        );
         await channel.send({
           content: cfg.ping_everyone ? '@everyone' : undefined,
-          embeds: [pulseEmbed('🧠 Quiz incoming!').setDescription(
-            `Get ready — a **Community Quiz** starts in about **${teaser.minutes} minute${teaser.minutes === 1 ? '' : 's'}**! ⏳\n\n` +
-            `📋 ${cfg.questions_per_round} questions${cfg.bonus_enabled ? ' + a 🌟 bonus' : ''} · 💰 **+${cfg.reward_per_correct} PULSE** per correct answer\n\n` +
-            `Stick around and sharpen your brain! 🧠✨`
-          )],
+          embeds: [pulseEmbed('🧠 Quiz incoming!').setDescription(description)],
           allowedMentions: cfg.ping_everyone ? { parse: ['everyone'] } : { parse: [] },
         }).catch(() => {});
       }

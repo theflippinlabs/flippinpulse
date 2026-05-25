@@ -157,16 +157,23 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
       new ButtonBuilder().setCustomId('panel:pulsarreply').setLabel(`Replies: ${c.reply_to_mentions ? 'ON' : 'OFF'}`).setEmoji('💬').setStyle(ButtonStyle.Secondary),
     ));
     rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('panel:pulsarwelcome').setLabel(`Welcomes: ${c.welcome ? 'ON' : 'OFF'}`).setEmoji('👋').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:pulsarevents').setLabel(`Host events: ${c.host_events ? 'ON' : 'OFF'}`).setEmoji('🎤').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:pulsarrecap').setLabel(`Daily recap: ${c.recap ? 'ON' : 'OFF'}`).setEmoji('📰').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('panel:pulsarcelebrate').setLabel(`Celebrate: ${c.celebrate ? 'ON' : 'OFF'}`).setEmoji('🎉').setStyle(ButtonStyle.Secondary),
+    ));
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder().setCustomId('panel:pulsartune').setLabel('Settings').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('panel:pulsarnow').setLabel('Post now').setEmoji('🤖').setStyle(ButtonStyle.Primary),
     ));
     return {
       embeds: [pulseEmbed('🤖 Pulsar — AI community host').setDescription(
         `**Status:** ${c.enabled ? 'ON ✅' : 'OFF ⛔'} · **Channel:** ${c.channel_id ? `<#${c.channel_id}>` : '*(pick one above)*'}\n` +
-        `**Posts spontaneously:** about every **${c.interval_hours}h** (only when the channel is active)\n` +
-        `**Tags active members:** ${c.tag_active_members ? 'ON' : 'OFF'} · **Replies when mentioned:** ${c.reply_to_mentions ? 'ON' : 'OFF'}\n` +
+        `**Posts to engage:** about every **${c.interval_hours}h** — even when it's quiet, to revive the chat\n` +
+        `**Tags members:** ${c.tag_active_members ? 'ON' : 'OFF'} · **Replies when mentioned:** ${c.reply_to_mentions ? 'ON' : 'OFF'}\n` +
+        `**Welcomes:** ${c.welcome ? 'ON' : 'OFF'} · **Host events:** ${c.host_events ? 'ON' : 'OFF'} · **Recap (${c.recap_time_utc} UTC):** ${c.recap ? 'ON' : 'OFF'} · **Celebrate:** ${c.celebrate ? 'ON' : 'OFF'}\n` +
         `**Language:** ${c.language}\n\n` +
-        `${process.env.ANTHROPIC_API_KEY ? 'Pulsar asks questions, checks in on members and keeps the vibe going. 🎉' : '⚠️ Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.'}`
+        `${process.env.ANTHROPIC_API_KEY ? 'Pulsar welcomes newcomers, hosts events, celebrates wins and keeps the vibe going. 🎉' : '⚠️ Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.'}`
       )],
       components: rows,
     };
@@ -307,6 +314,10 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     if (id === 'panel:pulsartoggle') { await patch('pulsar_config', { enabled: !getPulsarConfig().enabled }); await interaction.update(render('pulsar')); return; }
     if (id === 'panel:pulsartag') { await patch('pulsar_config', { tag_active_members: !getPulsarConfig().tag_active_members }); await interaction.update(render('pulsar')); return; }
     if (id === 'panel:pulsarreply') { await patch('pulsar_config', { reply_to_mentions: !getPulsarConfig().reply_to_mentions }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsarwelcome') { await patch('pulsar_config', { welcome: !getPulsarConfig().welcome }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsarevents') { await patch('pulsar_config', { host_events: !getPulsarConfig().host_events }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsarrecap') { await patch('pulsar_config', { recap: !getPulsarConfig().recap }); await interaction.update(render('pulsar')); return; }
+    if (id === 'panel:pulsarcelebrate') { await patch('pulsar_config', { celebrate: !getPulsarConfig().celebrate }); await interaction.update(render('pulsar')); return; }
     if (id === 'panel:pulsartune') { await interaction.showModal(pulsarModal()); return; }
     if (id === 'panel:pulsarnow') {
       const cfg = getPulsarConfig();
@@ -389,9 +400,11 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
       if (id === 'panel:modal:pulsar') {
         const c = getPulsarConfig();
         const hrs = Number(interaction.fields.getTextInputValue('h'));
+        const recapTime = interaction.fields.getTextInputValue('r').trim();
         await patch('pulsar_config', {
           interval_hours: Number.isFinite(hrs) && hrs >= 0.5 ? Math.min(24, hrs) : c.interval_hours,
           language: interaction.fields.getTextInputValue('l').trim() || c.language,
+          recap_time_utc: /^\d{1,2}:\d{2}$/.test(recapTime) ? recapTime : c.recap_time_utc,
         });
         await interaction.reply({ embeds: [successEmbed('Pulsar settings updated.')], flags: MessageFlags.Ephemeral });
         return;
@@ -534,9 +547,11 @@ function pulsarModal(): ModalBuilder {
   const c = getPulsarConfig();
   return new ModalBuilder().setCustomId('panel:modal:pulsar').setTitle('Pulsar settings').addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder().setCustomId('h').setLabel('Hours between spontaneous posts (0.5-24)').setStyle(TextInputStyle.Short).setValue(String(c.interval_hours)).setRequired(true)),
+      new TextInputBuilder().setCustomId('h').setLabel('Hours between posts (0.5-24)').setStyle(TextInputStyle.Short).setValue(String(c.interval_hours)).setRequired(true)),
     new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder().setCustomId('l').setLabel('Language (e.g. English, French)').setStyle(TextInputStyle.Short).setValue(c.language).setRequired(true)));
+      new TextInputBuilder().setCustomId('l').setLabel('Language (e.g. English, French)').setStyle(TextInputStyle.Short).setValue(c.language).setRequired(true)),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId('r').setLabel('Daily recap time (UTC, e.g. 20:00)').setStyle(TextInputStyle.Short).setValue(c.recap_time_utc).setRequired(true)));
 }
 
 function shopPriceModal(): ModalBuilder {

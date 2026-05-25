@@ -1,4 +1,4 @@
-import { Client, Message, GuildTextBasedChannel } from 'discord.js';
+import { Client, Message, GuildMember, GuildTextBasedChannel } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { runWithGuild } from '../guildContext.js';
 import { getRawSetting, setSetting } from './settings.js';
@@ -15,6 +15,11 @@ export interface PulsarConfig {
   interval_hours: number;
   tag_active_members: boolean;
   reply_to_mentions: boolean;
+  welcome: boolean;
+  host_events: boolean;
+  celebrate: boolean;
+  recap: boolean;
+  recap_time_utc: string;
 }
 
 const DEFAULTS: PulsarConfig = {
@@ -24,6 +29,11 @@ const DEFAULTS: PulsarConfig = {
   interval_hours: 3.5,
   tag_active_members: true,
   reply_to_mentions: true,
+  welcome: true,
+  host_events: true,
+  celebrate: true,
+  recap: true,
+  recap_time_utc: '20:00',
 };
 
 export function getPulsarConfig(): PulsarConfig {
@@ -175,6 +185,80 @@ export async function maybeReply(message: Message): Promise<void> {
   }).catch(() => {});
 }
 
+// ---- Orchestrator roles ----
+
+// AI-written welcome for a new member. Returns null when Pulsar can't write one
+// (disabled, role off, or no API key) so the caller falls back to the embed.
+export async function pulsarWelcomeText(member: GuildMember): Promise<string | null> {
+  const cfg = getPulsarConfig();
+  if (!cfg.enabled || !cfg.welcome || !process.env.ANTHROPIC_API_KEY) return null;
+  const user =
+    `A new member just joined the server: "${member.user.username}". ` +
+    `Write a warm, hype welcome that makes them feel at home. Address them with the token {user} exactly once. ` +
+    `Invite them to say hi and check out the games, quizzes and PULSE rewards. 1-2 sentences.`;
+  const text = await chat(persona(cfg.language), user, 200);
+  if (!text) return null;
+  return text.includes('{user}') ? text.replace('{user}', `<@${member.id}>`) : `<@${member.id}> ${text}`;
+}
+
+// Short hype intro for an upcoming event. Returns null to keep the default text.
+export async function pulsarEventIntro(kind: string, details: string): Promise<string | null> {
+  const cfg = getPulsarConfig();
+  if (!cfg.enabled || !cfg.host_events || !process.env.ANTHROPIC_API_KEY) return null;
+  const user =
+    `As the community host, write a short hype intro announcing this ${kind}: ${details}. ` +
+    `1-2 sentences, get people excited to take part. Never write @everyone or @here.`;
+  return await chat(persona(cfg.language), user, 160);
+}
+
+// Post a celebration to Pulsar's channel (rank-ups, milestones, big wins).
+export async function pulsarCelebrate(client: Client, occasion: string, mentionUserId?: string): Promise<void> {
+  const cfg = getPulsarConfig();
+  if (!cfg.enabled || !cfg.celebrate || !cfg.channel_id || !process.env.ANTHROPIC_API_KEY) return;
+  const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
+  if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) return;
+  let text = await chat(persona(cfg.language),
+    `Celebrate this moment for the community: ${occasion}. One short, hype, congratulatory message.` +
+    `${mentionUserId ? ' Address the member with the token {user} exactly once.' : ''}`, 160);
+  if (!text) return;
+  if (mentionUserId) {
+    text = text.includes('{user}') ? text.replace('{user}', `<@${mentionUserId}>`) : `<@${mentionUserId}> ${text}`;
+  } else {
+    text = text.replace(/\{user\}/g, '').trim();
+  }
+  await channel.send({
+    content: text.slice(0, 1800),
+    allowedMentions: { users: mentionUserId ? [mentionUserId] : [], parse: [] },
+  }).catch(() => {});
+}
+
+async function postRecap(client: Client, guildId: string): Promise<void> {
+  const cfg = getPulsarConfig();
+  if (!cfg.channel_id) return;
+  const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
+  if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) return;
+
+  const names = activeMembers(guildId, 24 * 60 * 60_000).map(a => a.name).slice(0, 6);
+  const user =
+    `Write a short, upbeat end-of-day recap for the community to keep the good vibes going. ` +
+    `${names.length ? `Give a friendly shout-out to a few people who were around today: ${names.join(', ')}. ` : ''}` +
+    `Encourage everyone to come back tomorrow for more games and quizzes. 2-3 sentences max.`;
+  const text = await chat(persona(cfg.language), user, 280);
+  if (!text) return;
+  await channel.send({ content: text.slice(0, 1800), allowedMentions: { parse: [] } }).catch(() => {});
+}
+
+function recapDue(cfg: PulsarConfig, lastRecapDate: string | undefined): boolean {
+  if (!cfg.recap) return false;
+  const m = cfg.recap_time_utc.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return false;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (lastRecapDate === today) return false;
+  const sched = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Number(m[1]), Number(m[2]));
+  return now.getTime() >= sched && now.getTime() < sched + 60 * 60_000;
+}
+
 // ---- Scheduler (per guild) ----
 let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -183,13 +267,21 @@ async function tickGuild(client: Client, guildId: string): Promise<void> {
     const cfg = getPulsarConfig();
     if (!cfg.enabled || !cfg.channel_id) return;
 
-    const state = getRawSetting<{ last?: number }>('pulsar_state') ?? {};
+    const state = getRawSetting<{ last?: number; recapDate?: string }>('pulsar_state') ?? {};
+
+    // Daily recap takes priority over a spontaneous post when it's due.
+    if (recapDue(cfg, state.recapDate)) {
+      await setSetting('pulsar_state', { ...state, recapDate: new Date().toISOString().slice(0, 10) });
+      await postRecap(client, guildId);
+      return;
+    }
+
     const intervalMs = Math.max(0.5, cfg.interval_hours) * 3_600_000;
     if (state.last && Date.now() - state.last < intervalMs) return;
 
     // Pulsar's job is to ENGAGE — it posts on schedule even when the channel is
     // quiet, to revive the conversation and pull people back in.
-    await setSetting('pulsar_state', { last: Date.now() });
+    await setSetting('pulsar_state', { ...state, last: Date.now() });
     await postSpontaneous(client, guildId);
   });
 }

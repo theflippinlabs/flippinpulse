@@ -2,6 +2,7 @@ import { ChannelType, EmbedBuilder, Guild, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { runWithGuild, currentGuildIdOrNull } from '../guildContext.js';
 import { getRankUpConfig } from './settings.js';
+import { pulsarCelebrate } from './pulsar.js';
 import { log } from '../utils/logger.js';
 
 interface RankConfig {
@@ -129,4 +130,6 @@ async function announceRankUp(
     content: config.ping_user ? `<@${member.id}>` : undefined,
     embeds: [embed],
   });
+
+  void pulsarCelebrate(member.client, `${member.user.username} just ranked up to ${newRank.rank_name}`, member.id);
 }
