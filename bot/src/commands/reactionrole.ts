@@ -19,7 +19,7 @@ function parseEmoji(input: string): string | null {
 export const data = new SlashCommandBuilder()
   .setName('reactionrole')
   .setDescription('Manage reaction roles (admin only)')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand(sub =>
     sub.setName('add')
       .setDescription('Bind an emoji on a message to a role')

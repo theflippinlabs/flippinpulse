@@ -21,7 +21,7 @@ const MAX_DURATION_MS = 30 * 24 * 60 * 60_000;
 export const data = new SlashCommandBuilder()
   .setName('giveaway')
   .setDescription('Run a giveaway')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand(sub =>
     sub.setName('start')
       .setDescription('Start a giveaway')

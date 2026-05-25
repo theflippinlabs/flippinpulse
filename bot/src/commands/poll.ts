@@ -6,6 +6,7 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder,
   MessageFlags,
+  PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
 import { errorEmbed } from '../utils/embeds.js';
@@ -34,6 +35,7 @@ function renderBar(percent: number): string {
 export const data = new SlashCommandBuilder()
   .setName('poll')
   .setDescription('Start a quick poll')
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addStringOption(o => o.setName('question').setDescription('Poll question').setRequired(true))
   .addStringOption(o => o.setName('options').setDescription('Comma-separated options (2-5)').setRequired(true))
   .addStringOption(o => o.setName('duration').setDescription('Duration e.g. 5m, 1h (default 5m, max 24h)').setRequired(false));
