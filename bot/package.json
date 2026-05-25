@@ -10,6 +10,7 @@
     "setup-db": "tsx src/setup-db-cli.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "@supabase/supabase-js": "^2.98.0",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.7",
