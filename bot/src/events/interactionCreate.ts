@@ -39,7 +39,10 @@ async function handleGiveawayButton(interaction: ButtonInteraction): Promise<voi
 }
 
 export async function handleInteractionCreate(interaction: Interaction): Promise<void> {
-  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith('panel:')) {
+  if (
+    (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isModalSubmit())
+    && interaction.customId.startsWith('panel:')
+  ) {
     if (!interaction.guildId) return;
     try {
       await runWithGuild(interaction.guildId, () => handlePanelInteraction(interaction));
