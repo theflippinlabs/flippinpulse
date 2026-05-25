@@ -202,7 +202,7 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
         `Launch a mission now — it posts in Pulsar's channel ${ch ? `(<#${ch}>)` : '*(set one in the Pulsar section first)*'}.\n\n` +
         `⚡ **Flash** — first 3 to claim win 50 PULSE (30 min)\n` +
         `🧩 **Riddle** — first to solve wins 100 PULSE (needs AI key)\n` +
-        `📅 **Daily / 🗓️ Weekly** — auto-tracked goal (messages), credits PULSE on completion\n\n` +
+        `📅 **Daily** — send 20 messages · 🗓️ **Weekly** — play 5 games (auto-tracked, credits PULSE)\n\n` +
         `🔁 **Auto-launch:** ${c.missions ? `ON — Pulsar starts one about every ${c.mission_interval_hours}h` : 'OFF'} (needs Pulsar ON).`
       )],
       components: rows,
@@ -381,7 +381,7 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
       if (id === 'panel:missionflash') void launchFlash(interaction.client, ch, { reward: 50, maxWinners: 3, durationMin: 30 });
       else if (id === 'panel:missionriddle') void launchRiddle(interaction.client, ch, { reward: 100, durationMin: 60 });
       else if (id === 'panel:missiondaily') void launchObjective(interaction.client, ch, { kind: 'daily', metric: 'messages', goal: 20, reward: 60 });
-      else if (id === 'panel:missionweekly') void launchObjective(interaction.client, ch, { kind: 'weekly', metric: 'messages', goal: 100, reward: 250 });
+      else if (id === 'panel:missionweekly') void launchObjective(interaction.client, ch, { kind: 'weekly', metric: 'games_played', goal: 5, reward: 250 });
       return;
     }
 

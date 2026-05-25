@@ -22,7 +22,7 @@ import { log } from '../utils/logger.js';
 const MODEL = process.env.PULSAR_MODEL || process.env.AI_QUIZ_MODEL || 'claude-sonnet-4-6';
 
 export type ChallengeKind = 'flash' | 'riddle' | 'daily' | 'weekly';
-export type Metric = 'messages' | 'reactions' | 'quiz_correct' | 'lottery_tickets';
+export type Metric = 'messages' | 'reactions' | 'quiz_correct' | 'lottery_tickets' | 'games_played';
 
 interface Challenge {
   id: string;
@@ -47,6 +47,7 @@ const METRIC_LABEL: Record<Metric, string> = {
   reactions: 'add {n} reactions',
   quiz_correct: 'answer {n} quiz questions correctly',
   lottery_tickets: 'buy {n} lottery tickets',
+  games_played: 'play {n} games',
 };
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
@@ -73,7 +74,9 @@ async function activeObjectives(guildId: string): Promise<Challenge[]> {
 function invalidateCache(guildId: string) { objCache.delete(guildId); }
 
 // ---- Progress tracking for objective missions (call within guild context) ----
-export async function recordChallengeMetric(client: Client, discordId: string, username: string, metric: Metric, amount = 1): Promise<void> {
+// client may be null (e.g. called from the games service, which has no client);
+// username may be null and is looked up on completion so we never blank it.
+export async function recordChallengeMetric(client: Client | null, discordId: string, username: string | null, metric: Metric, amount = 1): Promise<void> {
   const guildId = currentGuildId();
   const objs = (await activeObjectives(guildId)).filter(c => c.metric === metric);
   if (!objs.length) return;
@@ -92,8 +95,13 @@ export async function recordChallengeMetric(client: Client, discordId: string, u
         challenge_id: c.id, guild_id: guildId, discord_id: discordId, progress, completed, updated_at: new Date().toISOString(),
       }, { onConflict: 'challenge_id,discord_id' });
       if (completed) {
-        await creditPulse(discordId, username, null, c.reward, `mission_${c.kind}`);
-        const channel = await sendableChannel(client, c.channel_id);
+        let name = username;
+        if (!name) {
+          const { data: u } = await supabase.from('discord_users').select('username').eq('guild_id', guildId).eq('discord_id', discordId).maybeSingle();
+          name = u?.username ?? 'member';
+        }
+        await creditPulse(discordId, name ?? 'member', null, c.reward, `mission_${c.kind}`);
+        const channel = client ? await sendableChannel(client, c.channel_id) : null;
         if (channel) {
           await channel.send({ content: `🎯 <@${discordId}> completed **${c.title}** and earned **${c.reward}** PULSE! 🎉`, allowedMentions: { users: [discordId], parse: [] } }).catch(() => {});
         }
@@ -294,10 +302,13 @@ async function autoLaunch(client: Client, channelId: string): Promise<void> {
   const kind = AUTO_KINDS[Math.floor(Math.random() * AUTO_KINDS.length)];
   if (kind === 'flash') return void launchFlash(client, channelId, { reward: 50, maxWinners: 3, durationMin: 30 });
   if (kind === 'riddle') return void launchRiddle(client, channelId, { reward: 100, durationMin: 60 });
-  const metrics: Metric[] = ['messages', 'reactions', 'quiz_correct', 'lottery_tickets'];
+  const metrics: Metric[] = ['messages', 'reactions', 'quiz_correct', 'lottery_tickets', 'games_played'];
   const metric = metrics[Math.floor(Math.random() * metrics.length)];
   const daily = kind === 'daily';
-  const goal = metric === 'messages' ? (daily ? 20 : 100) : metric === 'reactions' ? (daily ? 10 : 50) : (daily ? 2 : 8);
+  const goal = metric === 'messages' ? (daily ? 20 : 100)
+    : metric === 'reactions' ? (daily ? 10 : 50)
+    : metric === 'games_played' ? (daily ? 3 : 10)
+    : (daily ? 2 : 8);
   await launchObjective(client, channelId, { kind: daily ? 'daily' : 'weekly', metric, goal, reward: daily ? 60 : 250 });
 }
 
