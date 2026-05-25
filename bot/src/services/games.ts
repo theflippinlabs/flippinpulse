@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { recordChallengeMetric } from './challenges.js';
 import { log } from '../utils/logger.js';
 
 export interface GameConfig {
@@ -75,6 +76,7 @@ export async function addGamePlayer(
     bet_amount: betAmount,
     payout: 0,
   });
+  void recordChallengeMetric(null, discordId, null, 'games_played');
 }
 
 export async function setPlayerPayout(
