@@ -47,6 +47,83 @@ export async function spendPulse(
   return { success: true, newBalance };
 }
 
+export async function grantPulse(
+  discordId: string,
+  username: string,
+  avatarUrl: string | null,
+  amount: number,
+  reason: string,
+  adminId: string
+): Promise<SpendResult> {
+  if (amount <= 0) return { success: false, newBalance: 0, error: 'Amount must be positive' };
+
+  const { data: user } = await supabase
+    .from('discord_users')
+    .select('balance_pulse, lifetime_earned_pulse')
+    .eq('discord_id', discordId)
+    .single();
+
+  const currentBalance = user?.balance_pulse ?? 0;
+  const newBalance = currentBalance + amount;
+
+  await supabase.from('discord_users').upsert({
+    discord_id: discordId,
+    username,
+    avatar_url: avatarUrl,
+    balance_pulse: newBalance,
+    lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
+  }, { onConflict: 'discord_id' });
+
+  await supabase.from('pulse_transactions').insert({
+    discord_id: discordId,
+    type: 'ADMIN_GRANT',
+    amount,
+    reason,
+    ref_id: adminId,
+    balance_after: newBalance,
+  });
+
+  log('INFO', `PULSE admin grant: ${adminId} -> ${discordId} +${amount} (${reason})`);
+  return { success: true, newBalance };
+}
+
+export async function revokePulse(
+  discordId: string,
+  amount: number,
+  reason: string,
+  adminId: string
+): Promise<SpendResult> {
+  if (amount <= 0) return { success: false, newBalance: 0, error: 'Amount must be positive' };
+
+  const { data: user } = await supabase
+    .from('discord_users')
+    .select('balance_pulse')
+    .eq('discord_id', discordId)
+    .single();
+
+  if (!user) return { success: false, newBalance: 0, error: 'User has no account yet' };
+
+  const newBalance = Math.max(0, user.balance_pulse - amount);
+  const removed = user.balance_pulse - newBalance;
+
+  await supabase
+    .from('discord_users')
+    .update({ balance_pulse: newBalance })
+    .eq('discord_id', discordId);
+
+  await supabase.from('pulse_transactions').insert({
+    discord_id: discordId,
+    type: 'ADMIN_REVOKE',
+    amount: -removed,
+    reason,
+    ref_id: adminId,
+    balance_after: newBalance,
+  });
+
+  log('INFO', `PULSE admin revoke: ${adminId} -> ${discordId} -${removed} (${reason})`);
+  return { success: true, newBalance };
+}
+
 export async function getBalance(discordId: string): Promise<{
   balance: number;
   earned: number;

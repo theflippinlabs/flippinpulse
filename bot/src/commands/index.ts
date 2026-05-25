@@ -27,6 +27,8 @@ import * as kick from './kick.js';
 import * as ban from './ban.js';
 import * as unban from './unban.js';
 import * as clear from './clear.js';
+import * as givepulse from './givepulse.js';
+import * as removepulse from './removepulse.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -39,6 +41,7 @@ const commandList: Command[] = [
   reactionrole, giveaway, poll,
   slots, roulette, blackjack, rps, wheel,
   warn, warnings, mute, unmute, kick, ban, unban, clear,
+  givepulse, removepulse,
 ];
 
 export const commands = new Map<string, Command>();

@@ -10,6 +10,7 @@ import { startGiveawayScheduler } from './services/giveaways.js';
 import { startDecayScheduler } from './services/decay.js';
 import { startAutomodCleanup } from './services/automod.js';
 import { runDbSetup } from './setup-db.js';
+import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
 
 const client = new Client({
@@ -35,6 +36,11 @@ async function main() {
 
 client.once('ready', async () => {
   log('INFO', `Bot online as ${client.user?.tag}`);
+  try {
+    await registerCommands();
+  } catch (err) {
+    log('ERROR', 'Command registration failed (bot will still run)', err);
+  }
   await loadSettings();
   await loadRanks();
   await loadGameConfigs();
