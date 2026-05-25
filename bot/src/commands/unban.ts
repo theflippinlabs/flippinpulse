@@ -10,7 +10,7 @@ import { successEmbed, errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('unban')
   .setDescription('Unban a user by ID')
-  .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addStringOption(o => o.setName('user_id').setDescription('Discord user ID to unban').setRequired(true))
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false));
 

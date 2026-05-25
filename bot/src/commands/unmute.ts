@@ -10,7 +10,7 @@ import { successEmbed, errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('unmute')
   .setDescription('Remove a member\'s timeout')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption(o => o.setName('user').setDescription('User to unmute').setRequired(true))
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false));
 

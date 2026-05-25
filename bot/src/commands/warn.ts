@@ -11,7 +11,7 @@ import { successEmbed, errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('warn')
   .setDescription('Issue a warning to a member')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption(o => o.setName('user').setDescription('User to warn').setRequired(true))
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(true));
 

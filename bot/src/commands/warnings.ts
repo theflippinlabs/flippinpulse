@@ -11,7 +11,7 @@ import { errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('warnings')
   .setDescription('List warnings for a member')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption(o => o.setName('user').setDescription('User to inspect').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction) {

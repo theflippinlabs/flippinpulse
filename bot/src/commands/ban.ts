@@ -10,7 +10,7 @@ import { successEmbed, errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('ban')
   .setDescription('Ban a member from the server')
-  .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption(o => o.setName('user').setDescription('User to ban').setRequired(true))
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false))
   .addIntegerOption(o => o.setName('delete_days').setDescription('Delete message history (0-7 days)').setMinValue(0).setMaxValue(7).setRequired(false));

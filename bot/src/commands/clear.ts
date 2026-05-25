@@ -11,7 +11,7 @@ import { successEmbed, errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('clear')
   .setDescription('Bulk delete recent messages in this channel')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addIntegerOption(o => o.setName('count').setDescription('How many messages (1-100)').setMinValue(1).setMaxValue(100).setRequired(true))
   .addUserOption(o => o.setName('user').setDescription('Only delete messages from this user').setRequired(false));
 

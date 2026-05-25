@@ -12,7 +12,7 @@ const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60_000;
 export const data = new SlashCommandBuilder()
   .setName('mute')
   .setDescription('Time out a member')
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption(o => o.setName('user').setDescription('User to mute').setRequired(true))
   .addStringOption(o => o.setName('duration').setDescription('Duration e.g. 10m, 2h, 1d (max 28d)').setRequired(true))
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false));

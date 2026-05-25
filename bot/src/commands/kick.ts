@@ -10,7 +10,7 @@ import { successEmbed, errorEmbed } from '../utils/embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('kick')
   .setDescription('Kick a member from the server')
-  .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption(o => o.setName('user').setDescription('User to kick').setRequired(true))
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false));
 
