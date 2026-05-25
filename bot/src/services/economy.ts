@@ -162,6 +162,42 @@ export async function setPulse(
   return { success: true, newBalance: amount };
 }
 
+export async function creditPulse(
+  discordId: string,
+  username: string,
+  avatarUrl: string | null,
+  amount: number,
+  reason: string
+): Promise<number> {
+  if (amount <= 0) return 0;
+
+  const { data: user } = await supabase
+    .from('discord_users')
+    .select('balance_pulse, lifetime_earned_pulse')
+    .eq('discord_id', discordId)
+    .single();
+
+  const newBalance = (user?.balance_pulse ?? 0) + amount;
+
+  await supabase.from('discord_users').upsert({
+    discord_id: discordId,
+    username,
+    avatar_url: avatarUrl,
+    balance_pulse: newBalance,
+    lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
+  }, { onConflict: 'discord_id' });
+
+  await supabase.from('pulse_transactions').insert({
+    discord_id: discordId,
+    type: 'EARN_EVENT',
+    amount,
+    reason,
+    balance_after: newBalance,
+  });
+
+  return newBalance;
+}
+
 export async function getBalance(discordId: string): Promise<{
   balance: number;
   earned: number;

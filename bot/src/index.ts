@@ -9,6 +9,7 @@ import { rehydrateVoiceSessions, startVoiceSessionCleanup } from './events/voice
 import { startGiveawayScheduler } from './services/giveaways.js';
 import { startDecayScheduler } from './services/decay.js';
 import { startLotteryScheduler } from './services/lottery.js';
+import { startAutoQuizScheduler } from './services/communityQuiz.js';
 import { startAutomodCleanup } from './services/automod.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
@@ -52,6 +53,7 @@ client.once('ready', async () => {
   startGiveawayScheduler(client);
   startDecayScheduler(client);
   startLotteryScheduler(client);
+  startAutoQuizScheduler(client);
   startAutomodCleanup();
   log('INFO', 'Settings, ranks, game configs, schedulers loaded. Bot is ready.');
 });

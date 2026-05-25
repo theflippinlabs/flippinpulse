@@ -361,7 +361,8 @@ INSERT INTO public.settings (key, value_json) VALUES
   ('streak_config', '{"enabled": true, "bonus_percent_per_day": 5, "max_bonus_percent": 50, "reset_after_hours": 48}'::jsonb),
   ('daily_cap_config', '{"enabled": false, "cap_pulse": 500}'::jsonb),
   ('mod_config', '{"mod_log_channel_id": null, "automod_enabled": false, "anti_spam": {"enabled": true, "max_messages": 5, "window_seconds": 5, "mute_seconds": 600}, "anti_mass_mentions": {"enabled": true, "max_mentions": 5, "action": "delete"}, "anti_invites": {"enabled": false, "action": "delete"}, "anti_links": {"enabled": false, "whitelist_domains": ["twitter.com", "x.com", "youtube.com", "youtu.be"]}, "anti_raid": {"enabled": false, "max_joins": 10, "window_seconds": 30, "lockdown_minutes": 10}, "auto_warn_threshold": 3}'::jsonb),
-  ('lottery_config', '{"enabled": true, "ticket_price": 50, "draw_interval_hours": 24, "house_cut_percent": 0, "announce_channel_id": null, "seed_pot": 0}'::jsonb)
+  ('lottery_config', '{"enabled": true, "ticket_price": 50, "draw_interval_hours": 24, "house_cut_percent": 0, "announce_channel_id": null, "seed_pot": 0}'::jsonb),
+  ('auto_quiz', '{"enabled": false, "channel_id": null, "interval_hours": 6, "questions_per_round": 5, "seconds_per_question": 20, "reward_per_correct": 10, "category": null}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.roles_config (rank_name, threshold, sort_order, color) VALUES
@@ -386,6 +387,19 @@ INSERT INTO public.games_config (game_key, config_json, is_enabled) VALUES
   ('battle_royale', '{"min_bet": 0, "max_bet": 1000, "fixed_reward": 50, "max_players": 15, "min_players": 2, "join_timeout_seconds": 45}'::jsonb, true),
   ('dice_royale', '{"min_bet": 0, "max_bet": 1000, "fixed_reward": 50, "max_players": 15, "min_players": 2, "join_timeout_seconds": 45}'::jsonb, true)
 ON CONFLICT (game_key) DO NOTHING;
+
+-- Starter community quiz questions (only if no questions exist yet)
+INSERT INTO public.quiz_questions (question, choices_json, correct_index, category)
+SELECT v.question, v.choices_json::jsonb, v.correct_index, v.category
+FROM (VALUES
+  ('What is the name of this server''s currency?', '["PULSE","Coins","Gems","Credits"]', 0, 'community'),
+  ('Which command shows your PULSE balance?', '["/balance","/wallet","/money","/cash"]', 0, 'community'),
+  ('How do you earn PULSE automatically?', '["By being active (messages, reactions, voice)","By paying real money","Only by inviting friends","You cannot earn it"]', 0, 'community'),
+  ('In the Higher or Lower game, what do you do?', '["Guess if the next number is higher or lower","Roll dice","Spin a wheel","Type a sentence fast"]', 0, 'community'),
+  ('In Battle Royale, who wins the pot?', '["The last one standing","The first to join","The host always","Everyone splits it"]', 0, 'community'),
+  ('Which command opens the shop?', '["/shop","/store","/market","/sell"]', 0, 'community')
+) AS v(question, choices_json, correct_index, category)
+WHERE NOT EXISTS (SELECT 1 FROM public.quiz_questions);
 
 -- A starter daily mission so /daily works immediately (valid 1 year)
 INSERT INTO public.missions (type, title, description, reward_points, end_at, is_active)
