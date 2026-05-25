@@ -7,7 +7,7 @@ import {
   updateGameSession,
   saveGameResult,
 } from '../services/games.js';
-import { runLobby, delay, type LobbyPlayer } from '../services/lobby.js';
+import { createLobby, registerLobbyResolver, delay, type LobbyPlayer } from '../services/lobby.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 
 const DEATHS = [
@@ -34,6 +34,42 @@ const shuffle = <T>(arr: T[]): T[] => {
   return a;
 };
 
+registerLobbyResolver('battle_royale', async ({ message, sessionId, players, pot }) => {
+  const fixedReward = (getGameConfig('battle_royale')?.config_json?.fixed_reward as number) ?? 50;
+
+  const alive: LobbyPlayer[] = shuffle(players);
+  const feed: string[] = [`⚔️ **${alive.length} fighters** enter the arena!`];
+
+  const render = () => pulseEmbed('⚔️ Battle Royale').setDescription(
+    feed.slice(-9).join('\n') +
+    `\n\n**Still alive (${alive.length}):** ${alive.map(p => p.name).join(', ')}`
+  );
+
+  await message.edit({ embeds: [render()], components: [] }).catch(() => {});
+
+  while (alive.length > 1) {
+    await delay(2500);
+    const victim = alive.splice(Math.floor(Math.random() * alive.length), 1)[0];
+    feed.push(DEATHS[Math.floor(Math.random() * DEATHS.length)].replace('{victim}', `**${victim.name}**`));
+    await message.edit({ embeds: [render()], components: [] }).catch(() => {});
+  }
+
+  const winner = alive[0];
+  const payout = pot > 0 ? pot : fixedReward;
+
+  await earnPulse(winner.id, payout, 'battleroyale_win', sessionId);
+  await setPlayerPayout(sessionId, winner.id, payout);
+  await updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
+  await saveGameResult(sessionId, { winner: winner.id, players: players.length, payout });
+
+  await message.edit({
+    embeds: [successEmbed(
+      `${feed.slice(-6).join('\n')}\n\n🏆 **${winner.name}** is the last one standing and wins **${payout}** PULSE!`
+    ).setTitle('⚔️ Battle Royale — Winner')],
+    components: [],
+  }).catch(() => {});
+});
+
 export const data = new SlashCommandBuilder()
   .setName('battleroyale')
   .setDescription('Battle Royale — last one standing wins the whole pot!')
@@ -46,11 +82,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const conf = (getGameConfig('battle_royale')?.config_json ?? {}) as {
-    min_bet: number; max_bet: number; fixed_reward: number; min_players: number;
+    min_bet: number; max_bet: number; min_players: number;
   };
   const minBet = conf.min_bet ?? 0;
   const maxBet = conf.max_bet ?? 1000;
-  const fixedReward = conf.fixed_reward ?? 50;
 
   const bet = interaction.options.getInteger('bet') ?? 0;
   if (bet > maxBet || (bet > 0 && bet < minBet)) {
@@ -58,7 +93,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const lobby = await runLobby({
+  await createLobby({
     interaction,
     gameKey: 'battle_royale',
     title: '⚔️ Battle Royale',
@@ -67,37 +102,4 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     betReason: 'battleroyale_bet',
     refundReason: 'battleroyale_refund',
   });
-  if (!lobby) return;
-
-  const alive: LobbyPlayer[] = shuffle(lobby.players);
-  const feed: string[] = [`⚔️ **${alive.length} fighters** enter the arena!`];
-
-  const render = () => pulseEmbed('⚔️ Battle Royale').setDescription(
-    feed.slice(-9).join('\n') +
-    `\n\n**Still alive (${alive.length}):** ${alive.map(p => p.name).join(', ')}`
-  );
-
-  await interaction.editReply({ embeds: [render()], components: [] }).catch(() => {});
-
-  while (alive.length > 1) {
-    await delay(2500);
-    const victim = alive.splice(Math.floor(Math.random() * alive.length), 1)[0];
-    feed.push(DEATHS[Math.floor(Math.random() * DEATHS.length)].replace('{victim}', `**${victim.name}**`));
-    await interaction.editReply({ embeds: [render()], components: [] }).catch(() => {});
-  }
-
-  const winner = alive[0];
-  const payout = lobby.pot > 0 ? lobby.pot : fixedReward;
-
-  await earnPulse(winner.id, payout, 'battleroyale_win', lobby.sessionId);
-  await setPlayerPayout(lobby.sessionId, winner.id, payout);
-  await updateGameSession(lobby.sessionId, { status: 'completed', ended_at: new Date().toISOString() });
-  await saveGameResult(lobby.sessionId, { winner: winner.id, players: lobby.players.length, payout });
-
-  await interaction.editReply({
-    embeds: [successEmbed(
-      `${feed.slice(-6).join('\n')}\n\n🏆 **${winner.name}** is the last one standing and wins **${payout}** PULSE!`
-    ).setTitle('⚔️ Battle Royale — Winner')],
-    components: [],
-  }).catch(() => {});
 }

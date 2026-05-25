@@ -7,6 +7,7 @@ import {
   countEntries,
   getGiveawayByMessage,
 } from '../services/giveaways.js';
+import { handleLobbyButton } from '../services/lobby.js';
 import { log } from '../utils/logger.js';
 
 async function handleGiveawayButton(interaction: ButtonInteraction): Promise<void> {
@@ -37,6 +38,14 @@ async function handleGiveawayButton(interaction: ButtonInteraction): Promise<voi
 
 export async function handleInteractionCreate(interaction: Interaction): Promise<void> {
   if (interaction.isButton()) {
+    if (interaction.customId.startsWith('lobby_')) {
+      try {
+        await handleLobbyButton(interaction);
+      } catch (err) {
+        log('ERROR', 'Lobby button handler crashed', err);
+      }
+      return;
+    }
     if (interaction.customId === GIVEAWAY_BUTTON_ID) {
       try {
         await handleGiveawayButton(interaction);
