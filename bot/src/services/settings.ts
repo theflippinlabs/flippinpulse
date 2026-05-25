@@ -165,6 +165,21 @@ export function getModConfig(): ModConfig {
   };
 }
 
+export function getRawSetting<T = Record<string, unknown>>(key: string): T | undefined {
+  return cache.get(key) as T | undefined;
+}
+
+export async function setSetting(key: string, value: unknown): Promise<void> {
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ key, value_json: value }, { onConflict: 'key' });
+  if (error) {
+    log('ERROR', `Failed to save setting ${key}`, error);
+    throw error;
+  }
+  cache.set(key, value);
+}
+
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startSettingsRefresh(intervalMs = 60_000) {

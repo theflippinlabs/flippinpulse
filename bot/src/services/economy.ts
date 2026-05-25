@@ -124,6 +124,44 @@ export async function revokePulse(
   return { success: true, newBalance };
 }
 
+export async function setPulse(
+  discordId: string,
+  username: string,
+  avatarUrl: string | null,
+  amount: number,
+  reason: string,
+  adminId: string
+): Promise<SpendResult> {
+  if (amount < 0) return { success: false, newBalance: 0, error: 'Amount cannot be negative' };
+
+  const { data: user } = await supabase
+    .from('discord_users')
+    .select('balance_pulse')
+    .eq('discord_id', discordId)
+    .single();
+
+  const delta = amount - (user?.balance_pulse ?? 0);
+
+  await supabase.from('discord_users').upsert({
+    discord_id: discordId,
+    username,
+    avatar_url: avatarUrl,
+    balance_pulse: amount,
+  }, { onConflict: 'discord_id' });
+
+  await supabase.from('pulse_transactions').insert({
+    discord_id: discordId,
+    type: delta >= 0 ? 'ADMIN_GRANT' : 'ADMIN_REVOKE',
+    amount: delta,
+    reason,
+    ref_id: adminId,
+    balance_after: amount,
+  });
+
+  log('INFO', `PULSE admin set: ${adminId} -> ${discordId} = ${amount} (${reason})`);
+  return { success: true, newBalance: amount };
+}
+
 export async function getBalance(discordId: string): Promise<{
   balance: number;
   earned: number;

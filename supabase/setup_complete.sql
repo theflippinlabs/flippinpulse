@@ -281,6 +281,32 @@ CREATE INDEX IF NOT EXISTS idx_mod_actions_target ON public.mod_actions (target_
 CREATE INDEX IF NOT EXISTS idx_mod_actions_guild ON public.mod_actions (guild_id, created_at DESC);
 ALTER TABLE public.mod_actions ENABLE ROW LEVEL SECURITY;
 
+-- ---------- PART 5b: lottery ----------
+CREATE TABLE IF NOT EXISTS public.lottery_rounds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status TEXT NOT NULL DEFAULT 'active',
+  pot_pulse INTEGER NOT NULL DEFAULT 0,
+  ticket_price INTEGER NOT NULL DEFAULT 50,
+  total_tickets INTEGER NOT NULL DEFAULT 0,
+  draw_at TIMESTAMPTZ NOT NULL,
+  winner_discord_id TEXT,
+  drawn_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_lottery_rounds_status ON public.lottery_rounds (status, draw_at);
+ALTER TABLE public.lottery_rounds ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.lottery_tickets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  round_id UUID NOT NULL REFERENCES public.lottery_rounds(id) ON DELETE CASCADE,
+  discord_id TEXT NOT NULL,
+  tickets INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (round_id, discord_id)
+);
+CREATE INDEX IF NOT EXISTS idx_lottery_tickets_round ON public.lottery_tickets (round_id);
+ALTER TABLE public.lottery_tickets ENABLE ROW LEVEL SECURITY;
+
 -- ---------- PART 6: RLS policies (admins manage, authenticated view) ----------
 DO $$
 DECLARE t TEXT;
@@ -334,7 +360,8 @@ INSERT INTO public.settings (key, value_json) VALUES
   ('rank_up_config', '{"enabled": false, "channel_id": null, "ping_user": true}'::jsonb),
   ('streak_config', '{"enabled": true, "bonus_percent_per_day": 5, "max_bonus_percent": 50, "reset_after_hours": 48}'::jsonb),
   ('daily_cap_config', '{"enabled": false, "cap_pulse": 500}'::jsonb),
-  ('mod_config', '{"mod_log_channel_id": null, "automod_enabled": false, "anti_spam": {"enabled": true, "max_messages": 5, "window_seconds": 5, "mute_seconds": 600}, "anti_mass_mentions": {"enabled": true, "max_mentions": 5, "action": "delete"}, "anti_invites": {"enabled": false, "action": "delete"}, "anti_links": {"enabled": false, "whitelist_domains": ["twitter.com", "x.com", "youtube.com", "youtu.be"]}, "anti_raid": {"enabled": false, "max_joins": 10, "window_seconds": 30, "lockdown_minutes": 10}, "auto_warn_threshold": 3}'::jsonb)
+  ('mod_config', '{"mod_log_channel_id": null, "automod_enabled": false, "anti_spam": {"enabled": true, "max_messages": 5, "window_seconds": 5, "mute_seconds": 600}, "anti_mass_mentions": {"enabled": true, "max_mentions": 5, "action": "delete"}, "anti_invites": {"enabled": false, "action": "delete"}, "anti_links": {"enabled": false, "whitelist_domains": ["twitter.com", "x.com", "youtube.com", "youtu.be"]}, "anti_raid": {"enabled": false, "max_joins": 10, "window_seconds": 30, "lockdown_minutes": 10}, "auto_warn_threshold": 3}'::jsonb),
+  ('lottery_config', '{"enabled": true, "ticket_price": 50, "draw_interval_hours": 24, "house_cut_percent": 0, "announce_channel_id": null, "seed_pot": 0}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.roles_config (rank_name, threshold, sort_order, color) VALUES
@@ -354,7 +381,8 @@ INSERT INTO public.games_config (game_key, config_json, is_enabled) VALUES
   ('roulette', '{"min_bet": 5, "max_bet": 500, "fee_percent": 0, "cooldown_seconds": 10, "even_money_payout": 2, "single_number_payout": 36}'::jsonb, true),
   ('blackjack', '{"min_bet": 10, "max_bet": 500, "fee_percent": 0, "cooldown_seconds": 15, "blackjack_payout_num": 3, "blackjack_payout_den": 2, "dealer_stand_min": 17}'::jsonb, true),
   ('rps', '{"min_bet": 5, "max_bet": 300, "fee_percent": 5, "cooldown_seconds": 10, "timeout_seconds": 60}'::jsonb, true),
-  ('wheel', '{"min_bet": 10, "max_bet": 300, "fee_percent": 0, "cooldown_seconds": 10, "outcomes": [{"label": "💸 Bust", "multiplier": 0, "weight": 35, "color": "#6B7280"}, {"label": "🪙 Common", "multiplier": 1, "weight": 30, "color": "#9CA3AF"}, {"label": "🥉 Uncommon", "multiplier": 2, "weight": 20, "color": "#22C55E"}, {"label": "🥈 Rare", "multiplier": 3, "weight": 10, "color": "#3B82F6"}, {"label": "🥇 Epic", "multiplier": 5, "weight": 4, "color": "#A855F7"}, {"label": "💎 Legendary", "multiplier": 25, "weight": 1, "color": "#F59E0B"}]}'::jsonb, true)
+  ('wheel', '{"min_bet": 10, "max_bet": 300, "fee_percent": 0, "cooldown_seconds": 10, "outcomes": [{"label": "💸 Bust", "multiplier": 0, "weight": 35, "color": "#6B7280"}, {"label": "🪙 Common", "multiplier": 1, "weight": 30, "color": "#9CA3AF"}, {"label": "🥉 Uncommon", "multiplier": 2, "weight": 20, "color": "#22C55E"}, {"label": "🥈 Rare", "multiplier": 3, "weight": 10, "color": "#3B82F6"}, {"label": "🥇 Epic", "multiplier": 5, "weight": 4, "color": "#A855F7"}, {"label": "💎 Legendary", "multiplier": 25, "weight": 1, "color": "#F59E0B"}]}'::jsonb, true),
+  ('higherlower', '{"min_bet": 10, "max_bet": 500, "fee_percent": 5, "cooldown_seconds": 5, "max_rounds": 10}'::jsonb, true)
 ON CONFLICT (game_key) DO NOTHING;
 
 -- A starter daily mission so /daily works immediately (valid 1 year)
