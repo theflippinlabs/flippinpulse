@@ -8,6 +8,7 @@ import {
   ComponentType,
   Message,
 } from 'discord.js';
+import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -108,6 +109,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const reply = await interaction.reply({ ...render(), fetchReply: true }) as Message;
 
+  const gid = interaction.guildId!;
   const collector = reply.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000,
@@ -134,7 +136,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
   };
 
-  collector.on('collect', async (btn) => {
+  collector.on('collect', bindGuild(gid, async (btn: ButtonInteraction) => {
     if (finished) return;
 
     if (btn.customId === `hl_cash_${sessionId}`) {
@@ -170,9 +172,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     await btn.update(render());
-  });
+  }));
 
-  collector.on('end', async (_c, reason) => {
+  collector.on('end', bindGuild(gid, async (_c: unknown, reason: string) => {
     if (finished || reason === 'done') return;
     // Timed out: keep winnings if any, otherwise the bet is lost.
     if (round > 0) {
@@ -192,5 +194,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         components: [],
       }).catch(() => {});
     }
-  });
+  }));
 }

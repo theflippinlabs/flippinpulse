@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { pulseEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -24,6 +25,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: users } = await supabase
     .from('discord_users')
     .select('discord_id, username, rank_name, points_total, points_week, points_month')
+    .eq('guild_id', currentGuildId())
     .order(column, { ascending: false })
     .limit(10);
 

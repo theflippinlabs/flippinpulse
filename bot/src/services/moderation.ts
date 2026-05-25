@@ -1,5 +1,6 @@
 import { ChannelType, EmbedBuilder, Guild } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { runWithGuild } from '../guildContext.js';
 import { getModConfig } from './settings.js';
 import { log } from '../utils/logger.js';
 
@@ -54,7 +55,7 @@ export async function recordModAction(input: ModActionInput): Promise<string | n
 }
 
 export async function postModLog(guild: Guild, input: ModActionInput, actionId: string | null): Promise<void> {
-  const config = getModConfig();
+  const config = runWithGuild(input.guildId, () => getModConfig());
   if (!config.mod_log_channel_id) return;
 
   const channel = await guild.channels.fetch(config.mod_log_channel_id).catch(() => null);

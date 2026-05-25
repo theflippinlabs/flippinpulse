@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { getRankForPoints } from '../services/ranks.js';
 import { pulseEmbed, errorEmbed } from '../utils/embeds.js';
 
@@ -13,6 +14,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: user } = await supabase
     .from('discord_users')
     .select('*')
+    .eq('guild_id', currentGuildId())
     .eq('discord_id', targetUser.id)
     .single();
 

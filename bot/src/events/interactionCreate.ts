@@ -1,4 +1,5 @@
 import { ButtonInteraction, Interaction, MessageFlags } from 'discord.js';
+import { runWithGuild } from '../guildContext.js';
 import { commands } from '../commands/index.js';
 import {
   GIVEAWAY_BUTTON_ID,
@@ -38,9 +39,11 @@ async function handleGiveawayButton(interaction: ButtonInteraction): Promise<voi
 
 export async function handleInteractionCreate(interaction: Interaction): Promise<void> {
   if (interaction.isButton()) {
+    if (!interaction.guildId) return;
+    const gid = interaction.guildId;
     if (interaction.customId.startsWith('lobby_')) {
       try {
-        await handleLobbyButton(interaction);
+        await runWithGuild(gid, () => handleLobbyButton(interaction));
       } catch (err) {
         log('ERROR', 'Lobby button handler crashed', err);
       }
@@ -48,7 +51,7 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
     }
     if (interaction.customId === GIVEAWAY_BUTTON_ID) {
       try {
-        await handleGiveawayButton(interaction);
+        await runWithGuild(gid, () => handleGiveawayButton(interaction));
       } catch (err) {
         log('ERROR', 'Giveaway button handler crashed', err);
       }
@@ -61,8 +64,14 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
   const command = commands.get(interaction.commandName);
   if (!command) return;
 
+  if (!interaction.guildId) {
+    await interaction.reply({ content: 'This bot only works inside a server.', flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const gid = interaction.guildId;
+
   try {
-    await command.execute(interaction);
+    await runWithGuild(gid, () => command.execute(interaction));
   } catch (err) {
     log('ERROR', `Command error: /${interaction.commandName}`, err);
     if (interaction.replied || interaction.deferred) {

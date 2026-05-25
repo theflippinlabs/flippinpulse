@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { pulseEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -24,6 +25,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   let query = supabase
     .from('shop_items')
     .select('name, description, category, price_pulse, stock_remaining')
+    .eq('guild_id', currentGuildId())
     .eq('is_active', true)
     .order('price_pulse', { ascending: true });
 

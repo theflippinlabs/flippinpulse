@@ -4,10 +4,12 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ButtonInteraction,
   ComponentType,
   Message,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -98,13 +100,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const reply = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }) as Message;
 
   // Collector for cash out button
+  const gid = interaction.guildId!;
   const collector = reply.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 30_000,
     filter: (i) => i.user.id === interaction.user.id,
   });
 
-  collector.on('collect', async (btnInteraction) => {
+  collector.on('collect', bindGuild(gid, async (btnInteraction: ButtonInteraction) => {
     if (btnInteraction.customId === `crash_cashout_${sessionId}` && !crashed && !cashedOut) {
       cashedOut = true;
       collector.stop('cashout');
@@ -121,7 +124,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const winEmbed = successEmbed(`🎉 You cashed out at **${multiplier.toFixed(2)}x**!\n\n💰 Payout: **${payout}** PULSE (${feePercent}% fee)\n📈 Crash point was: **${crashPoint.toFixed(2)}x**`);
       await btnInteraction.update({ embeds: [winEmbed], components: [] });
     }
-  });
+  }));
 
   // Increment multiplier
   const interval = setInterval(async () => {

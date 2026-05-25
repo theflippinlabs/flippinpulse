@@ -8,6 +8,7 @@ import {
   Message,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import {
   getGameConfig,
   isGameEnabled,
@@ -64,6 +65,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   let query = supabase
     .from('quiz_questions')
     .select('*')
+    .eq('guild_id', currentGuildId())
     .eq('is_active', true);
 
   if (difficulty) query = query.eq('difficulty', difficulty);

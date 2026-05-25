@@ -5,6 +5,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 
 const CATEGORIES = [
@@ -57,6 +58,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const maxPerUser = interaction.options.getInteger('max_per_user') ?? 1;
 
     const { error } = await supabase.from('shop_items').insert({
+      guild_id: currentGuildId(),
       name,
       description,
       category,
@@ -79,6 +81,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const { data: items } = await supabase
       .from('shop_items')
       .select('name, price_pulse, category, is_active, stock_remaining')
+      .eq('guild_id', currentGuildId())
       .order('price_pulse', { ascending: true })
       .limit(40);
 
@@ -99,6 +102,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: item } = await supabase
     .from('shop_items')
     .select('id, name')
+    .eq('guild_id', currentGuildId())
     .ilike('name', name)
     .limit(1)
     .single();

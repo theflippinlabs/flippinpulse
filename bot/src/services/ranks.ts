@@ -1,5 +1,6 @@
 import { ChannelType, EmbedBuilder, Guild, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { runWithGuild, currentGuildIdOrNull } from '../guildContext.js';
 import { getRankUpConfig } from './settings.js';
 import { log } from '../utils/logger.js';
 
@@ -10,29 +11,39 @@ interface RankConfig {
   color?: string | null;
 }
 
-let ranksCache: RankConfig[] = [];
+// guildId -> ranks (sorted)
+const ranksCache = new Map<string, RankConfig[]>();
 
 export async function loadRanks(): Promise<void> {
   const { data, error } = await supabase
     .from('roles_config')
-    .select('rank_name, threshold, discord_role_id, color')
+    .select('guild_id, rank_name, threshold, discord_role_id, color')
     .order('sort_order', { ascending: true });
 
   if (error) {
     log('ERROR', 'Failed to load ranks', error);
     return;
   }
-  ranksCache = data ?? [];
-  log('INFO', `Loaded ${ranksCache.length} rank configs`);
+  ranksCache.clear();
+  for (const row of data ?? []) {
+    const gid = (row as { guild_id: string }).guild_id;
+    if (!ranksCache.has(gid)) ranksCache.set(gid, []);
+    ranksCache.get(gid)!.push(row as RankConfig);
+  }
+  log('INFO', `Loaded ranks for ${ranksCache.size} guild(s)`);
+}
+
+function ranksForCurrentGuild(): RankConfig[] {
+  const gid = currentGuildIdOrNull();
+  if (!gid) return [];
+  return ranksCache.get(gid) ?? [];
 }
 
 export function getRankForPoints(points: number): RankConfig | null {
   let best: RankConfig | null = null;
-  for (const rank of ranksCache) {
+  for (const rank of ranksForCurrentGuild()) {
     if (points >= rank.threshold) {
-      if (!best || rank.threshold > best.threshold) {
-        best = rank;
-      }
+      if (!best || rank.threshold > best.threshold) best = rank;
     }
   }
   return best;
@@ -44,50 +55,45 @@ export async function checkRankUp(
   guild: Guild,
   member: GuildMember
 ): Promise<void> {
-  const newRank = getRankForPoints(currentPoints);
-  if (!newRank) return;
+  await runWithGuild(guild.id, async () => {
+    const ranks = ranksCache.get(guild.id) ?? [];
+    const newRank = getRankForPoints(currentPoints);
+    if (!newRank) return;
 
-  // Get current rank
-  const { data: user } = await supabase
-    .from('discord_users')
-    .select('rank_name')
-    .eq('discord_id', discordId)
-    .single();
+    const { data: user } = await supabase
+      .from('discord_users')
+      .select('rank_name')
+      .eq('guild_id', guild.id)
+      .eq('discord_id', discordId)
+      .single();
 
-  if (user?.rank_name === newRank.rank_name) return;
+    if (user?.rank_name === newRank.rank_name) return;
 
-  // Update rank in DB
-  await supabase
-    .from('discord_users')
-    .update({ rank_name: newRank.rank_name })
-    .eq('discord_id', discordId);
+    await supabase
+      .from('discord_users')
+      .update({ rank_name: newRank.rank_name })
+      .eq('guild_id', guild.id)
+      .eq('discord_id', discordId);
 
-  // Manage Discord roles
-  try {
-    // Remove old rank roles
-    const oldRoleIds = ranksCache
-      .filter(r => r.discord_role_id && r.rank_name !== newRank.rank_name)
-      .map(r => r.discord_role_id!);
+    try {
+      const oldRoleIds = ranks
+        .filter(r => r.discord_role_id && r.rank_name !== newRank.rank_name)
+        .map(r => r.discord_role_id!);
 
-    for (const roleId of oldRoleIds) {
-      if (member.roles.cache.has(roleId)) {
-        await member.roles.remove(roleId);
+      for (const roleId of oldRoleIds) {
+        if (member.roles.cache.has(roleId)) await member.roles.remove(roleId);
       }
+      if (newRank.discord_role_id) await member.roles.add(newRank.discord_role_id);
+
+      log('INFO', `Rank up: ${guild.id}/${discordId} → ${newRank.rank_name}`);
+    } catch (err) {
+      log('ERROR', `Failed to update Discord roles for ${discordId}`, err);
     }
 
-    // Add new rank role
-    if (newRank.discord_role_id) {
-      await member.roles.add(newRank.discord_role_id);
-    }
-
-    log('INFO', `Rank up: ${discordId} → ${newRank.rank_name}`);
-  } catch (err) {
-    log('ERROR', `Failed to update Discord roles for ${discordId}`, err);
-  }
-
-  await announceRankUp(guild, member, newRank, user?.rank_name ?? null).catch(err =>
-    log('ERROR', `Failed to announce rank-up for ${discordId}`, err),
-  );
+    await announceRankUp(guild, member, newRank, user?.rank_name ?? null).catch(err =>
+      log('ERROR', `Failed to announce rank-up for ${discordId}`, err),
+    );
+  });
 }
 
 function parseHexColor(input: string | null | undefined): number {

@@ -1,5 +1,6 @@
 import { MessageReaction } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { log } from '../utils/logger.js';
 
 export function reactionKey(reaction: MessageReaction): string {
@@ -13,6 +14,7 @@ export async function findRoleForReaction(reaction: MessageReaction): Promise<st
   const { data, error } = await supabase
     .from('reaction_roles')
     .select('role_id')
+    .eq('guild_id', currentGuildId())
     .eq('message_id', reaction.message.id)
     .eq('emoji', emoji)
     .maybeSingle();
@@ -39,7 +41,7 @@ export async function saveReactionRole(params: {
     emoji: params.emoji,
     role_id: params.roleId,
     created_by: params.createdBy,
-  }, { onConflict: 'message_id,emoji' });
+  }, { onConflict: 'guild_id,message_id,emoji' });
 
   if (error) {
     log('ERROR', 'Failed to save reaction role', error);
@@ -48,10 +50,11 @@ export async function saveReactionRole(params: {
   return true;
 }
 
-export async function deleteReactionRole(messageId: string, emoji: string): Promise<boolean> {
+export async function deleteReactionRole(guildId: string, messageId: string, emoji: string): Promise<boolean> {
   const { error } = await supabase
     .from('reaction_roles')
     .delete()
+    .eq('guild_id', guildId)
     .eq('message_id', messageId)
     .eq('emoji', emoji);
 

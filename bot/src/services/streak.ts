@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { getStreakConfig } from './settings.js';
 import { log } from '../utils/logger.js';
 
@@ -12,12 +13,14 @@ export async function applyDailyStreak(
   discordId: string,
   baseRewardPulse: number,
 ): Promise<StreakResult> {
+  const guildId = currentGuildId();
   const config = getStreakConfig();
   const now = new Date();
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('streak, last_daily_at')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
@@ -28,17 +31,14 @@ export async function applyDailyStreak(
     await supabase
       .from('discord_users')
       .update({ streak: 1, last_daily_at: now.toISOString() })
+      .eq('guild_id', guildId)
       .eq('discord_id', discordId);
     return { streak: 1, bonusPercent: 0, bonusPulse: 0 };
   }
 
   if (lastClaim) {
     const hoursSince = (now.getTime() - lastClaim.getTime()) / 3_600_000;
-    if (hoursSince <= config.reset_after_hours) {
-      streak = streak + 1;
-    } else {
-      streak = 1;
-    }
+    streak = hoursSince <= config.reset_after_hours ? streak + 1 : 1;
   } else {
     streak = 1;
   }
@@ -50,11 +50,10 @@ export async function applyDailyStreak(
   const { error } = await supabase
     .from('discord_users')
     .update({ streak, last_daily_at: now.toISOString() })
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId);
 
-  if (error) {
-    log('ERROR', `Failed to update streak for ${discordId}`, error);
-  }
+  if (error) log('ERROR', `Failed to update streak for ${discordId}`, error);
 
   return { streak, bonusPercent, bonusPulse };
 }

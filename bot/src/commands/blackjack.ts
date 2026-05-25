@@ -8,6 +8,7 @@ import {
   MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
+import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -170,6 +171,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  const gid = interaction.guildId!;
   const collector = message.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000,
@@ -178,7 +180,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   let resolved = false;
 
-  collector.on('collect', async (btn) => {
+  collector.on('collect', bindGuild(gid, async (btn: ButtonInteraction) => {
     if (resolved) return;
 
     if (btn.customId === 'bj_hit') {
@@ -214,9 +216,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const dtotal = handValue(dealer);
       await finish(dtotal > 21 || ptotal > dtotal ? 'win' : ptotal < dtotal ? 'lose' : 'push', dealer);
     }
-  });
+  }));
 
-  collector.on('end', async (_c, reason) => {
+  collector.on('end', bindGuild(gid, async (_c: unknown, reason: string) => {
     if (resolved) return;
     if (reason === 'time') {
       while (handValue(dealer) < cfg.dealer_stand_min) dealer.push(deck.pop()!);
@@ -224,5 +226,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const dtotal = handValue(dealer);
       await finish(dtotal > 21 || ptotal > dtotal ? 'win' : ptotal < dtotal ? 'lose' : 'push', dealer);
     }
-  });
+  }));
 }

@@ -5,6 +5,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -49,6 +50,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const correctIndex = choices.indexOf(correct);
 
     const { error } = await supabase.from('quiz_questions').insert({
+      guild_id: currentGuildId(),
       question,
       choices_json: choices,
       correct_index: correctIndex,
@@ -71,7 +73,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   if (sub === 'list') {
     const category = interaction.options.getString('category');
-    let query = supabase.from('quiz_questions').select('question, category, is_active').order('category', { ascending: true }).limit(50);
+    let query = supabase.from('quiz_questions').select('question, category, is_active').eq('guild_id', currentGuildId()).order('category', { ascending: true }).limit(50);
     if (category) query = query.eq('category', category.toLowerCase().trim());
     const { data: rows } = await query;
 
@@ -89,6 +91,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: matches } = await supabase
     .from('quiz_questions')
     .select('id, question')
+    .eq('guild_id', currentGuildId())
     .ilike('question', `%${contains}%`)
     .limit(5);
 

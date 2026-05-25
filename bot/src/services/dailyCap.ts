@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { getDailyCapConfig } from './settings.js';
 
 const EARN_TYPES = ['EARN_MISSION', 'EARN_VOICE', 'EARN_EVENT'];
@@ -11,6 +12,7 @@ export async function applyDailyCap(discordId: string, requestedPulse: number): 
   const { data } = await supabase
     .from('pulse_transactions')
     .select('amount')
+    .eq('guild_id', currentGuildId())
     .eq('discord_id', discordId)
     .in('type', EARN_TYPES)
     .gte('created_at', since);

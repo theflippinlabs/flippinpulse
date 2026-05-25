@@ -7,6 +7,7 @@ import {
   ComponentType,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { runWithGuild, currentGuildId } from '../guildContext.js';
 import { creditPulse } from './economy.js';
 import { getRawSetting, setSetting } from './settings.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
@@ -58,7 +59,11 @@ export async function runCommunityQuiz(
   channel: GuildTextBasedChannel,
   opts: { questionsPerRound: number; secondsPerQuestion: number; rewardPerCorrect: number; category: string | null },
 ): Promise<void> {
-  let query = supabase.from('quiz_questions').select('question, choices_json, correct_index, category').eq('is_active', true);
+  let query = supabase
+    .from('quiz_questions')
+    .select('question, choices_json, correct_index, category')
+    .eq('guild_id', currentGuildId())
+    .eq('is_active', true);
   if (opts.category) query = query.eq('category', opts.category);
   const { data: all } = await query;
 
@@ -172,36 +177,39 @@ async function getNextRun(): Promise<number> {
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
-export function startAutoQuizScheduler(client: Client, intervalMs = 60_000): void {
-  const tick = async () => {
+async function tickGuild(client: Client, guildId: string): Promise<void> {
+  await runWithGuild(guildId, async () => {
     const cfg = getAutoQuizConfig();
     if (!cfg.enabled || !cfg.channel_id) return;
-    try {
-      const nextRun = await getNextRun();
-      if (Date.now() < nextRun) return;
 
-      // Schedule the following run before launching, so a long quiz can't double-fire.
-      await setSetting('auto_quiz_state', {
-        next_run_at: new Date(Date.now() + cfg.interval_hours * 3_600_000).toISOString(),
-      });
+    const nextRun = await getNextRun();
+    if (Date.now() < nextRun) return;
 
-      const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
-      if (!channel || !channel.isTextBased() || channel.isDMBased()) {
-        log('ERROR', `Auto-quiz channel ${cfg.channel_id} is not a usable text channel.`);
-        return;
-      }
-      log('INFO', 'Auto-quiz: launching a community quiz.');
-      await runCommunityQuiz(channel as GuildTextBasedChannel, {
-        questionsPerRound: cfg.questions_per_round,
-        secondsPerQuestion: cfg.seconds_per_question,
-        rewardPerCorrect: cfg.reward_per_correct,
-        category: cfg.category,
-      });
-    } catch (err) {
-      log('ERROR', 'Auto-quiz scheduler tick failed', err);
+    await setSetting('auto_quiz_state', {
+      next_run_at: new Date(Date.now() + cfg.interval_hours * 3_600_000).toISOString(),
+    });
+
+    const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
+    if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+      log('ERROR', `Auto-quiz channel ${cfg.channel_id} is not a usable text channel.`);
+      return;
     }
-  };
-  interval = setInterval(() => void tick(), intervalMs);
+    log('INFO', `Auto-quiz: launching a community quiz in guild ${guildId}.`);
+    await runCommunityQuiz(channel as GuildTextBasedChannel, {
+      questionsPerRound: cfg.questions_per_round,
+      secondsPerQuestion: cfg.seconds_per_question,
+      rewardPerCorrect: cfg.reward_per_correct,
+      category: cfg.category,
+    });
+  });
+}
+
+export function startAutoQuizScheduler(client: Client, intervalMs = 60_000): void {
+  interval = setInterval(() => {
+    for (const guild of client.guilds.cache.values()) {
+      tickGuild(client, guild.id).catch(err => log('ERROR', 'Auto-quiz scheduler tick failed', err));
+    }
+  }, intervalMs);
 }
 
 export function stopAutoQuizScheduler(): void {

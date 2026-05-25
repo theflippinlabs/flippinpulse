@@ -1,5 +1,6 @@
 import { Client, EmbedBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { runWithGuild, currentGuildId } from '../guildContext.js';
 import { spendPulse } from './economy.js';
 import { earnPulse } from './games.js';
 import { getRawSetting } from './settings.js';
@@ -29,6 +30,7 @@ export function getLotteryConfig(): LotteryConfig {
 
 interface LotteryRound {
   id: string;
+  guild_id: string;
   status: string;
   pot_pulse: number;
   ticket_price: number;
@@ -37,9 +39,11 @@ interface LotteryRound {
 }
 
 export async function getOrCreateActiveRound(): Promise<LotteryRound | null> {
+  const guildId = currentGuildId();
   const { data: existing } = await supabase
     .from('lottery_rounds')
-    .select('id, status, pot_pulse, ticket_price, draw_at, total_tickets')
+    .select('id, guild_id, status, pot_pulse, ticket_price, draw_at, total_tickets')
+    .eq('guild_id', guildId)
     .eq('status', 'active')
     .order('created_at', { ascending: true })
     .limit(1)
@@ -52,13 +56,14 @@ export async function getOrCreateActiveRound(): Promise<LotteryRound | null> {
   const { data: created, error } = await supabase
     .from('lottery_rounds')
     .insert({
+      guild_id: guildId,
       status: 'active',
       pot_pulse: cfg.seed_pot,
       ticket_price: cfg.ticket_price,
       draw_at: drawAt,
       total_tickets: 0,
     })
-    .select('id, status, pot_pulse, ticket_price, draw_at, total_tickets')
+    .select('id, guild_id, status, pot_pulse, ticket_price, draw_at, total_tickets')
     .single();
 
   if (error) {
@@ -73,6 +78,7 @@ export async function buyTickets(
   count: number,
 ): Promise<{ success: boolean; error?: string; tickets?: number; pot?: number; drawAt?: string }> {
   if (count <= 0) return { success: false, error: 'Buy at least 1 ticket.' };
+  const guildId = currentGuildId();
 
   const round = await getOrCreateActiveRound();
   if (!round) return { success: false, error: 'No active lottery right now.' };
@@ -91,6 +97,7 @@ export async function buyTickets(
   const userTickets = (existingEntry?.tickets ?? 0) + count;
 
   await supabase.from('lottery_tickets').upsert({
+    guild_id: guildId,
     round_id: round.id,
     discord_id: discordId,
     tickets: userTickets,
@@ -135,11 +142,11 @@ async function drawRound(client: Client, round: LotteryRound): Promise<void> {
     .select('discord_id, tickets')
     .eq('round_id', round.id);
 
-  // No participants: roll the pot into a fresh round so it keeps growing.
   if (!entries?.length || round.total_tickets <= 0) {
     const nextDraw = new Date(Date.now() + cfg.draw_interval_hours * 3_600_000).toISOString();
     await supabase.from('lottery_rounds').update({ status: 'drawn', drawn_at: new Date().toISOString() }).eq('id', round.id);
     await supabase.from('lottery_rounds').insert({
+      guild_id: round.guild_id,
       status: 'active',
       pot_pulse: round.pot_pulse,
       ticket_price: cfg.ticket_price,
@@ -150,7 +157,6 @@ async function drawRound(client: Client, round: LotteryRound): Promise<void> {
     return;
   }
 
-  // Weighted random winner.
   const total = entries.reduce((sum, e) => sum + e.tickets, 0);
   let pick = Math.floor(Math.random() * total);
   let winner = entries[0].discord_id;
@@ -168,9 +174,9 @@ async function drawRound(client: Client, round: LotteryRound): Promise<void> {
     .update({ status: 'drawn', winner_discord_id: winner, drawn_at: new Date().toISOString() })
     .eq('id', round.id);
 
-  // Start the next round.
   const nextDraw = new Date(Date.now() + cfg.draw_interval_hours * 3_600_000).toISOString();
   await supabase.from('lottery_rounds').insert({
+    guild_id: round.guild_id,
     status: 'active',
     pot_pulse: cfg.seed_pot,
     ticket_price: cfg.ticket_price,
@@ -199,25 +205,30 @@ async function drawRound(client: Client, round: LotteryRound): Promise<void> {
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
-export function startLotteryScheduler(client: Client, intervalMs = 60_000): void {
-  const tick = async () => {
+async function tickGuild(client: Client, guildId: string): Promise<void> {
+  await runWithGuild(guildId, async () => {
     if (!getLotteryConfig().enabled) return;
-    try {
-      await getOrCreateActiveRound();
-      const { data: due } = await supabase
-        .from('lottery_rounds')
-        .select('id, status, pot_pulse, ticket_price, draw_at, total_tickets')
-        .eq('status', 'active')
-        .lte('draw_at', new Date().toISOString());
-      for (const round of due ?? []) {
-        await drawRound(client, round as LotteryRound);
-      }
-    } catch (err) {
-      log('ERROR', 'Lottery scheduler tick failed', err);
+    await getOrCreateActiveRound();
+    const { data: due } = await supabase
+      .from('lottery_rounds')
+      .select('id, guild_id, status, pot_pulse, ticket_price, draw_at, total_tickets')
+      .eq('guild_id', guildId)
+      .eq('status', 'active')
+      .lte('draw_at', new Date().toISOString());
+    for (const round of due ?? []) {
+      await drawRound(client, round as LotteryRound);
+    }
+  });
+}
+
+export function startLotteryScheduler(client: Client, intervalMs = 60_000): void {
+  const run = () => {
+    for (const guild of client.guilds.cache.values()) {
+      tickGuild(client, guild.id).catch(err => log('ERROR', 'Lottery scheduler tick failed', err));
     }
   };
-  void tick();
-  interval = setInterval(() => void tick(), intervalMs);
+  run();
+  interval = setInterval(run, intervalMs);
 }
 
 export function stopLotteryScheduler(): void {

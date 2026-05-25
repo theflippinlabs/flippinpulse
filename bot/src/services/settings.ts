@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { currentGuildId, currentGuildIdOrNull } from '../guildContext.js';
 import { log } from '../utils/logger.js';
 
 export interface PointsConfig {
@@ -102,58 +103,60 @@ const defaults = {
   } as ModConfig,
 };
 
-const cache = new Map<string, unknown>();
+// guildId -> (settings key -> value_json)
+const cache = new Map<string, Map<string, unknown>>();
 
 export async function loadSettings(): Promise<void> {
-  const { data, error } = await supabase.from('settings').select('key, value_json');
+  const { data, error } = await supabase.from('settings').select('guild_id, key, value_json');
   if (error) {
     log('ERROR', 'Failed to load settings', error);
     return;
   }
+  cache.clear();
   for (const row of data ?? []) {
-    cache.set(row.key, row.value_json);
+    const gid = (row as { guild_id: string }).guild_id;
+    if (!cache.has(gid)) cache.set(gid, new Map());
+    cache.get(gid)!.set(row.key, row.value_json);
   }
-  log('INFO', `Loaded ${cache.size} settings from database`);
+  log('INFO', `Loaded settings for ${cache.size} guild(s)`);
+}
+
+function read<T>(key: string, fallback: T): T {
+  const gid = currentGuildIdOrNull();
+  if (!gid) return fallback;
+  const value = cache.get(gid)?.get(key);
+  return (value as T) ?? fallback;
 }
 
 export function getPointsConfig(): PointsConfig {
-  return (cache.get('points_config') as PointsConfig) ?? defaults.points_config;
+  return read('points_config', defaults.points_config);
 }
-
 export function getAntiSpamConfig(): AntiSpamConfig {
-  return (cache.get('anti_spam') as AntiSpamConfig) ?? defaults.anti_spam;
+  return read('anti_spam', defaults.anti_spam);
 }
-
 export function getEconomyConfig(): EconomyConfig {
-  return (cache.get('economy') as EconomyConfig) ?? defaults.economy;
+  return read('economy', defaults.economy);
 }
-
 export function getWelcomeConfig(): WelcomeConfig {
-  return { ...defaults.welcome_config, ...(cache.get('welcome_config') as Partial<WelcomeConfig> ?? {}) };
+  return { ...defaults.welcome_config, ...(read<Partial<WelcomeConfig>>('welcome_config', {})) };
 }
-
 export function getRankUpConfig(): RankUpConfig {
-  return { ...defaults.rank_up_config, ...(cache.get('rank_up_config') as Partial<RankUpConfig> ?? {}) };
+  return { ...defaults.rank_up_config, ...(read<Partial<RankUpConfig>>('rank_up_config', {})) };
 }
-
 export function getStreakConfig(): StreakConfig {
-  return { ...defaults.streak_config, ...(cache.get('streak_config') as Partial<StreakConfig> ?? {}) };
+  return { ...defaults.streak_config, ...(read<Partial<StreakConfig>>('streak_config', {})) };
 }
-
 export function getDailyCapConfig(): DailyCapConfig {
-  return { ...defaults.daily_cap_config, ...(cache.get('daily_cap_config') as Partial<DailyCapConfig> ?? {}) };
+  return { ...defaults.daily_cap_config, ...(read<Partial<DailyCapConfig>>('daily_cap_config', {})) };
 }
-
 export function getPulseHourConfig(): PulseHourConfig {
-  return { ...defaults.pulse_hour, ...(cache.get('pulse_hour') as Partial<PulseHourConfig> ?? {}) };
+  return { ...defaults.pulse_hour, ...(read<Partial<PulseHourConfig>>('pulse_hour', {})) };
 }
-
 export function getDecayConfig(): DecayConfig {
-  return { ...defaults.decay, ...(cache.get('decay') as Partial<DecayConfig> ?? {}) };
+  return { ...defaults.decay, ...(read<Partial<DecayConfig>>('decay', {})) };
 }
-
 export function getModConfig(): ModConfig {
-  const raw = (cache.get('mod_config') as Partial<ModConfig>) ?? {};
+  const raw = read<Partial<ModConfig>>('mod_config', {});
   return {
     ...defaults.mod_config,
     ...raw,
@@ -166,18 +169,22 @@ export function getModConfig(): ModConfig {
 }
 
 export function getRawSetting<T = Record<string, unknown>>(key: string): T | undefined {
-  return cache.get(key) as T | undefined;
+  const gid = currentGuildIdOrNull();
+  if (!gid) return undefined;
+  return cache.get(gid)?.get(key) as T | undefined;
 }
 
 export async function setSetting(key: string, value: unknown): Promise<void> {
+  const gid = currentGuildId();
   const { error } = await supabase
     .from('settings')
-    .upsert({ key, value_json: value }, { onConflict: 'key' });
+    .upsert({ guild_id: gid, key, value_json: value }, { onConflict: 'guild_id,key' });
   if (error) {
     log('ERROR', `Failed to save setting ${key}`, error);
     throw error;
   }
-  cache.set(key, value);
+  if (!cache.has(gid)) cache.set(gid, new Map());
+  cache.get(gid)!.set(key, value);
 }
 
 let refreshInterval: ReturnType<typeof setInterval> | null = null;

@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { spendPulse } from '../services/economy.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
 
@@ -18,6 +19,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: items } = await supabase
     .from('shop_items')
     .select('*')
+    .eq('guild_id', currentGuildId())
     .eq('is_active', true)
     .ilike('name', itemName);
 
@@ -38,6 +40,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const { data: purchases } = await supabase
       .from('user_purchases')
       .select('id')
+      .eq('guild_id', currentGuildId())
       .eq('discord_id', interaction.user.id)
       .eq('item_id', item.id);
 
@@ -65,6 +68,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   // Create order
   const orderStatus = item.auto_apply ? 'FULFILLED' : 'PENDING';
   await supabase.from('orders').insert({
+    guild_id: currentGuildId(),
     discord_id: interaction.user.id,
     item_id: item.id,
     status: orderStatus,
@@ -73,6 +77,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   // Record purchase
   await supabase.from('user_purchases').insert({
+    guild_id: currentGuildId(),
     discord_id: interaction.user.id,
     item_id: item.id,
   });

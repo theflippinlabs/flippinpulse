@@ -7,8 +7,10 @@ import {
   ComponentType,
   Message,
   TextChannel,
+  ButtonInteraction,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { bindGuild, currentGuildId } from '../guildContext.js';
 import {
   getGameConfig,
   isGameEnabled,
@@ -42,6 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const { data: limits } = await supabase
       .from('user_game_limits')
       .select('count, reset_at')
+      .eq('guild_id', currentGuildId())
       .eq('discord_id', interaction.user.id)
       .eq('limit_key', 'treasure_claim')
       .single();
@@ -98,13 +101,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const reply = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }) as Message;
 
+  const gid = interaction.guildId!;
   const collector = reply.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 30_000,
     max: 1,
   });
 
-  collector.on('collect', async (btnI) => {
+  collector.on('collect', bindGuild(gid, async (btnI: ButtonInteraction) => {
     const maxClaims = conf.max_claims_per_user_per_day ?? 3;
     const canClaim = await checkGameLimit(btnI.user.id, 'treasure_claim', maxClaims);
 
@@ -123,7 +127,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     );
 
     await btnI.update({ embeds: [winEmbed], components: [] });
-  });
+  }));
 
   collector.on('end', async (collected) => {
     if (collected.size === 0) {

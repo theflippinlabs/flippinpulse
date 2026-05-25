@@ -1,4 +1,5 @@
 import { MessageReaction, PartialMessageReaction, User, PartialUser } from 'discord.js';
+import { runWithGuild } from '../guildContext.js';
 import { findRoleForReaction } from '../services/reactionRoles.js';
 import { log } from '../utils/logger.js';
 
@@ -18,7 +19,7 @@ export async function handleMessageReactionRemove(
   const guild = reaction.message.guild;
   if (!guild) return;
 
-  const roleId = await findRoleForReaction(reaction as MessageReaction);
+  const roleId = await runWithGuild(guild.id, () => findRoleForReaction(reaction as MessageReaction));
   if (!roleId) return;
 
   const member = await guild.members.fetch(user.id).catch(() => null);

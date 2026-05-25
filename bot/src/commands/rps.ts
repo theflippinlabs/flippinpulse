@@ -8,6 +8,7 @@ import {
   MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
+import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -101,6 +102,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const message = reply.resource?.message;
   if (!message) return;
 
+  const gid = interaction.guildId!;
   const lobby = message.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: cfg.timeout_seconds * 1000,
@@ -109,7 +111,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   let started = false;
 
-  lobby.on('collect', async (btn) => {
+  lobby.on('collect', bindGuild(gid, async (btn: ButtonInteraction) => {
     if (btn.customId === `rps_decline_${sessionId}`) {
       lobby.stop('declined');
       await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
@@ -183,7 +185,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       if (picks.size === 2) pickCollector.stop('both_picked');
     });
 
-    pickCollector.on('end', async (_c, reason) => {
+    pickCollector.on('end', bindGuild(gid, async (_c: unknown, reason: string) => {
       const aChoice = picks.get(interaction.user.id);
       const bChoice = picks.get(opponent.id);
 
@@ -230,8 +232,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       ].join('\n')).setTitle('✊✋✌️ RPS Result');
 
       await interaction.editReply({ embeds: [resultEmbed], components: [] });
-    });
-  });
+    }));
+  }));
 
   lobby.on('end', async (_c, reason) => {
     if (started) return;

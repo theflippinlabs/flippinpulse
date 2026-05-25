@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { log } from '../utils/logger.js';
 import { getEconomyConfig } from './settings.js';
 
@@ -17,6 +18,7 @@ export async function getActiveMissions(type?: string): Promise<Mission[]> {
   let query = supabase
     .from('missions')
     .select('id, type, title, description, reward_points, start_at, end_at')
+    .eq('guild_id', currentGuildId())
     .eq('is_active', true)
     .lte('start_at', now)
     .gte('end_at', now);
@@ -35,6 +37,7 @@ export async function hasCompletedMission(discordId: string, missionId: string):
   const { data } = await supabase
     .from('mission_completions')
     .select('id')
+    .eq('guild_id', currentGuildId())
     .eq('discord_id', discordId)
     .eq('mission_id', missionId)
     .eq('status', 'completed')
@@ -49,9 +52,10 @@ export async function completeMission(
   rewardPoints: number
 ): Promise<boolean> {
   if (await hasCompletedMission(discordId, missionId)) return false;
+  const guildId = currentGuildId();
 
-  // Insert completion
   const { error } = await supabase.from('mission_completions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     mission_id: missionId,
     status: 'completed',
@@ -63,13 +67,13 @@ export async function completeMission(
     return false;
   }
 
-  // Award PULSE
   const economyConfig = getEconomyConfig();
   const pulseReward = rewardPoints * economyConfig.pulse_per_point;
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('points_total, points_week, points_month, balance_pulse, lifetime_earned_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
@@ -84,9 +88,11 @@ export async function completeMission(
         balance_pulse: newBalance,
         lifetime_earned_pulse: (user.lifetime_earned_pulse ?? 0) + pulseReward,
       })
+      .eq('guild_id', guildId)
       .eq('discord_id', discordId);
 
     await supabase.from('pulse_transactions').insert({
+      guild_id: guildId,
       discord_id: discordId,
       type: 'EARN_MISSION',
       amount: pulseReward,
@@ -96,6 +102,6 @@ export async function completeMission(
     });
   }
 
-  log('INFO', `Mission completed: ${discordId} → ${missionId} (+${rewardPoints} pts)`);
+  log('INFO', `Mission completed: ${guildId}/${discordId} → ${missionId} (+${rewardPoints} pts)`);
   return true;
 }

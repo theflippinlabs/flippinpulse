@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { currentGuildId, currentGuildIdOrNull } from '../guildContext.js';
 import { log } from '../utils/logger.js';
 
 export interface GameConfig {
@@ -7,26 +8,34 @@ export interface GameConfig {
   is_enabled: boolean;
 }
 
-const configCache = new Map<string, GameConfig>();
+// guildId -> (game_key -> config)
+const configCache = new Map<string, Map<string, GameConfig>>();
 
 export async function loadGameConfigs(): Promise<void> {
-  const { data, error } = await supabase.from('games_config').select('*');
+  const { data, error } = await supabase.from('games_config').select('guild_id, game_key, config_json, is_enabled');
   if (error) {
     log('ERROR', 'Failed to load game configs', error);
     return;
   }
+  configCache.clear();
   for (const row of data ?? []) {
-    configCache.set(row.game_key, row as GameConfig);
+    const gid = (row as { guild_id: string }).guild_id;
+    if (!configCache.has(gid)) configCache.set(gid, new Map());
+    configCache.get(gid)!.set(row.game_key, row as GameConfig);
   }
-  log('INFO', `Loaded ${configCache.size} game configs`);
+  log('INFO', `Loaded game configs for ${configCache.size} guild(s)`);
 }
 
 export function getGameConfig(key: string): GameConfig | null {
-  return configCache.get(key) ?? null;
+  const gid = currentGuildIdOrNull();
+  if (!gid) return null;
+  return configCache.get(gid)?.get(key) ?? null;
 }
 
 export function isGameEnabled(key: string): boolean {
-  return configCache.get(key)?.is_enabled ?? false;
+  const gid = currentGuildIdOrNull();
+  if (!gid) return false;
+  return configCache.get(gid)?.get(key)?.is_enabled ?? false;
 }
 
 export async function createGameSession(
@@ -37,6 +46,7 @@ export async function createGameSession(
   const { data, error } = await supabase
     .from('game_sessions')
     .insert({
+      guild_id: currentGuildId(),
       game_key: gameKey,
       channel_id: channelId,
       status: 'waiting',
@@ -105,9 +115,11 @@ export async function earnPulse(
   reason: string,
   refId?: string,
 ): Promise<number> {
+  const guildId = currentGuildId();
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse, lifetime_earned_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
@@ -121,9 +133,11 @@ export async function earnPulse(
       balance_pulse: newBalance,
       lifetime_earned_pulse: currentEarned + amount,
     })
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId);
 
   await supabase.from('pulse_transactions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     type: 'EARN_EVENT',
     amount,
@@ -144,14 +158,15 @@ export async function checkGameLimit(
   const { data } = await supabase
     .from('user_game_limits')
     .select('count, reset_at')
+    .eq('guild_id', currentGuildId())
     .eq('discord_id', discordId)
     .eq('limit_key', limitKey)
     .single();
 
-  if (!data) return true; // no record = allowed
+  if (!data) return true;
 
   const resetAt = new Date(data.reset_at);
-  if (now >= resetAt) return true; // reset period passed
+  if (now >= resetAt) return true;
 
   return data.count < maxCount;
 }
@@ -160,28 +175,32 @@ export async function incrementGameLimit(
   discordId: string,
   limitKey: string,
 ): Promise<void> {
+  const guildId = currentGuildId();
   const now = new Date();
   const resetAt = new Date();
-  resetAt.setHours(23, 59, 59, 999); // end of today
+  resetAt.setHours(23, 59, 59, 999);
 
   const { data: existing } = await supabase
     .from('user_game_limits')
     .select('count, reset_at')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .eq('limit_key', limitKey)
     .single();
 
   if (!existing || new Date(existing.reset_at) <= now) {
     await supabase.from('user_game_limits').upsert({
+      guild_id: guildId,
       discord_id: discordId,
       limit_key: limitKey,
       count: 1,
       reset_at: resetAt.toISOString(),
-    }, { onConflict: 'discord_id,limit_key' });
+    }, { onConflict: 'guild_id,discord_id,limit_key' });
   } else {
     await supabase
       .from('user_game_limits')
       .update({ count: existing.count + 1 })
+      .eq('guild_id', guildId)
       .eq('discord_id', discordId)
       .eq('limit_key', limitKey);
   }

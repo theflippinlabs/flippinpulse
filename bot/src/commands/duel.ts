@@ -4,9 +4,11 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ButtonInteraction,
   ComponentType,
   Message,
 } from 'discord.js';
+import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -117,13 +119,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const reply = await interaction.reply({ content: `${opponent}`, embeds: [embed], components: [row], fetchReply: true }) as Message;
 
+  const gid = interaction.guildId!;
   const collector = reply.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: timeout,
     filter: (i) => i.user.id === opponent.id,
   });
 
-  collector.on('collect', async (btnInteraction) => {
+  collector.on('collect', bindGuild(gid, async (btnInteraction: ButtonInteraction) => {
     if (btnInteraction.customId === `duel_decline_${sessionId}`) {
       collector.stop('declined');
       await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
@@ -192,7 +195,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
       await btnInteraction.update({ embeds: [resultEmbed], components: [] });
     }
-  });
+  }));
 
   collector.on('end', (_collected, reason) => {
     if (reason === 'time') {

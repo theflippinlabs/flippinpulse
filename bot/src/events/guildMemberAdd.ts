@@ -1,5 +1,6 @@
 import { ChannelType, EmbedBuilder, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { runWithGuild } from '../guildContext.js';
 import { getWelcomeConfig, type WelcomeConfig } from '../services/settings.js';
 import { recordJoin } from '../services/automod.js';
 import { logAndAnnounce } from '../services/moderation.js';
@@ -53,7 +54,10 @@ async function sendWelcomeMessage(member: GuildMember): Promise<void> {
 
 export async function handleGuildMemberAdd(member: GuildMember): Promise<void> {
   if (member.user.bot) return;
+  await runWithGuild(member.guild.id, () => onGuildMemberAdd(member));
+}
 
+async function onGuildMemberAdd(member: GuildMember): Promise<void> {
   const raidState = recordJoin(member.guild.id);
   if (raidState.lockdown) {
     await logAndAnnounce(member.guild, {
@@ -68,11 +72,12 @@ export async function handleGuildMemberAdd(member: GuildMember): Promise<void> {
   }
 
   const { error } = await supabase.from('discord_users').upsert({
+    guild_id: member.guild.id,
     discord_id: member.id,
     username: member.user.username,
     avatar_url: member.user.displayAvatarURL({ size: 128 }),
     joined_at: new Date().toISOString(),
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'guild_id,discord_id' });
 
   if (error) {
     log('ERROR', `Failed to create user for ${member.id}`, error);

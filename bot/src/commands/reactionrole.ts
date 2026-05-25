@@ -97,7 +97,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   if (sub === 'remove') {
-    const ok = await deleteReactionRole(messageId, emoji);
+    const ok = await deleteReactionRole(interaction.guild.id, messageId, emoji);
     await interaction.editReply({
       embeds: ok
         ? [successEmbed(`Reaction role removed for ${emojiInput} on message ${messageId}.`)]

@@ -4,6 +4,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ButtonInteraction,
   ComponentType,
   Message,
   ModalBuilder,
@@ -11,6 +12,7 @@ import {
   TextInputStyle,
   ModalSubmitInteraction,
 } from 'discord.js';
+import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -122,6 +124,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const reply = await interaction.reply({ embeds: [lobbyEmbed], components: [row], fetchReply: true }) as Message;
 
   // Join phase
+  const gid = interaction.guildId!;
   const joinCollector = reply.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: joinTimeout,
@@ -129,7 +132,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   let raceStarted = false;
 
-  joinCollector.on('collect', async (btnI) => {
+  joinCollector.on('collect', bindGuild(gid, async (btnI: ButtonInteraction) => {
     if (btnI.customId === `race_join_${sessionId}` && !raceStarted) {
       if (players.has(btnI.user.id)) {
         await btnI.reply({ content: 'You already joined!', ephemeral: true });
@@ -173,9 +176,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       joinCollector.stop('started');
       await btnI.deferUpdate();
     }
-  });
+  }));
 
-  joinCollector.on('end', async (_collected, reason) => {
+  joinCollector.on('end', bindGuild(gid, async (_collected: unknown, reason: string) => {
     if (!raceStarted && reason === 'time') {
       // Refund everyone
       for (const pid of players) {
@@ -280,7 +283,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       }
     });
 
-    typeCollector.on('end', async () => {
+    typeCollector.on('end', bindGuild(gid, async () => {
       if (submissions.size === 0) {
         for (const pid of players) {
           if (bet > 0) await earnPulse(pid, bet, 'typingrace_refund', sessionId);
@@ -324,6 +327,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       ).setTitle('🏁 Typing Race — Results');
 
       await interaction.editReply({ embeds: [resultEmbed], components: [] }).catch(() => {});
-    });
-  });
+    }));
+  }));
 }

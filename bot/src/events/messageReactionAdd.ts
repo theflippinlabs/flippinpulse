@@ -1,4 +1,5 @@
 import { MessageReaction, PartialMessageReaction, User, PartialUser } from 'discord.js';
+import { runWithGuild } from '../guildContext.js';
 import { isOnCooldown } from '../services/antiSpam.js';
 import { awardPoints } from '../services/points.js';
 import { getPointsConfig } from '../services/settings.js';
@@ -23,26 +24,29 @@ export async function handleMessageReactionAdd(
 
   const member = await guild.members.fetch(user.id).catch(() => null);
   if (!member) return;
+  const resolvedUser = user;
 
-  const roleId = await findRoleForReaction(reaction as MessageReaction);
-  if (roleId) {
-    await member.roles.add(roleId).catch(err =>
-      log('ERROR', `Failed to add reaction role ${roleId} to ${user.id}`, err),
-    );
-  }
+  await runWithGuild(guild.id, async () => {
+    const roleId = await findRoleForReaction(reaction as MessageReaction);
+    if (roleId) {
+      await member.roles.add(roleId).catch(err =>
+        log('ERROR', `Failed to add reaction role ${roleId} to ${resolvedUser.id}`, err),
+      );
+    }
 
-  const discordId = user.id;
-  if (isOnCooldown(discordId, 'reaction')) return;
+    const discordId = resolvedUser.id;
+    if (isOnCooldown(discordId, 'reaction')) return;
 
-  const config = getPointsConfig();
-  await awardPoints({
-    discordId,
-    username: user.username ?? 'unknown',
-    avatarUrl: user.displayAvatarURL({ size: 128 }),
-    type: 'reaction',
-    channelId: reaction.message.channelId,
-    points: config.reaction,
-    guild,
-    member,
+    const config = getPointsConfig();
+    await awardPoints({
+      discordId,
+      username: resolvedUser.username ?? 'unknown',
+      avatarUrl: resolvedUser.displayAvatarURL({ size: 128 }),
+      type: 'reaction',
+      channelId: reaction.message.channelId,
+      points: config.reaction,
+      guild,
+      member,
+    });
   });
 }

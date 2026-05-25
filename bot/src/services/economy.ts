@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { currentGuildId } from '../guildContext.js';
 import { log } from '../utils/logger.js';
 
 interface SpendResult {
@@ -13,9 +14,11 @@ export async function spendPulse(
   reason: string,
   refId?: string
 ): Promise<SpendResult> {
+  const guildId = currentGuildId();
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse, lifetime_spent_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
@@ -32,9 +35,11 @@ export async function spendPulse(
       balance_pulse: newBalance,
       lifetime_spent_pulse: (user.lifetime_spent_pulse ?? 0) + amount,
     })
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId);
 
   await supabase.from('pulse_transactions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     type: 'SPEND_SHOP',
     amount: -amount,
@@ -43,7 +48,7 @@ export async function spendPulse(
     balance_after: newBalance,
   });
 
-  log('INFO', `PULSE spend: ${discordId} -${amount} (${reason})`);
+  log('INFO', `PULSE spend: ${guildId}/${discordId} -${amount} (${reason})`);
   return { success: true, newBalance };
 }
 
@@ -56,25 +61,28 @@ export async function grantPulse(
   adminId: string
 ): Promise<SpendResult> {
   if (amount <= 0) return { success: false, newBalance: 0, error: 'Amount must be positive' };
+  const guildId = currentGuildId();
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse, lifetime_earned_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
-  const currentBalance = user?.balance_pulse ?? 0;
-  const newBalance = currentBalance + amount;
+  const newBalance = (user?.balance_pulse ?? 0) + amount;
 
   await supabase.from('discord_users').upsert({
+    guild_id: guildId,
     discord_id: discordId,
     username,
     avatar_url: avatarUrl,
     balance_pulse: newBalance,
     lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'guild_id,discord_id' });
 
   await supabase.from('pulse_transactions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     type: 'ADMIN_GRANT',
     amount,
@@ -83,7 +91,7 @@ export async function grantPulse(
     balance_after: newBalance,
   });
 
-  log('INFO', `PULSE admin grant: ${adminId} -> ${discordId} +${amount} (${reason})`);
+  log('INFO', `PULSE admin grant: ${adminId} -> ${guildId}/${discordId} +${amount} (${reason})`);
   return { success: true, newBalance };
 }
 
@@ -94,10 +102,12 @@ export async function revokePulse(
   adminId: string
 ): Promise<SpendResult> {
   if (amount <= 0) return { success: false, newBalance: 0, error: 'Amount must be positive' };
+  const guildId = currentGuildId();
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
@@ -109,9 +119,11 @@ export async function revokePulse(
   await supabase
     .from('discord_users')
     .update({ balance_pulse: newBalance })
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId);
 
   await supabase.from('pulse_transactions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     type: 'ADMIN_REVOKE',
     amount: -removed,
@@ -120,7 +132,7 @@ export async function revokePulse(
     balance_after: newBalance,
   });
 
-  log('INFO', `PULSE admin revoke: ${adminId} -> ${discordId} -${removed} (${reason})`);
+  log('INFO', `PULSE admin revoke: ${adminId} -> ${guildId}/${discordId} -${removed} (${reason})`);
   return { success: true, newBalance };
 }
 
@@ -133,23 +145,27 @@ export async function setPulse(
   adminId: string
 ): Promise<SpendResult> {
   if (amount < 0) return { success: false, newBalance: 0, error: 'Amount cannot be negative' };
+  const guildId = currentGuildId();
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
   const delta = amount - (user?.balance_pulse ?? 0);
 
   await supabase.from('discord_users').upsert({
+    guild_id: guildId,
     discord_id: discordId,
     username,
     avatar_url: avatarUrl,
     balance_pulse: amount,
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'guild_id,discord_id' });
 
   await supabase.from('pulse_transactions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     type: delta >= 0 ? 'ADMIN_GRANT' : 'ADMIN_REVOKE',
     amount: delta,
@@ -158,7 +174,7 @@ export async function setPulse(
     balance_after: amount,
   });
 
-  log('INFO', `PULSE admin set: ${adminId} -> ${discordId} = ${amount} (${reason})`);
+  log('INFO', `PULSE admin set: ${adminId} -> ${guildId}/${discordId} = ${amount} (${reason})`);
   return { success: true, newBalance: amount };
 }
 
@@ -170,24 +186,28 @@ export async function creditPulse(
   reason: string
 ): Promise<number> {
   if (amount <= 0) return 0;
+  const guildId = currentGuildId();
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse, lifetime_earned_pulse')
+    .eq('guild_id', guildId)
     .eq('discord_id', discordId)
     .single();
 
   const newBalance = (user?.balance_pulse ?? 0) + amount;
 
   await supabase.from('discord_users').upsert({
+    guild_id: guildId,
     discord_id: discordId,
     username,
     avatar_url: avatarUrl,
     balance_pulse: newBalance,
     lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'guild_id,discord_id' });
 
   await supabase.from('pulse_transactions').insert({
+    guild_id: guildId,
     discord_id: discordId,
     type: 'EARN_EVENT',
     amount,
@@ -206,6 +226,7 @@ export async function getBalance(discordId: string): Promise<{
   const { data } = await supabase
     .from('discord_users')
     .select('balance_pulse, lifetime_earned_pulse, lifetime_spent_pulse')
+    .eq('guild_id', currentGuildId())
     .eq('discord_id', discordId)
     .single();
 

@@ -13,6 +13,7 @@ import { startAutoQuizScheduler } from './services/communityQuiz.js';
 import { startAutomodCleanup } from './services/automod.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
+import { seedGuildDefaults } from './events/guildCreate.js';
 import { log } from './utils/logger.js';
 
 const client = new Client({
@@ -42,6 +43,10 @@ client.once('ready', async () => {
     await registerCommands();
   } catch (err) {
     log('ERROR', 'Command registration failed (bot will still run)', err);
+  }
+  // Ensure every server the bot is already in has its defaults installed.
+  for (const guild of client.guilds.cache.values()) {
+    await seedGuildDefaults(guild.id);
   }
   await loadSettings();
   await loadRanks();
