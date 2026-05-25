@@ -362,7 +362,7 @@ INSERT INTO public.settings (key, value_json) VALUES
   ('daily_cap_config', '{"enabled": false, "cap_pulse": 500}'::jsonb),
   ('mod_config', '{"mod_log_channel_id": null, "automod_enabled": false, "anti_spam": {"enabled": true, "max_messages": 5, "window_seconds": 5, "mute_seconds": 600}, "anti_mass_mentions": {"enabled": true, "max_mentions": 5, "action": "delete"}, "anti_invites": {"enabled": false, "action": "delete"}, "anti_links": {"enabled": false, "whitelist_domains": ["twitter.com", "x.com", "youtube.com", "youtu.be"]}, "anti_raid": {"enabled": false, "max_joins": 10, "window_seconds": 30, "lockdown_minutes": 10}, "auto_warn_threshold": 3}'::jsonb),
   ('lottery_config', '{"enabled": true, "ticket_price": 50, "draw_interval_hours": 24, "house_cut_percent": 0, "announce_channel_id": null, "seed_pot": 0}'::jsonb),
-  ('auto_quiz', '{"enabled": false, "channel_id": null, "interval_hours": 6, "questions_per_round": 5, "seconds_per_question": 20, "reward_per_correct": 10, "category": null}'::jsonb)
+  ('auto_quiz', '{"enabled": false, "channel_id": null, "questions_per_round": 5, "seconds_per_question": 20, "reward_per_correct": 10, "category": null, "bonus_enabled": true, "auto_generate": true, "language": "English", "daily_times_utc": ["18:00", "00:00"], "topics": ["cinema", "music", "Cronos blockchain", "Loaded Lions Mane City", "general knowledge"]}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.roles_config (rank_name, threshold, sort_order, color) VALUES
