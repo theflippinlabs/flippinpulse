@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { currentGuildId } from '../guildContext.js';
+import { generateQuizQuestions } from '../services/aiQuiz.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -25,7 +26,13 @@ export const data = new SlashCommandBuilder()
       .addStringOption(o => o.setName('category').setDescription('Filter by category').setRequired(false)))
   .addSubcommand(s =>
     s.setName('remove').setDescription('Remove a question (by matching its text)')
-      .addStringOption(o => o.setName('contains').setDescription('Part of the question text').setRequired(true)));
+      .addStringOption(o => o.setName('contains').setDescription('Part of the question text').setRequired(true)))
+  .addSubcommand(s =>
+    s.setName('generate').setDescription('Auto-generate questions with AI')
+      .addStringOption(o => o.setName('topic').setDescription('Topic, e.g. Cronos, cinema, music, MainCity').setRequired(true))
+      .addIntegerOption(o => o.setName('count').setDescription('How many (1-15)').setMinValue(1).setMaxValue(15).setRequired(true))
+      .addStringOption(o => o.setName('category').setDescription('Category to file under (default: the topic)').setRequired(false))
+      .addStringOption(o => o.setName('language').setDescription('Language, e.g. English, French (default: English)').setRequired(false)));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -83,6 +90,63 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
     const lines = rows.map(r => `${r.is_active ? '🟢' : '⚫'} [${r.category}] ${r.question}`.slice(0, 100));
     await interaction.editReply({ embeds: [pulseEmbed(`Quiz questions (${rows.length})`).setDescription(lines.join('\n').slice(0, 4000))] });
+    return;
+  }
+
+  if (sub === 'generate') {
+    const topic = interaction.options.getString('topic', true);
+    const count = interaction.options.getInteger('count', true);
+    const category = (interaction.options.getString('category') ?? topic).toLowerCase().trim();
+    const language = interaction.options.getString('language') ?? 'English';
+    const guildId = currentGuildId();
+
+    let generated;
+    try {
+      generated = await generateQuizQuestions(topic, count, language);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'unknown';
+      const friendly = msg === 'NO_API_KEY'
+        ? 'AI generation is not configured. Set the `ANTHROPIC_API_KEY` environment variable in Railway, then try again.'
+        : msg === 'BAD_JSON'
+          ? 'The AI response could not be parsed. Try again.'
+          : `AI generation failed: ${msg}`;
+      await interaction.editReply({ embeds: [errorEmbed(friendly)] });
+      return;
+    }
+
+    if (!generated.length) {
+      await interaction.editReply({ embeds: [errorEmbed('The AI did not return any usable questions. Try a clearer topic.')] });
+      return;
+    }
+
+    const texts = generated.map(q => q.question);
+    const { data: existing } = await supabase
+      .from('quiz_questions')
+      .select('question')
+      .eq('guild_id', guildId)
+      .in('question', texts);
+    const existingSet = new Set((existing ?? []).map(r => r.question));
+
+    const toInsert = generated
+      .filter(q => !existingSet.has(q.question))
+      .map(q => ({ guild_id: guildId, question: q.question, choices_json: q.choices, correct_index: q.correct_index, category, is_active: true }));
+
+    if (toInsert.length) {
+      const { error } = await supabase.from('quiz_questions').insert(toInsert);
+      if (error) {
+        await interaction.editReply({ embeds: [errorEmbed(`Generated ${generated.length} but failed to save: ${error.message}`)] });
+        return;
+      }
+    }
+
+    const skipped = generated.length - toInsert.length;
+    const preview = toInsert.slice(0, 5).map(q => `• ${q.question}`).join('\n');
+    await interaction.editReply({
+      embeds: [successEmbed(
+        `🤖 Added **${toInsert.length}** new question${toInsert.length === 1 ? '' : 's'} to **${category}**` +
+        `${skipped ? ` (${skipped} duplicate${skipped === 1 ? '' : 's'} skipped)` : ''}.\n\n${preview}`
+      )],
+    });
     return;
   }
 
