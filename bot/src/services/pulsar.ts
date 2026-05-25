@@ -104,7 +104,11 @@ async function postSpontaneous(client: Client, guildId: string): Promise<void> {
   const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
   if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) return;
 
-  const actives = activeMembers(guildId);
+  // Tag from a wider window (last 3h) so Pulsar can pull recent members back
+  // even after a lull, not only people chatting right this second.
+  const actives = activeMembers(guildId, 3 * 60 * 60_000);
+  const quiet = !activeMembers(guildId, 30 * 60_000).length;
+
   let mode: typeof MODES[number] = MODES[Math.floor(Math.random() * MODES.length)];
   let target: Activity | undefined;
   if (mode === 'checkin') {
@@ -114,9 +118,9 @@ async function postSpontaneous(client: Client, guildId: string): Promise<void> {
 
   const ctx = contextLines(guildId);
   const ask =
-    mode === 'question' ? 'Post one fun, open-ended question to spark conversation in the server right now.'
-    : mode === 'checkin' ? `Warmly greet this member and ask how their day is going. Put the token {user} exactly once where their name should appear.`
-    : mode === 'hype' ? 'Post one short hype, positive message to energize the community right now.'
+    mode === 'question' ? `Post one fun, open-ended question to ${quiet ? 'revive a quiet channel and get people talking again' : 'spark conversation right now'}.`
+    : mode === 'checkin' ? `Warmly greet this member${quiet ? ' (the channel has been quiet — pull them back in)' : ''} and ask how their day is going. Put the token {user} exactly once where their name should appear.`
+    : mode === 'hype' ? `Post one short hype, positive message to ${quiet ? 'wake up the community and bring energy back' : 'energize the community right now'}.`
     : 'Post one light icebreaker or "would you rather" style prompt to get people chatting.';
 
   const userMsg = `${ctx ? `Recent chat for context:\n${ctx}\n\n` : ''}${ask}`;
@@ -185,9 +189,8 @@ async function tick(client: Client): Promise<void> {
   const intervalMs = Math.max(0.5, cfg.interval_hours) * 3_600_000;
   if (state.last && Date.now() - state.last < intervalMs) return;
 
-  // Don't talk to an empty room — only chime in when people have been active.
-  if (!activeMembers(guildId, 60 * 60_000).length) return;
-
+  // Pulsar's job is to ENGAGE — it posts on schedule even when the channel is
+  // quiet, to revive the conversation and pull people back in.
   await setSetting('pulsar_state', { last: Date.now() });
   await postSpontaneous(client, guildId);
 }
