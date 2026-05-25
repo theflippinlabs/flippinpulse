@@ -40,7 +40,7 @@ async function handleGiveawayButton(interaction: ButtonInteraction): Promise<voi
 
 export async function handleInteractionCreate(interaction: Interaction): Promise<void> {
   if (
-    (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isModalSubmit())
+    (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isUserSelectMenu() || interaction.isModalSubmit())
     && interaction.customId.startsWith('panel:')
   ) {
     if (!interaction.guildId) return;

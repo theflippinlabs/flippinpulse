@@ -26,6 +26,8 @@ export interface AutoQuizConfig {
   language: string;
   daily_times_utc: string[];
   topics: string[];
+  ping_everyone: boolean;
+  announce_lead_minutes: number;
 }
 
 const DEFAULTS: AutoQuizConfig = {
@@ -40,6 +42,8 @@ const DEFAULTS: AutoQuizConfig = {
   language: 'English',
   daily_times_utc: ['18:00', '00:00'],
   topics: ['cinema', 'music', 'Cronos blockchain', 'Loaded Lions Mane City', 'general knowledge'],
+  ping_everyone: true,
+  announce_lead_minutes: 15,
 };
 
 export function getAutoQuizConfig(): AutoQuizConfig {
@@ -216,40 +220,101 @@ export async function launchQuiz(channel: GuildTextBasedChannel, cfg: AutoQuizCo
 
 const GRACE_MS = 30 * 60_000;
 
+function slotEpoch(now: Date, t: string): number | null {
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Number(m[1]), Number(m[2]));
+}
+
 function dueSlot(cfg: AutoQuizConfig, fired: Record<string, string>): string | null {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   for (const t of cfg.daily_times_utc) {
-    const m = t.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) continue;
-    const sched = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Number(m[1]), Number(m[2]));
+    const sched = slotEpoch(now, t);
+    if (sched == null) continue;
     if (now.getTime() >= sched && now.getTime() < sched + GRACE_MS && fired[t] !== today) return t;
+  }
+  return null;
+}
+
+// A slot whose start is within the lead window and hasn't been teased today.
+function dueAnnounce(cfg: AutoQuizConfig, announced: Record<string, string>): { slot: string; minutes: number } | null {
+  if (cfg.announce_lead_minutes <= 0) return null;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const leadMs = cfg.announce_lead_minutes * 60_000;
+  for (const t of cfg.daily_times_utc) {
+    const sched = slotEpoch(now, t);
+    if (sched == null) continue;
+    if (now.getTime() >= sched - leadMs && now.getTime() < sched && announced[t] !== today) {
+      return { slot: t, minutes: Math.max(1, Math.round((sched - now.getTime()) / 60_000)) };
+    }
   }
   return null;
 }
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
+async function fetchQuizChannel(client: Client, channelId: string): Promise<GuildTextBasedChannel | null> {
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+    log('ERROR', `Auto-quiz channel ${channelId} is not a usable text channel.`);
+    return null;
+  }
+  return channel as GuildTextBasedChannel;
+}
+
 async function tickGuild(client: Client, guildId: string): Promise<void> {
   await runWithGuild(guildId, async () => {
     const cfg = getAutoQuizConfig();
     if (!cfg.enabled || !cfg.channel_id) return;
 
-    const state = getRawSetting<{ fired?: Record<string, string> }>('auto_quiz_state') ?? {};
+    const state = getRawSetting<{ fired?: Record<string, string>; announced?: Record<string, string> }>('auto_quiz_state') ?? {};
     const fired = state.fired ?? {};
+    const announced = state.announced ?? {};
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 1) Teaser: warn the community a few minutes before a quiz drops.
+    const teaser = dueAnnounce(cfg, announced);
+    if (teaser && fired[teaser.slot] !== today) {
+      announced[teaser.slot] = today;
+      await setSetting('auto_quiz_state', { fired, announced });
+
+      const channel = await fetchQuizChannel(client, cfg.channel_id);
+      if (channel) {
+        await channel.send({
+          content: cfg.ping_everyone ? '@everyone' : undefined,
+          embeds: [pulseEmbed('🧠 Quiz incoming!').setDescription(
+            `Get ready — a **Community Quiz** starts in about **${teaser.minutes} minute${teaser.minutes === 1 ? '' : 's'}**! ⏳\n\n` +
+            `📋 ${cfg.questions_per_round} questions${cfg.bonus_enabled ? ' + a 🌟 bonus' : ''} · 💰 **+${cfg.reward_per_correct} PULSE** per correct answer\n\n` +
+            `Stick around and sharpen your brain! 🧠✨`
+          )],
+          allowedMentions: cfg.ping_everyone ? { parse: ['everyone'] } : { parse: [] },
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // 2) Launch when the slot is due.
     const slot = dueSlot(cfg, fired);
     if (!slot) return;
 
-    fired[slot] = new Date().toISOString().slice(0, 10);
-    await setSetting('auto_quiz_state', { fired });
+    fired[slot] = today;
+    await setSetting('auto_quiz_state', { fired, announced });
 
-    const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
-    if (!channel || !channel.isTextBased() || channel.isDMBased()) {
-      log('ERROR', `Auto-quiz channel ${cfg.channel_id} is not a usable text channel.`);
-      return;
+    const channel = await fetchQuizChannel(client, cfg.channel_id);
+    if (!channel) return;
+
+    if (cfg.ping_everyone) {
+      await channel.send({
+        content: '@everyone',
+        embeds: [pulseEmbed('🧠 The Quiz is LIVE!').setDescription('Jump in now — first correct answers win PULSE! 🏆')],
+        allowedMentions: { parse: ['everyone'] },
+      }).catch(() => {});
     }
+
     log('INFO', `Auto-quiz: launching daily quiz (slot ${slot}) in guild ${guildId}.`);
-    await launchQuiz(channel as GuildTextBasedChannel, cfg);
+    await launchQuiz(channel, cfg);
   });
 }
 

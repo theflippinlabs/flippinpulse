@@ -3,7 +3,7 @@ import { supabase } from '../supabase.js';
 import { runWithGuild, currentGuildId } from '../guildContext.js';
 import { spendPulse } from './economy.js';
 import { earnPulse } from './games.js';
-import { getRawSetting } from './settings.js';
+import { getRawSetting, setSetting } from './settings.js';
 import { log } from '../utils/logger.js';
 
 export interface LotteryConfig {
@@ -13,6 +13,8 @@ export interface LotteryConfig {
   house_cut_percent: number;
   announce_channel_id: string | null;
   seed_pot: number;
+  announce_interval_hours: number;
+  ping_everyone: boolean;
 }
 
 const DEFAULTS: LotteryConfig = {
@@ -22,6 +24,8 @@ const DEFAULTS: LotteryConfig = {
   house_cut_percent: 0,
   announce_channel_id: null,
   seed_pot: 0,
+  announce_interval_hours: 6,
+  ping_everyone: true,
 };
 
 export function getLotteryConfig(): LotteryConfig {
@@ -203,12 +207,46 @@ async function drawRound(client: Client, round: LotteryRound): Promise<void> {
   }
 }
 
+// Periodic jackpot reminder that tags the community throughout the day.
+async function maybeAnnounce(client: Client, round: LotteryRound): Promise<void> {
+  const cfg = getLotteryConfig();
+  if (cfg.announce_interval_hours <= 0 || !cfg.announce_channel_id) return;
+
+  const state = getRawSetting<{ last?: number }>('lottery_announce_state') ?? {};
+  const intervalMs = cfg.announce_interval_hours * 3_600_000;
+  if (state.last && Date.now() - state.last < intervalMs) return;
+
+  const channel = await client.channels.fetch(cfg.announce_channel_id).catch(() => null);
+  if (!channel?.isTextBased() || !('send' in channel)) return;
+
+  await setSetting('lottery_announce_state', { last: Date.now() });
+
+  const drawTs = Math.floor(new Date(round.draw_at).getTime() / 1000);
+  const embed = new EmbedBuilder()
+    .setColor(0xF59E0B)
+    .setTitle('🎰 Lottery Jackpot Reminder')
+    .setDescription(
+      `The current jackpot is **${round.pot_pulse} PULSE**! 💰\n\n` +
+      `🎟️ Tickets cost **${round.ticket_price} PULSE** each — buy in with \`/lottery buy\`.\n` +
+      `⏰ Next draw <t:${drawTs}:R>.\n\n` +
+      `The more tickets you hold, the better your odds. Good luck! 🍀`
+    )
+    .setTimestamp();
+
+  await channel.send({
+    content: cfg.ping_everyone ? '@everyone' : undefined,
+    embeds: [embed],
+    allowedMentions: cfg.ping_everyone ? { parse: ['everyone'] } : { parse: [] },
+  }).catch(() => {});
+}
+
 let interval: ReturnType<typeof setInterval> | null = null;
 
 async function tickGuild(client: Client, guildId: string): Promise<void> {
   await runWithGuild(guildId, async () => {
     if (!getLotteryConfig().enabled) return;
-    await getOrCreateActiveRound();
+    const active = await getOrCreateActiveRound();
+    if (active) await maybeAnnounce(client, active);
     const { data: due } = await supabase
       .from('lottery_rounds')
       .select('id, guild_id, status, pot_pulse, ticket_price, draw_at, total_tickets')

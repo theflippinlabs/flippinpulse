@@ -16,13 +16,39 @@ const DEATHS = [
   '{victim} got sniped from across the server. 🎯',
   '{victim} ran out of ammo at the worst possible moment. 🔫',
   '{victim} was betrayed by their own teammate. 🗡️',
-  '{victim} stepped on a landmine. 💣',
+  '{victim} stepped on a landmine while moonwalking. 💣',
   '{victim} got swallowed by the storm. 🌪️',
   '{victim} took an arrow to the knee. 🏹',
   '{victim} rage-quit after some brutal lag. 📵',
   '{victim} got cornered and taken out. ⚰️',
-  '{victim} slipped on a banana peel. 🍌',
+  '{victim} slipped on a banana peel left by {killer}. 🍌',
   '{victim} disconnected… permanently. 🔌',
+  '{victim} tried to pet a wild boar. The boar disagreed. 🐗',
+  '{victim} hid in a bush for 20 minutes, then sneezed. 🤧',
+  '{victim} brought a spoon to a gunfight. 🥄',
+  '{victim} was looting when {killer} said “behind you 👀”.',
+  '{victim} got third-partied by {killer} mid-celebration. 🎉',
+  '{victim} fell out of the supply plane and forgot the parachute. 🪂',
+  '{victim} drank the wrong potion and turned into a chicken. 🐔',
+  '{victim} got out-jumped, out-played, and out-emoted by {killer}. 🕺',
+  '{victim} stood still to read the patch notes. Big mistake. 📜',
+  '{victim} mistook a grenade for a snack. 🍎',
+  '{victim} ran the wrong way into the circle. 🧭',
+  '{victim} was sent back to the lobby by {killer}, no refunds. 🎟️',
+];
+
+// Atmosphere lines that fire between eliminations — no one dies, just vibes.
+const FLAVOR = [
+  '🌫️ The storm tightens. Nowhere left to hide…',
+  '📦 A legendary supply drop lands. Everyone freezes, then sprints.',
+  '🔊 Distant gunfire echoes across the arena.',
+  '🌙 Night falls. Somewhere, someone is definitely panicking.',
+  '🐍 A snake slithers through the grass. Tensions rise.',
+  '💨 The wind howls. {a} and {b} circle each other warily.',
+  '🩹 {a} patches up behind a rock, hands shaking.',
+  '⚡ A thunderclap. {a} nearly has a heart attack.',
+  '🍗 Someone is calmly grilling chicken in the middle of the warzone.',
+  '👀 {a} swears they saw movement. It was just a bush.',
 ];
 
 const shuffle = <T>(arr: T[]): T[] => {
@@ -34,24 +60,60 @@ const shuffle = <T>(arr: T[]): T[] => {
   return a;
 };
 
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
 registerLobbyResolver('battle_royale', async ({ message, sessionId, players, pot }) => {
   const fixedReward = (getGameConfig('battle_royale')?.config_json?.fixed_reward as number) ?? 50;
 
   const alive: LobbyPlayer[] = shuffle(players);
-  const feed: string[] = [`⚔️ **${alive.length} fighters** enter the arena!`];
+  const total = alive.length;
+  const channel = message.channel;
 
-  const render = () => pulseEmbed('⚔️ Battle Royale').setDescription(
-    feed.slice(-9).join('\n') +
-    `\n\n**Still alive (${alive.length}):** ${alive.map(p => p.name).join(', ')}`
-  );
+  // Pacing: keep the whole match in a comfortable window even with many players.
+  const elimDelay = total > 12 ? 1700 : total > 7 ? 2400 : 3200;
 
-  await message.edit({ embeds: [render()], components: [] }).catch(() => {});
+  const send = (text: string) =>
+    channel.isSendable()
+      ? channel.send({ embeds: [pulseEmbed('⚔️ Battle Royale').setDescription(text)] }).catch(() => null)
+      : Promise.resolve(null);
+
+  // Opening message replaces the lobby card.
+  await message.edit({
+    embeds: [pulseEmbed('⚔️ Battle Royale — FIGHT!').setDescription(
+      `The dropship doors open… **${total} fighters** parachute into the arena!\n\n` +
+      `${alive.map(p => `• ${p.name}`).join('\n')}\n\n` +
+      `${pot > 0 ? `💰 Winner takes the **${pot} PULSE** pot.` : `💰 Winner takes **${fixedReward} PULSE**.`}\n` +
+      `Let the chaos begin… 🪂`
+    )],
+    components: [],
+  }).catch(() => {});
+
+  await delay(2200);
 
   while (alive.length > 1) {
-    await delay(2500);
+    // Occasional atmosphere beat (not when we're down to the final 2).
+    if (alive.length > 2 && Math.random() < 0.33) {
+      const two = shuffle(alive).slice(0, 2);
+      await send(pick(FLAVOR)
+        .replace('{a}', `**${two[0]?.name ?? 'Someone'}**`)
+        .replace('{b}', `**${two[1]?.name ?? 'someone'}**`));
+      await delay(elimDelay);
+    }
+
     const victim = alive.splice(Math.floor(Math.random() * alive.length), 1)[0];
-    feed.push(DEATHS[Math.floor(Math.random() * DEATHS.length)].replace('{victim}', `**${victim.name}**`));
-    await message.edit({ embeds: [render()], components: [] }).catch(() => {});
+    const killer = alive.length ? pick(alive) : victim;
+    const line = pick(DEATHS)
+      .replace('{victim}', `**${victim.name}**`)
+      .replace('{killer}', `**${killer.name}**`);
+
+    const tail = alive.length === 1
+      ? ''
+      : alive.length <= 3
+        ? `\n\n🔥 **Final ${alive.length}:** ${alive.map(p => p.name).join(' vs ')}`
+        : `\n\n*${alive.length} fighters remain.*`;
+
+    await send(`☠️ ${line}${tail}`);
+    await delay(elimDelay);
   }
 
   const winner = alive[0];
@@ -62,12 +124,15 @@ registerLobbyResolver('battle_royale', async ({ message, sessionId, players, pot
   await updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
   await saveGameResult(sessionId, { winner: winner.id, players: players.length, payout });
 
-  await message.edit({
-    embeds: [successEmbed(
-      `${feed.slice(-6).join('\n')}\n\n🏆 **${winner.name}** is the last one standing and wins **${payout}** PULSE!`
-    ).setTitle('⚔️ Battle Royale — Winner')],
-    components: [],
-  }).catch(() => {});
+  if (channel.isSendable()) {
+    await channel.send({
+      embeds: [successEmbed(
+        `The dust settles over ${total} fallen fighters…\n\n` +
+        `🏆 **${winner.name}** is the **last one standing** and walks away with **${payout}** PULSE! 🎉\n\n` +
+        `*GG everyone — run it back?*`
+      ).setTitle('⚔️ Battle Royale — Victory Royale')],
+    }).catch(() => {});
+  }
 });
 
 export const data = new SlashCommandBuilder()
