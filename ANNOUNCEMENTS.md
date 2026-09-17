@@ -7,7 +7,7 @@
 ## 💬 Annonce Discord — Français
 
 ```
-@everyone 🌊⚡ PULSE ENGINE EST EN LIGNE !
+@everyone 🌊⚡ NOVARYS EST EN LIGNE !
 
 Notre bot communautaire est là — et plus tu participes, plus tu gagnes 🤑
 
@@ -26,7 +26,7 @@ Bonne chance, et que les meilleurs gagnent ! 💙
 ## 💬 Discord Announcement — English
 
 ```
-@everyone 🌊⚡ PULSE ENGINE IS LIVE!
+@everyone 🌊⚡ NOVARYS IS LIVE!
 
 Our community bot is here — and the more you take part, the more you earn 🤑
 
@@ -47,7 +47,7 @@ Good luck — may the best win! 💙
 ## 🐦 Annonce X / Twitter — Français (≤ 280 caractères)
 
 ```
-🌊⚡ Pulse Engine est EN LIGNE sur notre Discord !
+🌊⚡ Novarys est EN LIGNE sur notre Discord !
 
 Gagne des PULSE rien qu'en étant actif 💬🎙️
 Joue-les : Crash, Plus ou Moins, Battle Royale & + ⚔️
@@ -61,7 +61,7 @@ Rejoins-nous 👉 [LIEN]
 ## 🐦 X / Twitter Announcement — English (≤ 280 chars)
 
 ```
-🌊⚡ Pulse Engine is LIVE on our Discord!
+🌊⚡ Novarys is LIVE on our Discord!
 
 Earn PULSE just by being active 💬🎙️
 Play it: Crash, Higher/Lower, Battle Royale & more ⚔️
@@ -77,7 +77,7 @@ Join us 👉 [LINK]
 ## 🧵 Option : fil X / Twitter thread (plus détaillé)
 
 ```
-1/ 🌊⚡ Big news — Pulse Engine, our community bot, is now LIVE!
+1/ 🌊⚡ Big news — Novarys, our community bot, is now LIVE!
 
 The more active you are in our Discord, the more you earn. Here's how 👇
 

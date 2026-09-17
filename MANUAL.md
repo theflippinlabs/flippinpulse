@@ -1,4 +1,4 @@
-# Pulse Engine — Bot Manual / Manuel du bot
+# Novarys — Bot Manual / Manuel du bot
 
 `<...>` = required / obligatoire · `[...]` = optional / optionnel · 🔒 = Administrator only / Admin uniquement
 

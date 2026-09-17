@@ -64,7 +64,7 @@ function navRow(): Row {
       { label: 'Economy', value: 'economy', emoji: '💰' },
       { label: 'Give / remove PULSE', value: 'pulse', emoji: '🎁' },
       { label: 'Shop', value: 'shop', emoji: '🛒' },
-      { label: 'Pulsar (AI host)', value: 'pulsar', emoji: '🤖' },
+      { label: 'Novus (AI Community Manager)', value: 'pulsar', emoji: '🧠' },
       { label: 'Missions', value: 'missions', emoji: '🎯' },
     );
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(select);
@@ -103,7 +103,7 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
         `🚀 Rank-up: ${r ? `<#${r}>` : '*(not set)*'}\n` +
         `🛡️ Mod-log: ${ml ? `<#${ml}>` : '*(not set)*'}\n` +
         `🧠 Auto-quiz: ${q ? `<#${q}>` : '*(not set)*'}\n\n` +
-        `*Pulsar's channel is set in the **Pulsar** section.*`
+        `*Novus's channel is set in the **Novus** section.*`
       )],
       components: rows,
     };
@@ -152,7 +152,7 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
   if (section === 'pulsar') {
     const c = getPulsarConfig();
     rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-      new ChannelSelectMenuBuilder().setCustomId('panel:chan:pulsar').addChannelTypes(ChannelType.GuildText).setPlaceholder('🤖 Pulsar channel')));
+      new ChannelSelectMenuBuilder().setCustomId('panel:chan:pulsar').addChannelTypes(ChannelType.GuildText).setPlaceholder('🧠 Novus channel')));
     rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder().setCustomId('panel:pulsartoggle').setLabel(c.enabled ? 'Turn OFF' : 'Turn ON').setEmoji(c.enabled ? '⛔' : '✅').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
       new ButtonBuilder().setCustomId('panel:pulsartag').setLabel(`Tag members: ${c.tag_active_members ? 'ON' : 'OFF'}`).setEmoji('🏷️').setStyle(ButtonStyle.Secondary),
@@ -169,13 +169,13 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
       new ButtonBuilder().setCustomId('panel:pulsarnow').setLabel('Post now').setEmoji('🤖').setStyle(ButtonStyle.Primary),
     ));
     return {
-      embeds: [pulseEmbed('🤖 Pulsar — AI community host').setDescription(
+      embeds: [pulseEmbed('🧠 NOVUS // COMMUNITY').setDescription(
         `**Status:** ${c.enabled ? 'ON ✅' : 'OFF ⛔'} · **Channel:** ${c.channel_id ? `<#${c.channel_id}>` : '*(pick one above)*'}\n` +
         `**Posts to engage:** about every **${c.interval_hours}h** — even when it's quiet, to revive the chat\n` +
         `**Tags members:** ${c.tag_active_members ? 'ON' : 'OFF'} · **Replies when mentioned:** ${c.reply_to_mentions ? 'ON' : 'OFF'}\n` +
         `**Welcomes:** ${c.welcome ? 'ON' : 'OFF'} · **Host events:** ${c.host_events ? 'ON' : 'OFF'} · **Recap (${c.recap_time_utc} UTC):** ${c.recap ? 'ON' : 'OFF'} · **Celebrate:** ${c.celebrate ? 'ON' : 'OFF'}\n` +
         `**Language:** ${c.language}\n\n` +
-        `${process.env.ANTHROPIC_API_KEY ? 'Pulsar welcomes newcomers, hosts events, celebrates wins and keeps the vibe going. 🎉' : '⚠️ Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.'}`
+        `${process.env.ANTHROPIC_API_KEY ? 'Novus welcomes newcomers, hosts events, celebrates wins and keeps the community alive. 🎉' : '⚠️ Set `ANTHROPIC_API_KEY` in Railway to power Novus.'}`
       )],
       components: rows,
     };
@@ -199,11 +199,11 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
     ));
     return {
       embeds: [pulseEmbed('🎯 Missions').setDescription(
-        `Launch a mission now — it posts in Pulsar's channel ${ch ? `(<#${ch}>)` : '*(set one in the Pulsar section first)*'}.\n\n` +
+        `Launch a mission now — it posts in Novus's channel ${ch ? `(<#${ch}>)` : '*(set one in the Novus section first)*'}.\n\n` +
         `⚡ **Flash** — first 3 to claim win 50 PULSE (30 min)\n` +
         `🧩 **Riddle** — first to solve wins 100 PULSE (needs AI key)\n` +
         `📅 **Daily** — send 20 messages · 🗓️ **Weekly** — play 5 games (auto-tracked, credits PULSE)\n\n` +
-        `🔁 **Auto-launch:** ${c.missions ? `ON — Pulsar starts one about every ${c.mission_interval_hours}h` : 'OFF'} (needs Pulsar ON).`
+        `🔁 **Auto-launch:** ${c.missions ? `ON — Novus starts one about every ${c.mission_interval_hours}h` : 'OFF'} (needs Novus ON).`
       )],
       components: rows,
     };
@@ -219,11 +219,11 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
     new ButtonBuilder().setCustomId('panel:refresh').setLabel('Refresh').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
   ));
   return {
-    embeds: [pulseEmbed('🛠️ Pulse Engine — Admin Panel').setDescription(
+    embeds: [pulseEmbed('🛠️ NOVARYS — Community Operations').setDescription(
       'Use the **section menu** above to configure everything.\n\n' +
       `**Modules:** ${modLines}\n` +
-      `**Auto-quiz:** ${getAutoQuizConfig().enabled ? 'ON ✅' : 'OFF ⛔'} · **Pulsar:** ${getPulsarConfig().enabled ? 'ON ✅' : 'OFF ⛔'}\n\n` +
-      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop · Pulsar.*'
+      `**Auto-quiz:** ${getAutoQuizConfig().enabled ? 'ON ✅' : 'OFF ⛔'} · **Novus:** ${getPulsarConfig().enabled ? 'ON ✅' : 'OFF ⛔'}\n\n` +
+      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop · Novus.*'
     )],
     components: rows,
   };
@@ -351,10 +351,10 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     if (id === 'panel:pulsartune') { await interaction.showModal(pulsarModal()); return; }
     if (id === 'panel:pulsarnow') {
       const cfg = getPulsarConfig();
-      if (!cfg.channel_id) { await interaction.reply({ embeds: [errorEmbed('Pick a Pulsar channel first.')], flags: MessageFlags.Ephemeral }); return; }
-      if (!process.env.ANTHROPIC_API_KEY) { await interaction.reply({ embeds: [errorEmbed('Set `ANTHROPIC_API_KEY` in Railway to power Pulsar.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!cfg.channel_id) { await interaction.reply({ embeds: [errorEmbed('Pick a Novus channel first.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!process.env.ANTHROPIC_API_KEY) { await interaction.reply({ embeds: [errorEmbed('Set `ANTHROPIC_API_KEY` in Railway to power Novus.')], flags: MessageFlags.Ephemeral }); return; }
       if (!interaction.guild) { await interaction.reply({ embeds: [errorEmbed('Use this in a server.')], flags: MessageFlags.Ephemeral }); return; }
-      await interaction.reply({ embeds: [successEmbed('Pulsar is posting now! 🤖')], flags: MessageFlags.Ephemeral });
+      await interaction.reply({ embeds: [successEmbed('Novus is posting now. 🧠')], flags: MessageFlags.Ephemeral });
       void pulsarPostNow(interaction.client, interaction.guild.id);
       return;
     }
@@ -376,7 +376,7 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
         return;
       }
       if (id === 'panel:missionauto') { await patch('pulsar_config', { missions: !getPulsarConfig().missions }); await interaction.update(render('missions')); return; }
-      if (!ch) { await interaction.reply({ embeds: [errorEmbed('Set a Pulsar channel first (Pulsar section).')], flags: MessageFlags.Ephemeral }); return; }
+      if (!ch) { await interaction.reply({ embeds: [errorEmbed('Set a Novus channel first (Novus section).')], flags: MessageFlags.Ephemeral }); return; }
       await interaction.reply({ embeds: [successEmbed('Launching the mission now! 🎯')], flags: MessageFlags.Ephemeral });
       if (id === 'panel:missionflash') void launchFlash(interaction.client, ch, { reward: 50, maxWinners: 3, durationMin: 30 });
       else if (id === 'panel:missionriddle') void launchRiddle(interaction.client, ch, { reward: 100, durationMin: 60 });
@@ -462,7 +462,7 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
           language: interaction.fields.getTextInputValue('l').trim() || c.language,
           recap_time_utc: /^\d{1,2}:\d{2}$/.test(recapTime) ? recapTime : c.recap_time_utc,
         });
-        await interaction.reply({ embeds: [successEmbed('Pulsar settings updated.')], flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [successEmbed('Novus settings updated.')], flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -601,7 +601,7 @@ function shopNameModal(kind: string, title: string): ModalBuilder {
 
 function pulsarModal(): ModalBuilder {
   const c = getPulsarConfig();
-  return new ModalBuilder().setCustomId('panel:modal:pulsar').setTitle('Pulsar settings').addComponents(
+  return new ModalBuilder().setCustomId('panel:modal:pulsar').setTitle('Novus settings').addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder().setCustomId('h').setLabel('Hours between posts (0.5-24)').setStyle(TextInputStyle.Short).setValue(String(c.interval_hours)).setRequired(true)),
     new ActionRowBuilder<TextInputBuilder>().addComponents(

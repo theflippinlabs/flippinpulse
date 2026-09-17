@@ -1,4 +1,4 @@
-# 🌊 Pulse Engine — Le guide du serveur
+# 🌊 Novarys — Le guide du serveur
 
 *Bienvenue ! Ce guide explique simplement comment fonctionne le bot, comment gagner des récompenses et comment t'amuser. / Welcome! This guide explains simply how the bot works, how to earn rewards, and how to have fun.*
 

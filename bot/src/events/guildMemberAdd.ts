@@ -56,12 +56,12 @@ async function sendWelcomeMessage(member: GuildMember): Promise<void> {
     return;
   }
 
-  // Let Pulsar write a personalized welcome when it's available; otherwise
+  // Let Novus write a personalized welcome when it's available; otherwise
   // fall back to the configured embed so welcomes always go out.
   const pulsarText = await pulsarWelcomeText(member).catch(() => null);
   if (pulsarText) {
     await channel.send({ content: pulsarText, allowedMentions: { users: [member.id], parse: [] } })
-      .catch(err => log('ERROR', 'Failed to send Pulsar welcome', err));
+      .catch(err => log('ERROR', 'Failed to send Novus welcome', err));
     return;
   }
 

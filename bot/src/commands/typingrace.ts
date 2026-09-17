@@ -37,7 +37,7 @@ const SENTENCES = [
   'The jay pig fox and zebra quickly vanished',
   'Grumpy wizards make toxic brew for evil queen',
   'Quick zephyrs blow vexing daft Jim',
-  'Pulse engine powers the community forward',
+  'Novus keeps the Novarys community moving forward',
   'Every great community starts with a single message',
   'Discord bots make server management easier',
   'Typing fast is a valuable skill to develop',

@@ -1,5 +1,5 @@
 -- ============================================================
--- PULSE ENGINE — MULTI-TENANT SCHEMA (Pro / multi-server)
+-- NOVARYS — MULTI-TENANT SCHEMA (Pro / multi-server)
 -- ============================================================
 -- Every per-server table carries a guild_id so ONE bot instance can
 -- serve many Discord servers with fully isolated data (balances,
@@ -429,7 +429,7 @@ BEGIN
     ('What is the name of this server''s currency?', '["PULSE","Coins","Gems","Credits"]', 0, 'community'),
     ('Which command shows your PULSE balance?', '["/balance","/wallet","/money","/cash"]', 0, 'community'),
     ('How do you earn PULSE automatically?', '["By being active (messages, reactions, voice)","By paying real money","Only by inviting friends","You cannot earn it"]', 0, 'community'),
-    ('What is the name of this community bot?', '["MEE6","Pulse Engine","Dyno","Carl-bot"]', 1, 'community'),
+    ('What is the name of this community bot?', '["MEE6","Novus","Dyno","Carl-bot"]', 1, 'community'),
     ('Who directed the 1975 film Jaws?', '["George Lucas","Steven Spielberg","Martin Scorsese","Ridley Scott"]', 1, 'cinema'),
     ('In The Matrix, which color pill does Neo take?', '["Blue","Green","Red","Yellow"]', 2, 'cinema'),
     ('Which actor played Jack in Titanic (1997)?', '["Brad Pitt","Tom Cruise","Leonardo DiCaprio","Johnny Depp"]', 2, 'cinema'),
@@ -457,3 +457,8 @@ BEGIN
   ) AS v(question, choices_json, correct_index, category)
   WHERE NOT EXISTS (SELECT 1 FROM public.quiz_questions q WHERE q.guild_id = p_guild_id AND q.question = v.question);
 END $$;
+
+-- Rebrand: migrate legacy answers on existing installs to the Novarys/Novus identity (safe: updates existing rows across all guilds).
+UPDATE public.quiz_questions
+  SET choices_json = '["MEE6","Novus","Dyno","Carl-bot"]'::jsonb
+  WHERE question = 'What is the name of this community bot?';

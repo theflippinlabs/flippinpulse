@@ -1,5 +1,6 @@
-import { Client, GatewayIntentBits, Partials } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, ActivityType } from 'discord.js';
 import { config } from './config.js';
+import { BRAND } from './brand.js';
 import { registerEvents } from './events/index.js';
 import { loadSettings, startSettingsRefresh } from './services/settings.js';
 import { loadRanks } from './services/ranks.js';
@@ -40,7 +41,11 @@ async function main() {
 }
 
 client.once('ready', async () => {
-  log('INFO', `Bot online as ${client.user?.tag}`);
+  log('INFO', `${BRAND.agent} online as ${client.user?.tag} — ${BRAND.agentRole} of ${BRAND.ecosystem}`);
+  client.user?.setPresence({
+    activities: [{ name: `over ${BRAND.ecosystem}`, type: ActivityType.Watching }],
+    status: 'online',
+  });
   try {
     await registerCommands();
   } catch (err) {
@@ -64,7 +69,7 @@ client.once('ready', async () => {
   startPulsar(client);
   startChallengeScheduler(client);
   startAutomodCleanup();
-  log('INFO', 'Settings, ranks, game configs, schedulers loaded. Bot is ready.');
+  log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });
 
 main().catch(err => {

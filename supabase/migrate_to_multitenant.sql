@@ -1,5 +1,5 @@
 -- ============================================================
--- PULSE ENGINE — IN-PLACE MIGRATION: single-server -> multi-tenant
+-- NOVARYS — IN-PLACE MIGRATION: single-server -> multi-tenant
 -- ============================================================
 -- Upgrades your EXISTING single-server database (the current
 -- production schema from setup_complete.sql) into the multi-tenant

@@ -1,5 +1,5 @@
 -- ============================================================
--- FLIPPIN PULSE — FULL SETUP (from scratch)
+-- NOVARYS — FULL SETUP (from scratch)
 -- ============================================================
 -- Run this ONCE in the Supabase SQL Editor. It is idempotent
 -- (safe to re-run). It creates every table the bot needs, seeds

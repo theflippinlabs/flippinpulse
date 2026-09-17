@@ -1,4 +1,4 @@
-# 🏢 Pulse Engine — Pro / Multi-server preparation
+# 🏢 Novarys — Pro / Multi-server preparation
 
 > **Status: PREPARED, NOT ACTIVE.** Your live single-server bot on branch
 > `claude/discord-bot-review-4YOaJ` is untouched and keeps working. This branch
