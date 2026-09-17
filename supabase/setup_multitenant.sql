@@ -462,3 +462,6 @@ END $$;
 UPDATE public.quiz_questions
   SET choices_json = '["MEE6","Novus","Dyno","Carl-bot"]'::jsonb
   WHERE question = 'What is the name of this community bot?';
+
+-- Rebrand + reliability: make sure every game is enabled by default across all guilds (safe: only touches games_config).
+UPDATE public.games_config SET is_enabled = true;
