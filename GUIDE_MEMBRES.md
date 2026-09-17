@@ -1,4 +1,4 @@
-# 🎮 Pulse Engine — Guide des membres
+# 🎮 Novarys — Guide des membres
 
 Bienvenue ! Voici tout ce que tu peux faire ici. Tu gagnes des **PULSE** (la monnaie du serveur) **automatiquement** en étant actif : messages, réactions et minutes en vocal. Dépense-les dans les jeux et la boutique !
 
@@ -64,8 +64,8 @@ Des défis apparaissent régulièrement pour gagner des PULSE :
 
 ---
 
-## 🤖 Pulsar
-**Pulsar** est notre animateur. Il pose des questions, lance des défis et met l'ambiance. **Mentionne-le ou réponds à un de ses messages** pour discuter avec lui ! 💬
+## 🤖 Novus
+**Novus** est notre animateur. Il pose des questions, lance des défis et met l'ambiance. **Mentionne-le ou réponds à un de ses messages** pour discuter avec lui ! 💬
 
 ---
 

@@ -51,8 +51,8 @@ export function DashboardSidebar() {
           <Menu className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2 ml-3">
-          <img src={logo} alt="Pulse Engine" className="w-8 h-8 rounded-lg object-contain" />
-          <span className="text-sm font-bold text-gradient-logo">Pulse Engine</span>
+          <img src={logo} alt="Novarys" className="w-8 h-8 rounded-lg object-contain" />
+          <span className="text-sm font-bold text-gradient-logo">Novarys</span>
         </div>
       </div>
 
@@ -70,10 +70,10 @@ export function DashboardSidebar() {
         {/* Logo */}
         <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="Pulse Engine" className="w-11 h-11 rounded-lg object-contain" />
+            <img src={logo} alt="Novarys" className="w-11 h-11 rounded-lg object-contain" />
             <div>
-              <h1 className="text-lg font-bold text-gradient-logo tracking-tight">Pulse Engine</h1>
-              <p className="text-[10px] text-muted-foreground font-mono tracking-widest">by The Flippin' Labs</p>
+              <h1 className="text-lg font-bold text-gradient-logo tracking-tight">Novarys</h1>
+              <p className="text-[10px] text-muted-foreground font-mono tracking-widest">Community Operations</p>
             </div>
           </div>
           <button onClick={() => setOpen(false)} className="lg:hidden text-sidebar-foreground hover:text-foreground">

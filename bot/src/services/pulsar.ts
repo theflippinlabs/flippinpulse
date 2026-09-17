@@ -1,10 +1,12 @@
 import { Client, Message, GuildMember, GuildTextBasedChannel } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { getRawSetting, setSetting } from './settings.js';
+import { BRAND } from '../brand.js';
 import { log } from '../utils/logger.js';
 
-// Pulsar is the AI community manager. Cheap-but-capable model by default;
-// override with PULSAR_MODEL, else reuse the quiz model.
+// Novus is the AI Community Manager of Novarys. Cheap-but-capable model by
+// default; override with PULSAR_MODEL (kept for backwards-compatibility with
+// existing deployments), else reuse the quiz model.
 const MODEL = process.env.PULSAR_MODEL || process.env.AI_QUIZ_MODEL || 'claude-sonnet-4-6';
 
 export interface PulsarConfig {
@@ -43,9 +45,9 @@ export function getPulsarConfig(): PulsarConfig {
   return { ...DEFAULTS, ...(getRawSetting<Partial<PulsarConfig>>('pulsar_config') ?? {}) };
 }
 
-// Generate a line of text in Pulsar's voice (used by the missions system).
+// Generate a line of text in Novus's voice (used by the missions system).
 // Gated only on the API key so manual admin actions can use it even if
-// Pulsar's autonomous posting is off.
+// Novus's autonomous posting is off.
 export async function pulsarCompose(task: string, maxTokens = 220): Promise<string | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   return chat(persona(getPulsarConfig().language), task, maxTokens);
@@ -53,12 +55,13 @@ export async function pulsarCompose(task: string, maxTokens = 220): Promise<stri
 
 function persona(language: string): string {
   return (
-    `You are Pulsar, the energetic community manager of "The Flippin' Labs" Discord server — ` +
-    `home of the Pulse Engine bot and a crypto/gaming community around Cronos and Loaded Lions Mane City.\n` +
-    `Personality: hype, upbeat, motivating and welcoming, like an enthusiastic gaming/crypto host who keeps the vibe positive.\n` +
+    `You are ${BRAND.agent}, the ${BRAND.agentRole} of the ${BRAND.ecosystem} Discord community — ` +
+    `a crypto/gaming ecosystem around Cronos and Loaded Lions Mane City.\n` +
+    `Personality: intelligent, concise, premium, confident and slightly witty when appropriate. ` +
+    `Futuristic without sounding like a cheap sci-fi bot; upbeat and welcoming without childish Discord-bot language.\n` +
     `Rules:\n` +
     `- Write in ${language}.\n` +
-    `- Keep it SHORT — 1 to 2 sentences, casual Discord style. A couple of emojis are great; don't overdo it.\n` +
+    `- Keep it SHORT — 1 to 2 sentences, casual but polished. A couple of emojis are fine; don't overdo it.\n` +
     `- Sound natural and human, never corporate or robotic.\n` +
     `- NEVER use @everyone or @here, and never ping roles.\n` +
     `- Don't invent facts, prices, token launches or promises, and never give financial advice.\n` +
@@ -113,7 +116,7 @@ async function chat(system: string, user: string, maxTokens = 300): Promise<stri
     const text = res.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text?.trim();
     return text || null;
   } catch (err) {
-    log('ERROR', 'Pulsar AI call failed', err);
+    log('ERROR', 'Novus AI call failed', err);
     return null;
   }
 }
@@ -181,7 +184,7 @@ export async function maybeReply(message: Message): Promise<void> {
 
   const name = message.member?.displayName ?? message.author.username;
   const ctx = contextLines(message.guild.id);
-  const cleaned = message.content.replace(new RegExp(`<@!?${botId}>`, 'g'), 'Pulsar').trim();
+  const cleaned = message.content.replace(new RegExp(`<@!?${botId}>`, 'g'), BRAND.agent).trim();
   const userMsg =
     `${ctx ? `Recent chat:\n${ctx}\n\n` : ''}` +
     `${name} just said to you: "${cleaned}"\n` +
@@ -301,7 +304,7 @@ async function tick(client: Client): Promise<void> {
 
 export function startPulsar(client: Client, intervalMs = 5 * 60_000): void {
   interval = setInterval(() => {
-    tick(client).catch(err => log('ERROR', 'Pulsar scheduler tick failed', err));
+    tick(client).catch(err => log('ERROR', 'Novus scheduler tick failed', err));
   }, intervalMs);
 }
 

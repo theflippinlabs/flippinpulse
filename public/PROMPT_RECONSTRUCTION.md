@@ -1,12 +1,12 @@
-# 🔧 PROMPT DE RECONSTRUCTION — Pulse Engine Admin Dashboard
+# 🔧 PROMPT DE RECONSTRUCTION — Novarys Admin Dashboard
 
-> Ce prompt permet de recréer exactement l'application **Pulse Engine** (dashboard d'administration pour un bot Discord de gamification) dans un autre outil de génération de code (Bolt, Cursor, etc.).
+> Ce prompt permet de recréer exactement l'application **Novarys** (dashboard d'administration pour un bot Discord de gamification) dans un autre outil de génération de code (Bolt, Cursor, etc.).
 
 ---
 
 ## 📋 DESCRIPTION DU PROJET
 
-**Pulse Engine** est un tableau de bord d'administration web pour un système de gamification Discord appelé "Pulse Engine" par "The Flippin' Labs".
+**Novarys** est un tableau de bord d'administration web pour un système de gamification Discord appelé "Novarys" par "Novarys".
 
 L'application est un **dashboard admin dark-only** avec un thème **cyberpunk/futuriste** (cyan, violet, or) qui permet de :
 - Gérer les membres Discord (points, rangs, streaks)
@@ -84,7 +84,7 @@ L'application est un **dashboard admin dark-only** avec un thème **cyberpunk/fu
 - `.gradient-accent` → `linear-gradient(135deg, hsl(280 55% 62%), hsl(310 50% 55%))`
 - `.gradient-energy` → `linear-gradient(135deg, hsl(36 92% 55%), hsl(25 90% 50%))`
 - `.gradient-success` → `linear-gradient(135deg, hsl(150 60% 45%), hsl(170 55% 40%))`
-- `.gradient-logo` → `linear-gradient(135deg, cyan, violet, or)` — gradient signature utilisé sur le titre "Pulse Engine" et le bouton de login
+- `.gradient-logo` → `linear-gradient(135deg, cyan, violet, or)` — gradient signature utilisé sur le titre "Novarys" et le bouton de login
 - `.text-gradient-logo` → même gradient en text fill
 - `.glow-primary` → `box-shadow: 0 0 20px hsl(190 85% 58% / 0.3)`
 - `.glow-accent` → `box-shadow: 0 0 20px hsl(280 55% 62% / 0.3)`
@@ -427,7 +427,7 @@ const L = translations.overview;
 - Zone de contenu avec padding et animation `animate-fade-in`
 
 ### Sidebar (`DashboardSidebar`)
-- Logo Pulse Engine (image) + titre gradient + "by The Flippin' Labs"
+- Logo Novarys (image) + titre gradient + "by Novarys"
 - 9 liens de navigation avec icônes Lucide
 - Bouton déconnexion en footer
 - Mobile : burger menu en haut, overlay sombre, transition slide
@@ -538,4 +538,4 @@ La table `games_config` doit contenir 5 entrées :
 
 ---
 
-*Généré depuis le projet FlippinPulse — Pulse Engine Admin Dashboard*
+*Généré depuis le projet Novarys — Novarys Admin Dashboard*

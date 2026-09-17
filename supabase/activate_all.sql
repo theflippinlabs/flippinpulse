@@ -1,5 +1,5 @@
 -- ============================================================
--- FLIPPIN PULSE — ACTIVATION SCRIPT
+-- NOVARYS — ACTIVATION SCRIPT
 -- ============================================================
 -- Run this in the Supabase SQL Editor (Project → SQL Editor → New query).
 -- It is idempotent: safe to run multiple times.

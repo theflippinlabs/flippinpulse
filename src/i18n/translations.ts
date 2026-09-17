@@ -16,20 +16,20 @@ export const translations = {
   },
   // Login
   login: {
-    title: { fr: "Pulse Engine", en: "Pulse Engine" },
-    subtitle: { fr: "by The Flippin' Labs", en: "by The Flippin' Labs" },
+    title: { fr: "Novarys", en: "Novarys" },
+    subtitle: { fr: "Community Operations", en: "Community Operations" },
     dashboardLabel: { fr: "TABLEAU DE BORD ADMINISTRATION", en: "ADMINISTRATION DASHBOARD" },
     email: { fr: "Email", en: "Email" },
     password: { fr: "Mot de passe", en: "Password" },
     submit: { fr: "Se connecter", en: "Sign in" },
     loading: { fr: "Chargement...", en: "Loading..." },
     error: { fr: "Identifiants invalides. Vérifiez votre email et mot de passe.", en: "Invalid credentials. Check your email and password." },
-    footer: { fr: "Pulse Engine — Système de gamification Discord", en: "Pulse Engine — Discord gamification system" },
+    footer: { fr: "Novarys — Système de gamification Discord piloté par Novus", en: "Novarys — Discord gamification system operated by Novus" },
   },
   // Overview
   overview: {
     title: { fr: "Vue globale", en: "Overview" },
-    subtitle: { fr: "Tableau de bord Pulse Engine", en: "Pulse Engine Dashboard" },
+    subtitle: { fr: "Tableau de bord Novarys", en: "Novarys Dashboard" },
     trackedMembers: { fr: "Membres trackés", en: "Tracked Members" },
     activeMissions: { fr: "Missions actives", en: "Active Missions" },
     shopItems: { fr: "Items boutique", en: "Shop Items" },
@@ -49,7 +49,7 @@ export const translations = {
   // Configuration
   config: {
     title: { fr: "Configuration", en: "Configuration" },
-    subtitle: { fr: "Paramètres du système Pulse Engine", en: "Pulse Engine system settings" },
+    subtitle: { fr: "Paramètres du système Novarys", en: "Novarys system settings" },
     loading: { fr: "Chargement...", en: "Loading..." },
     save: { fr: "Sauver", en: "Save" },
     edit: { fr: "Modifier", en: "Edit" },

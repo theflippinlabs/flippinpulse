@@ -1,4 +1,4 @@
-# Pulse Engine — Manuel complet / Full Manual
+# Novarys — Manuel complet / Full Manual
 
 `<...>` = obligatoire / required · `[...]` = optionnel / optional · 🔒 = Admin uniquement / Administrator only
 
@@ -9,9 +9,9 @@
 
 # 🇫🇷 MANUEL (Français)
 
-## 1. Qu'est-ce que Pulse Engine ?
+## 1. Qu'est-ce que Novarys ?
 
-Pulse Engine est un bot communautaire « tout-en-un » pour ton serveur Discord. Il tourne **tout seul, 24h/24**, et gère :
+Novarys est un bot communautaire « tout-en-un » pour ton serveur Discord. Il tourne **tout seul, 24h/24**, et gère :
 
 - **💰 Une économie de points (PULSE)** : les membres gagnent des PULSE automatiquement en étant actifs (messages, réactions, minutes en vocal).
 - **🏆 Des rangs** qui montent avec l'activité, avec annonces.
@@ -19,14 +19,14 @@ Pulse Engine est un bot communautaire « tout-en-un » pour ton serveur Discord.
 - **🛒 Une boutique** où dépenser ses PULSE (rôles, perks, tickets…).
 - **🎰 Une loterie** automatique avec jackpot et tirages.
 - **🧠 Des quiz communautaires** générés et lancés automatiquement par l'IA.
-- **🤖 Pulsar**, un animateur (community manager) IA qui fait vivre le serveur.
+- **🤖 Novus**, un animateur (community manager) IA qui fait vivre le serveur.
 - **🎯 Des missions** (défis) lancées automatiquement ou à la demande.
 - **🛡️ De la modération** manuelle et automatique (anti-spam, anti-raid…).
 - **👋 Des messages de bienvenue** et des annonces.
 
 Tout se pilote depuis le **panneau admin `/panel`**.
 
-> ⚙️ **Fonctions IA** (Pulsar, quiz auto, énigmes) : elles nécessitent une clé `ANTHROPIC_API_KEY` configurée dans Railway. Sans clé, le reste du bot fonctionne normalement.
+> ⚙️ **Fonctions IA** (Novus, quiz auto, énigmes) : elles nécessitent une clé `ANTHROPIC_API_KEY` configurée dans Railway. Sans clé, le reste du bot fonctionne normalement.
 
 ---
 
@@ -73,16 +73,16 @@ Tout se pilote depuis le **panneau admin `/panel`**.
 | `/lottery status` | Voir le jackpot, tes tickets et l'heure du tirage |
 | `/lottery buy <tickets>` | Acheter des tickets |
 
-> Le tirage est automatique. Plus tu as de tickets, plus tu as de chances. Pulsar/le bot rappelle le jackpot dans la journée.
+> Le tirage est automatique. Plus tu as de tickets, plus tu as de chances. Novus/le bot rappelle le jackpot dans la journée.
 
 ### 🧠 Quiz communautaire
 Les quiz sont lancés **automatiquement** (voir réglages admin). Quand un quiz démarre, tout le monde répond avec des boutons et gagne des PULSE par bonne réponse. Une question bonus peut valoir double.
 
 ---
 
-## 3. 🤖 Pulsar — l'animateur IA
+## 3. 🤖 Novus — l'animateur IA
 
-Pulsar est un « community manager » alimenté par l'IA. Quand il est activé, il :
+Novus est un « community manager » alimenté par l'IA. Quand il est activé, il :
 
 - **Anime le salon** : il poste régulièrement des questions, des brise-glaces et des messages d'ambiance — **même quand c'est calme**, pour relancer la discussion.
 - **Prend des nouvelles** : il tague de temps en temps un membre actif récemment pour lui demander comment ça va.
@@ -93,20 +93,20 @@ Pulsar est un « community manager » alimenté par l'IA. Quand il est activé, 
 - **Félicite** les montées de rang et les paliers de membres.
 - **Lance des missions** (voir section suivante).
 
-> Pulsar ne tague **jamais** @everyone ni les rôles, et n'invente pas d'infos (prix, promesses…).
+> Novus ne tague **jamais** @everyone ni les rôles, et n'invente pas d'infos (prix, promesses…).
 
-**Activer Pulsar** : `/panel → Pulsar` → choisis le salon → **Turn ON**. Boutons disponibles : langue/fréquence (Settings), Tag members, Replies, Welcomes, Host events, Daily recap, Celebrate, et **Post now** pour tester.
+**Activer Novus** : `/panel → Novus` → choisis le salon → **Turn ON**. Boutons disponibles : langue/fréquence (Settings), Tag members, Replies, Welcomes, Host events, Daily recap, Celebrate, et **Post now** pour tester.
 
 ---
 
 ## 4. 🎯 Missions (défis)
 
-Pulsar peut lancer des missions, **automatiquement** (toutes les ~6h, réglable) **et** à la demande depuis `/panel → Missions`.
+Novus peut lancer des missions, **automatiquement** (toutes les ~6h, réglable) **et** à la demande depuis `/panel → Missions`.
 
 | Type | Comment ça marche |
 |---|---|
 | ⚡ **Défi express** | Les premiers à cliquer **Claim** gagnent des PULSE (ex : les 3 premiers → 50 PULSE, 30 min) |
-| 🧩 **Énigme** | Pulsar pose une énigme (IA) ; le 1er qui trouve la bonne réponse (via bouton) gagne |
+| 🧩 **Énigme** | Novus pose une énigme (IA) ; le 1er qui trouve la bonne réponse (via bouton) gagne |
 | 📅 **Objectif du jour** | But auto-suivi (ex : envoyer 20 messages) → PULSE crédité automatiquement |
 | 🗓️ **Objectif de la semaine** | Idem, sur la semaine, plus grosse récompense (ex : jouer à 5 jeux) |
 
@@ -129,7 +129,7 @@ Tape **`/panel`** (réservé aux admins). Un menu déroulant donne accès à tou
 | 💰 **Economy** | PULSE par point, points par message/réaction/minute vocale |
 | 🎁 **Give / remove PULSE** | Choisir un membre → Donner / Retirer / Fixer le solde |
 | 🛒 **Shop** | Ajouter / Lister / Masquer / Changer le prix d'un article |
-| 🤖 **Pulsar** | Salon, on/off, langue, fréquence, et toutes ses missions (welcomes, events, recap, celebrate) |
+| 🤖 **Novus** | Salon, on/off, langue, fréquence, et toutes ses missions (welcomes, events, recap, celebrate) |
 | 🎯 **Missions** | Lancer des missions et activer le mode auto |
 
 > Le panneau couvre l'essentiel. Les commandes ci-dessous restent disponibles pour un réglage fin.
@@ -192,7 +192,7 @@ Tape **`/panel`** (réservé aux admins). Un menu déroulant donne accès à tou
 1. `/panel → Channels` : règle les salons (bienvenue, rank-up, logs, quiz).
 2. `/panel → Modules` : active bienvenue, rank-up, automod.
 3. `/panel → Auto-quiz` : choisis le salon, les horaires, puis **Turn ON**.
-4. `/panel → Pulsar` : choisis le salon, **Turn ON** (clé IA requise).
+4. `/panel → Novus` : choisis le salon, **Turn ON** (clé IA requise).
 5. `/panel → Shop` : ajoute des articles.
 6. `/panel → Economy` : ajuste les gains si besoin.
 
@@ -201,7 +201,7 @@ Tape **`/panel`** (réservé aux admins). Un menu déroulant donne accès à tou
 
 # 🇬🇧 MANUAL (English)
 
-## 1. What is Pulse Engine?
+## 1. What is Novarys?
 
 An all-in-one community bot that runs **24/7 on its own** and handles:
 
@@ -211,14 +211,14 @@ An all-in-one community bot that runs **24/7 on its own** and handles:
 - **🛒 A shop** to spend PULSE.
 - **🎰 An automatic lottery** with a jackpot and draws.
 - **🧠 Community quizzes** auto-generated and launched by AI.
-- **🤖 Pulsar**, an AI community-manager that keeps the server alive.
+- **🤖 Novus**, an AI community-manager that keeps the server alive.
 - **🎯 Missions** launched automatically or on demand.
 - **🛡️ Moderation**, manual and automatic (anti-spam, anti-raid…).
 - **👋 Welcome messages** and announcements.
 
 Everything is controlled from the **`/panel`** admin menu.
 
-> ⚙️ **AI features** (Pulsar, auto-quiz, riddles) need an `ANTHROPIC_API_KEY` set in Railway. Without it, the rest of the bot works normally.
+> ⚙️ **AI features** (Novus, auto-quiz, riddles) need an `ANTHROPIC_API_KEY` set in Railway. Without it, the rest of the bot works normally.
 
 ## 2. Member commands
 
@@ -268,9 +268,9 @@ Everything is controlled from the **`/panel`** admin menu.
 ### 🧠 Community quiz
 Quizzes auto-launch (admin-configured). Everyone answers with buttons and earns PULSE per correct answer; a bonus question can be worth double.
 
-## 3. 🤖 Pulsar — the AI host
+## 3. 🤖 Novus — the AI host
 
-When enabled, Pulsar:
+When enabled, Novus:
 - **Animates the channel** with questions, icebreakers and hype — **even when it's quiet**, to revive the chat.
 - **Checks in** on recently active members.
 - **Replies** when mentioned or replied to.
@@ -280,9 +280,9 @@ When enabled, Pulsar:
 - **Celebrates** rank-ups and member milestones.
 - **Launches missions** (next section).
 
-> Pulsar never pings @everyone/roles and never invents facts.
+> Novus never pings @everyone/roles and never invents facts.
 
-**Enable**: `/panel → Pulsar` → pick the channel → **Turn ON**. Toggles: Settings (language/frequency/recap time), Tag members, Replies, Welcomes, Host events, Daily recap, Celebrate, and **Post now**.
+**Enable**: `/panel → Novus` → pick the channel → **Turn ON**. Toggles: Settings (language/frequency/recap time), Tag members, Replies, Welcomes, Host events, Daily recap, Celebrate, and **Post now**.
 
 ## 4. 🎯 Missions
 
@@ -301,7 +301,7 @@ Admin (`/panel → Missions`): **Flash / Riddle / Daily / Weekly** buttons, plus
 
 ## 5. 🛠️ Administration — the `/panel`
 
-Type **`/panel`** (admins only). Sections: Home, Modules, Channels, Auto-quiz, Economy, Give/remove PULSE, Shop, Pulsar, Missions.
+Type **`/panel`** (admins only). Sections: Home, Modules, Channels, Auto-quiz, Economy, Give/remove PULSE, Shop, Novus, Missions.
 
 ### Manage PULSE
 | Command | Description |
@@ -351,6 +351,6 @@ Type **`/panel`** (admins only). Sections: Home, Modules, Channels, Auto-quiz, E
 1. `/panel → Channels`: set channels.
 2. `/panel → Modules`: enable welcome, rank-up, automod.
 3. `/panel → Auto-quiz`: channel + times, then **Turn ON**.
-4. `/panel → Pulsar`: channel, then **Turn ON** (AI key required).
+4. `/panel → Novus`: channel, then **Turn ON** (AI key required).
 5. `/panel → Shop`: stock items.
 6. `/panel → Economy`: adjust earn rates.

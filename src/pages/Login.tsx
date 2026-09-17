@@ -41,7 +41,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8 animate-slide-up">
-          <img src={logo} alt="Pulse Engine" className="w-24 h-24 mx-auto mb-4 object-contain" />
+          <img src={logo} alt="Novarys" className="w-24 h-24 mx-auto mb-4 object-contain" />
           <h1 className="text-3xl font-bold text-gradient-logo">{t(L.title)}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t(L.subtitle)}</p>
           <p className="text-muted-foreground text-xs mt-2 font-mono tracking-wider">{t(L.dashboardLabel)}</p>

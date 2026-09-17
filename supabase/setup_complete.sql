@@ -1,5 +1,5 @@
 -- ============================================================
--- FLIPPIN PULSE — FULL SETUP (from scratch)
+-- NOVARYS — FULL SETUP (from scratch)
 -- ============================================================
 -- Run this ONCE in the Supabase SQL Editor. It is idempotent
 -- (safe to re-run). It creates every table the bot needs, seeds
@@ -437,10 +437,18 @@ FROM (VALUES
   ('How much does it cost to start playing Mane City?', '["It is free-to-play","$10","$100","Subscription only"]', 0, 'maincity'),
   ('In Mane City, players build and decorate their...', '["Mane Mansions","Space stations","Castles","Farms"]', 0, 'maincity'),
   ('Mane City competition is organized around...', '["Time-limited seasons","Daily duels","Clan wars","Monthly raids"]', 0, 'maincity'),
-  ('What is the name of this community bot?', '["MEE6","Pulse Engine","Dyno","Carl-bot"]', 1, 'community'),
-  ('Who created this bot?', '["Discord Inc","The Flippin Labs","Crypto.com","OpenAI"]', 1, 'community')
+  ('What is the name of this community bot?', '["MEE6","Novus","Dyno","Carl-bot"]', 1, 'community'),
+  ('Who created this bot?', '["Discord Inc","Novarys","Crypto.com","OpenAI"]', 1, 'community')
 ) AS v(question, choices_json, correct_index, category)
 WHERE NOT EXISTS (SELECT 1 FROM public.quiz_questions q WHERE q.question = v.question);
+
+-- Rebrand: migrate legacy answers on existing installs to the Novarys/Novus identity.
+UPDATE public.quiz_questions
+  SET choices_json = '["MEE6","Novus","Dyno","Carl-bot"]'::jsonb
+  WHERE question = 'What is the name of this community bot?';
+UPDATE public.quiz_questions
+  SET choices_json = '["Discord Inc","Novarys","Crypto.com","OpenAI"]'::jsonb
+  WHERE question = 'Who created this bot?';
 
 -- A starter daily mission so /daily works immediately (valid 1 year)
 INSERT INTO public.missions (type, title, description, reward_points, end_at, is_active)

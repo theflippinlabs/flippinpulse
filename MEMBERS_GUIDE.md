@@ -1,4 +1,4 @@
-# 🎮 Pulse Engine — Members Guide
+# 🎮 Novarys — Members Guide
 
 Welcome! Here's everything you can do here. You earn **PULSE** (the server currency) **automatically** just by being active: messages, reactions and voice minutes. Spend them on games and the shop!
 
@@ -64,8 +64,8 @@ Challenges pop up regularly to earn PULSE:
 
 ---
 
-## 🤖 Pulsar
-**Pulsar** is our host. It asks questions, launches challenges and keeps the vibe going. **Mention it or reply to one of its messages** to chat with it! 💬
+## 🤖 Novus
+**Novus** is our host. It asks questions, launches challenges and keeps the vibe going. **Mention it or reply to one of its messages** to chat with it! 💬
 
 ---
 
