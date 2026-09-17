@@ -39,6 +39,9 @@ export function getRankForPoints(points: number): RankConfig | null {
   return best;
 }
 
+const rankUpCooldown = new Map<string, number>();
+const RANK_UP_COOLDOWN_MS = 6 * 60 * 60_000; // one rank-up shout per member per 6h
+
 export async function checkRankUp(
   discordId: string,
   currentPoints: number,
@@ -85,6 +88,13 @@ export async function checkRankUp(
   } catch (err) {
     log('ERROR', `Failed to update Discord roles for ${discordId}`, err);
   }
+
+  // Never shout for the base rank (threshold 0) — that's just "you exist here"
+  // — and rate-limit per member so cascading thresholds don't spam.
+  const isBaseRank = newRank.threshold <= 0;
+  const last = rankUpCooldown.get(discordId) ?? 0;
+  if (isBaseRank || Date.now() - last < RANK_UP_COOLDOWN_MS) return;
+  rankUpCooldown.set(discordId, Date.now());
 
   await announceRankUp(guild, member, newRank, user?.rank_name ?? null).catch(err =>
     log('ERROR', `Failed to announce rank-up for ${discordId}`, err),
