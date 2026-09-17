@@ -496,6 +496,11 @@ UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'false'::jsonb) WHERE key = 'decay';
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'false'::jsonb) WHERE key = 'daily_cap_config';
 
+-- Rebrand + reliability: make sure every game (blackjack, crash, slots, roulette,
+-- wheel, higherlower, duel, rps, typing_race, battle_royale, dice_royale,
+-- treasure_drop, quiz) is enabled by default. Safe: only touches games_config.
+UPDATE public.games_config SET is_enabled = true;
+
 -- ---------- VERIFY ----------
 SELECT 'Tables created' AS check, count(*) AS n
 FROM information_schema.tables WHERE table_schema = 'public';
