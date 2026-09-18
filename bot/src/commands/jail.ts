@@ -16,20 +16,12 @@ import {
   setJailChannel,
 } from '../services/jail.js';
 import { logAndAnnounce, parseDurationSeconds } from '../services/moderation.js';
+import { requireLord } from '../services/lord.js';
 import { successEmbed, errorEmbed, pulseEmbed } from '../utils/embeds.js';
-
-// Only the server owner (and the JAIL_ADMIN_ID env, if set) can use /jail.
-function isJailAdmin(interaction: ChatInputCommandInteraction): boolean {
-  const ownerId = interaction.guild?.ownerId;
-  if (ownerId && interaction.user.id === ownerId) return true;
-  const extra = (process.env.JAIL_ADMIN_ID ?? '').trim();
-  if (extra && interaction.user.id === extra) return true;
-  return false;
-}
 
 export const data = new SlashCommandBuilder()
   .setName('jail')
-  .setDescription('Owner-only: send a member to the jail channel')
+  .setDescription('Lord-only: send a member to the jail channel')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand(s =>
     s.setName('setup')
@@ -63,13 +55,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  if (!isJailAdmin(interaction)) {
-    await interaction.reply({
-      embeds: [errorEmbed('This command is owner-only.')],
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
+  if (!(await requireLord(interaction))) return;
 
   const sub = interaction.options.getSubcommand();
 
