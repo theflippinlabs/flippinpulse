@@ -31,15 +31,24 @@ export async function setJailRole(roleId: string): Promise<void> {
   await setSetting('jail_config', { ...cur, role_id: roleId });
 }
 
-export async function ensureJailRole(guild: Guild, jailChannelId: string): Promise<Role | null> {
+export async function ensureJailRole(
+  guild: Guild,
+  jailChannelId: string,
+  preferRoleId?: string,
+): Promise<Role | null> {
   const cfg = getJailConfig();
   let role: Role | null = null;
 
-  if (cfg.role_id) {
+  if (preferRoleId) {
+    role = await guild.roles.fetch(preferRoleId).catch(() => null);
+  }
+  if (!role && cfg.role_id) {
     role = await guild.roles.fetch(cfg.role_id).catch(() => null);
   }
   if (!role) {
-    role = guild.roles.cache.find(r => r.name.toLowerCase() === 'jailed') ?? null;
+    role = guild.roles.cache.find(r =>
+      ['jailed', 'jail inmate', 'jail-inmate', 'inmate'].includes(r.name.toLowerCase()),
+    ) ?? null;
   }
   if (!role) {
     role = await guild.roles.create({

@@ -26,12 +26,16 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand(s =>
     s.setName('setup')
-      .setDescription('Pick the jail channel (the room where jailed members are sent)')
+      .setDescription('Pick the jail channel (and optionally the role to reuse)')
       .addChannelOption(o =>
         o.setName('channel')
           .setDescription('The jail channel')
           .addChannelTypes(ChannelType.GuildText)
-          .setRequired(true)),
+          .setRequired(true))
+      .addRoleOption(o =>
+        o.setName('role')
+          .setDescription('Reuse an existing role (e.g. Jail Inmate) instead of creating "Jailed"')
+          .setRequired(false)),
   )
   .addSubcommand(s =>
     s.setName('add')
@@ -63,11 +67,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (sub === 'setup') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const channel = interaction.options.getChannel('channel', true);
+    const preferRole = interaction.options.getRole('role');
     await setJailChannel(channel.id);
-    const role = await ensureJailRole(interaction.guild, channel.id);
+    const role = await ensureJailRole(interaction.guild, channel.id, preferRole?.id);
     if (!role) {
       await interaction.editReply({
-        embeds: [errorEmbed('Set the channel, but I could not create the Jailed role. Give me the "Manage Roles" permission and try again.')],
+        embeds: [errorEmbed('Set the channel, but I could not prepare the jail role. Give me the "Manage Roles" permission and try again.')],
       });
       return;
     }
