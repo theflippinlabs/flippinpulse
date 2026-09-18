@@ -11,11 +11,12 @@ import {
   ensureJailRole,
   fetchActiveJail,
   getJailConfig,
+  parseJailDuration,
   recordJail,
   releaseJail,
   setJailChannel,
 } from '../services/jail.js';
-import { logAndAnnounce, parseDurationSeconds } from '../services/moderation.js';
+import { logAndAnnounce } from '../services/moderation.js';
 import { requireLord } from '../services/lord.js';
 import { successEmbed, errorEmbed, pulseEmbed } from '../utils/embeds.js';
 
@@ -36,7 +37,7 @@ export const data = new SlashCommandBuilder()
     s.setName('add')
       .setDescription('Send a member to jail')
       .addUserOption(o => o.setName('user').setDescription('Who to jail').setRequired(true))
-      .addStringOption(o => o.setName('duration').setDescription('Duration e.g. 10m, 2h, 1d (optional)').setRequired(false))
+      .addStringOption(o => o.setName('duration').setDescription('e.g. 10m · 2h · 1d · 1w · 1mo · 1y · life').setRequired(false))
       .addStringOption(o => o.setName('reason').setDescription('Why').setRequired(false)),
   )
   .addSubcommand(s =>
@@ -90,16 +91,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const durationStr = interaction.options.getString('duration');
     const reason = interaction.options.getString('reason') ?? 'No reason provided';
 
-    let seconds: number | null = null;
-    if (durationStr) {
-      seconds = parseDurationSeconds(durationStr);
-      if (!seconds || seconds <= 0) {
-        await interaction.editReply({
-          embeds: [errorEmbed('Invalid duration. Use formats like `30s`, `10m`, `2h`, `1d`. Omit for indefinite.')],
-        });
-        return;
-      }
+    const parsed = parseJailDuration(durationStr);
+    if (!parsed) {
+      await interaction.editReply({
+        embeds: [errorEmbed('Invalid duration. Try `30s`, `10m`, `2h`, `1d`, `1w`, `1mo`, `1y`, or `life`.')],
+      });
+      return;
     }
+    const seconds = parsed.seconds;
+    const durLabel = parsed.forLife
+      ? 'for **LIFE 🔒**'
+      : (seconds && durationStr ? `for **${durationStr}**` : '**indefinitely**');
 
     const member = await interaction.guild.members.fetch(target.id).catch(() => null);
     if (!member) {
@@ -160,16 +162,18 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const jail = await interaction.guild.channels.fetch(cfg.channel_id).catch(() => null);
     if (jail?.isTextBased() && 'send' in jail) {
-      const durText = seconds ? ` for **${durationStr}**` : ' (indefinite)';
+      const releaseNote = parsed.forLife
+        ? '⛓️ **No release date — you are here for life.**'
+        : (seconds ? `⏰ Released <t:${Math.floor((Date.now() + seconds * 1000) / 1000)}:R>.` : '⏰ Released whenever a Lord frees you.');
       await jail.send({
-        content: `🔒 <@${target.id}> — you have been sent to jail${durText}.\nReason: ${reason}`,
+        content: `🔒 <@${target.id}> — welcome to **${jail.name}**. You have been jailed ${durLabel}.\n**Reason:** ${reason}\n${releaseNote}`,
         allowedMentions: { users: [target.id] },
       }).catch(() => null);
     }
 
     await interaction.editReply({
       embeds: [successEmbed(
-        `Sent <@${target.id}> to <#${cfg.channel_id}>${seconds ? ` for **${durationStr}**` : ' (no expiry)'}. Reason: ${reason}`,
+        `Sent <@${target.id}> to <#${cfg.channel_id}> ${durLabel}. Reason: ${reason}`,
       )],
     });
     return;
