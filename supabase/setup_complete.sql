@@ -488,6 +488,19 @@ CREATE TABLE IF NOT EXISTS public.challenge_claims (
 ALTER TABLE public.challenge_claims ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_challenge_claims_cid ON public.challenge_claims(challenge_id);
 
+CREATE TABLE IF NOT EXISTS public.jailed_members (
+  guild_id TEXT NOT NULL,
+  discord_id TEXT NOT NULL,
+  moderator_id TEXT,
+  reason TEXT,
+  jailed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  previous_roles_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  PRIMARY KEY (guild_id, discord_id)
+);
+ALTER TABLE public.jailed_members ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_jailed_members_expires ON public.jailed_members(expires_at);
+
 -- ---------- PART 9: ACTIVATE features (decay & cap stay OFF) ----------
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true'::jsonb) WHERE key = 'welcome_config';
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true'::jsonb) WHERE key = 'rank_up_config';

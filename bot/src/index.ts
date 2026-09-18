@@ -14,6 +14,7 @@ import { startAutoQuizScheduler } from './services/communityQuiz.js';
 import { startPulsar } from './services/pulsar.js';
 import { startChallengeScheduler } from './services/challenges.js';
 import { startAutomodCleanup } from './services/automod.js';
+import { startJailScheduler } from './services/jail.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -64,6 +65,7 @@ client.once('ready', async () => {
   startPulsar(client);
   startChallengeScheduler(client);
   startAutomodCleanup();
+  startJailScheduler(client);
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });
 
