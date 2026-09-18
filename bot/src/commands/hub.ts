@@ -6,7 +6,10 @@ import {
   Interaction,
   MessageActionRowComponentBuilder,
   MessageFlags,
+  ModalBuilder,
   SlashCommandBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getRankForPoints } from '../services/ranks.js';
@@ -16,6 +19,11 @@ import { earnPulse } from '../services/games.js';
 import { getEconomyConfig } from '../services/settings.js';
 import { getStatus as getLotteryStatus, buyTickets } from '../services/lottery.js';
 import { recordChallengeMetric } from '../services/challenges.js';
+import { runSlots } from './slots.js';
+import { runCrash } from './crash.js';
+import { runBlackjack } from './blackjack.js';
+import { runWheel } from './wheel.js';
+import { runHigherLower } from './higherlower.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
@@ -175,6 +183,9 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
   const ids = await loadCmdIds(interaction);
   const line = (name: string, emoji: string, desc: string) => `${emoji} ${mention(name, ids)} — ${desc}`;
   const description = [
+    fr ? '**⚡ Lance en 1 tap** (mise via fenêtre)' : '**⚡ One-tap play** (bet via window)',
+    fr ? '_Utilise les boutons ci-dessous pour les jeux solo._' : '_Use the buttons below for solo games._',
+    '',
     fr ? '**🎯 Solo**' : '**🎯 Solo**',
     line('higherlower', '🎲', fr ? 'Plus ou Moins' : 'Higher or Lower'),
     line('crash', '💥', fr ? 'Cash out avant le crash' : 'Cash out before the crash'),
@@ -196,12 +207,17 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
     fr ? '**🎁 Autres**' : '**🎁 Others**',
     line('treasure', '💰', fr ? 'Chasse au trésor' : 'Treasure hunt'),
     line('lottery', '🎫', fr ? 'Loterie' : 'Lottery'),
-    '',
-    fr ? '_Tape sur un jeu pour lancer sa commande._' : '_Tap a game to prefill its command._',
   ].join('\n');
+  const quickRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId('hub:play:slots').setLabel('Slots').setEmoji('🎰').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('hub:play:blackjack').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('hub:play:crash').setLabel('Crash').setEmoji('💥').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('hub:play:wheel').setLabel('Wheel').setEmoji('🎡').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('hub:play:higherlower').setLabel('H/L').setEmoji('🎲').setStyle(ButtonStyle.Success),
+  );
   return {
     embeds: [pulseEmbed(fr ? '🎮 Salle des jeux' : '🎮 Games Room').setDescription(description)],
-    components: navRows(),
+    components: [quickRow, ...navRows()],
   };
 }
 
@@ -346,13 +362,90 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
 }
 
+// ---- Game runners map (single-player bet games launchable from a button/modal) ----
+type GameRunner = (interaction: Interaction, bet: number) => Promise<void>;
+const GAMES: Record<string, { runner: GameRunner; label: string; emoji: string; defaultBet: number }> = {
+  slots:       { runner: (i, b) => runSlots(i as any, b),       label: 'Slots',      emoji: '🎰', defaultBet: 25 },
+  blackjack:   { runner: (i, b) => runBlackjack(i as any, b),   label: 'Blackjack',  emoji: '🃏', defaultBet: 25 },
+  crash:       { runner: (i, b) => runCrash(i as any, b),       label: 'Crash',      emoji: '💥', defaultBet: 25 },
+  wheel:       { runner: (i, b) => runWheel(i as any, b),       label: 'Wheel',      emoji: '🎡', defaultBet: 25 },
+  higherlower: { runner: (i, b) => runHigherLower(i as any, b), label: 'Higher/Lower', emoji: '🎲', defaultBet: 25 },
+};
+
+function betModal(gameKey: string, defaultBet: number, fr: boolean): ModalBuilder {
+  const g = GAMES[gameKey];
+  return new ModalBuilder()
+    .setCustomId(`hub:playmodal:${gameKey}`)
+    .setTitle(`${g?.emoji ?? '🎮'} ${g?.label ?? gameKey} — ${fr ? 'Ta mise' : 'Your bet'}`)
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId('bet')
+          .setLabel(fr ? 'Mise en PULSE' : 'Bet in PULSE')
+          .setStyle(TextInputStyle.Short)
+          .setValue(String(defaultBet))
+          .setRequired(true),
+      ),
+    );
+}
+
 // ---- Global button router (called by interactionCreate for hub:*) ----
 export async function handleHubInteraction(interaction: Interaction): Promise<void> {
+  // Modal submissions for game bets
+  if (interaction.isModalSubmit() && interaction.customId.startsWith('hub:playmodal:')) {
+    const gameKey = interaction.customId.split(':')[2];
+    const g = GAMES[gameKey];
+    if (!g) return;
+    const raw = interaction.fields.getTextInputValue('bet');
+    const bet = Math.floor(Number(raw));
+    if (!Number.isFinite(bet) || bet <= 0) {
+      await interaction.reply({ embeds: [errorEmbed(isFR(interaction) ? 'Mise invalide.' : 'Invalid bet.')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    try {
+      await g.runner(interaction, bet);
+    } catch (err) {
+      log('ERROR', `Hub playmodal ${gameKey} failed`, err);
+    }
+    return;
+  }
+
   if (!interaction.isButton()) return;
   const id = interaction.customId;
   const uid = interaction.user.id;
 
   try {
+    // Quick-play: open bet modal
+    if (id.startsWith('hub:play:')) {
+      const gameKey = id.split(':')[2];
+      const g = GAMES[gameKey];
+      if (!g) return;
+      await interaction.showModal(betModal(gameKey, g.defaultBet, isFR(interaction)));
+      return;
+    }
+
+    // Rejouer with same bet
+    if (id.startsWith('hub:again:')) {
+      const parts = id.split(':');
+      const gameKey = parts[2];
+      const bet = Number(parts[3]);
+      const g = GAMES[gameKey];
+      if (!g || !Number.isFinite(bet)) return;
+      await g.runner(interaction, bet);
+      return;
+    }
+
+    // Doubler: same game, bet*2
+    if (id.startsWith('hub:double:')) {
+      const parts = id.split(':');
+      const gameKey = parts[2];
+      const bet = Number(parts[3]) * 2;
+      const g = GAMES[gameKey];
+      if (!g || !Number.isFinite(bet)) return;
+      await g.runner(interaction, bet);
+      return;
+    }
+
     if (id === 'hub:home')    return respond(interaction, await renderHome(interaction, uid));
     if (id === 'hub:profil')  return respond(interaction, await renderProfil(interaction, uid));
     if (id === 'hub:jeux')    return respond(interaction, await renderJeux(interaction));

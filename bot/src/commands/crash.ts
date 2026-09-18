@@ -6,6 +6,8 @@ import {
   ButtonStyle,
   ComponentType,
   Message,
+  ModalSubmitInteraction,
+  ButtonInteraction,
 } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { spendPulse, getBalance } from '../services/economy.js';
@@ -20,6 +22,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { buildPostGameRow } from '../utils/postgame.js';
 import { log } from '../utils/logger.js';
 
 export const data = new SlashCommandBuilder()
@@ -33,6 +36,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const bet = interaction.options.getInteger('bet', true);
+  await runCrash(interaction, bet);
+}
+
+export async function runCrash(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
   if (!isGameEnabled('crash')) {
     await interaction.reply({ embeds: [errorEmbed('Crash is currently disabled.')], ephemeral: true });
     return;
@@ -49,7 +57,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const crashMax = conf.crash_max ?? 10.0;
   const feePercent = conf.fee_percent ?? 5;
 
-  const bet = interaction.options.getInteger('bet', true);
   if (bet < minBet || bet > maxBet) {
     await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${minBet} and ${maxBet} PULSE.`)], ephemeral: true });
     return;
@@ -71,7 +78,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   // Generate crash point (weighted towards lower values)
   const crashPoint = Math.round((crashMin + Math.random() * Math.random() * (crashMax - crashMin)) * 100) / 100;
 
-  const sessionId = await createGameSession('crash', interaction.channelId, { crashPoint, bet });
+  const sessionId = await createGameSession('crash', interaction.channelId ?? '', { crashPoint, bet });
   if (!sessionId) {
     await earnPulse(interaction.user.id, bet, 'crash_refund');
     await interaction.reply({ embeds: [errorEmbed('Failed to start game. Bet refunded.')], ephemeral: true });
@@ -119,7 +126,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       await saveGameResult(sessionId, { crashPoint, cashedOutAt: multiplier, payout });
 
       const winEmbed = successEmbed(`🎉 You cashed out at **${multiplier.toFixed(2)}x**!\n\n💰 Payout: **${payout}** PULSE (${feePercent}% fee)\n📈 Crash point was: **${crashPoint.toFixed(2)}x**`);
-      await btnInteraction.update({ embeds: [winEmbed], components: [] });
+      await btnInteraction.update({ embeds: [winEmbed], components: [buildPostGameRow('crash', bet)] });
     }
   });
 
@@ -142,7 +149,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
       const loseEmbed = errorEmbed(`💥 CRASHED at **${crashPoint.toFixed(2)}x**!\n\nYou lost **${bet}** PULSE.`)
         .setTitle('🚀 Crash');
-      await interaction.editReply({ embeds: [loseEmbed], components: [] }).catch(() => {});
+      await interaction.editReply({ embeds: [loseEmbed], components: [buildPostGameRow('crash', bet)] }).catch(() => {});
       return;
     }
 
@@ -162,7 +169,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
       saveGameResult(sessionId, { crashPoint, cashedOutAt: null, payout: 0, reason: 'timeout' });
       const timeoutEmbed = errorEmbed(`⏰ Time's up! You didn't cash out.\n\nYou lost **${bet}** PULSE.`).setTitle('🚀 Crash');
-      interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
+      interaction.editReply({ embeds: [timeoutEmbed], components: [buildPostGameRow('crash', bet)] }).catch(() => {});
     }
   });
 }
