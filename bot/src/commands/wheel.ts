@@ -2,6 +2,8 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder,
   MessageFlags,
+  ModalSubmitInteraction,
+  ButtonInteraction,
   SlashCommandBuilder,
 } from 'discord.js';
 import { spendPulse, getBalance } from '../services/economy.js';
@@ -16,6 +18,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { errorEmbed } from '../utils/embeds.js';
+import { buildPostGameRow } from '../utils/postgame.js';
 
 interface WheelOutcome {
   label: string;
@@ -66,6 +69,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const bet = interaction.options.getInteger('bet', true);
+  await runWheel(interaction, bet);
+}
+
+export async function runWheel(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
   if (!isGameEnabled('wheel')) {
     await interaction.reply({ embeds: [errorEmbed('Wheel is currently disabled.')], flags: MessageFlags.Ephemeral });
     return;
@@ -75,7 +83,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const cfg: WheelConfig = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
   if (!cfg.outcomes?.length) cfg.outcomes = DEFAULT_CONFIG.outcomes;
 
-  const bet = interaction.options.getInteger('bet', true);
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
     await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
@@ -93,7 +100,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const sessionId = await createGameSession('wheel', interaction.channelId, { bet });
+  const sessionId = await createGameSession('wheel', interaction.channelId ?? '', { bet });
   if (sessionId) await addGamePlayer(sessionId, interaction.user.id, bet);
 
   const outcome = pickOutcome(cfg.outcomes);
@@ -126,5 +133,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     ].join('\n'))
     .setTimestamp();
 
-  await interaction.editReply({ embeds: [result] });
+  await interaction.editReply({ embeds: [result], components: [buildPostGameRow('wheel', bet)] });
 }

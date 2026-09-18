@@ -6,9 +6,9 @@ import {
   ChatInputCommandInteraction,
   ComponentType,
   MessageFlags,
+  ModalSubmitInteraction,
   SlashCommandBuilder,
 } from 'discord.js';
-import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -21,6 +21,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { buildPostGameRow } from '../utils/postgame.js';
 
 interface BlackjackConfig {
   min_bet: number;
@@ -74,6 +75,11 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption(o => o.setName('bet').setDescription('PULSE to bet').setRequired(true).setMinValue(1));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const bet = interaction.options.getInteger('bet', true);
+  await runBlackjack(interaction, bet);
+}
+
+export async function runBlackjack(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
   if (!isGameEnabled('blackjack')) {
     await interaction.reply({ embeds: [errorEmbed('Blackjack is currently disabled.')], flags: MessageFlags.Ephemeral });
     return;
@@ -82,7 +88,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const raw = getGameConfig('blackjack')?.config_json as Partial<BlackjackConfig> | undefined;
   const cfg: BlackjackConfig = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
 
-  const bet = interaction.options.getInteger('bet', true);
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
     await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
@@ -100,7 +105,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const sessionId = await createGameSession('blackjack', interaction.channelId, { bet });
+  const sessionId = await createGameSession('blackjack', interaction.channelId ?? '', { bet });
   if (sessionId) await addGamePlayer(sessionId, interaction.user.id, bet);
 
   const deck = newDeck();
@@ -141,7 +146,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     ].join('\n');
 
     const embed = (outcome === 'win' || outcome === 'blackjack' ? successEmbed(desc) : outcome === 'push' ? pulseEmbed('🃏 Blackjack').setDescription(desc) : errorEmbed(desc)).setTitle('🃏 Blackjack');
-    await interaction.editReply({ embeds: [embed], components: [] });
+    await interaction.editReply({ embeds: [embed], components: [buildPostGameRow('blackjack', bet)] });
   }
 
   if (playerBJ || dealerBJ) {
@@ -171,7 +176,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const gid = interaction.guildId!;
   const collector = message.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000,
@@ -180,7 +184,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   let resolved = false;
 
-  collector.on('collect', bindGuild(gid, async (btn: ButtonInteraction) => {
+  collector.on('collect', async (btn) => {
     if (resolved) return;
 
     if (btn.customId === 'bj_hit') {
@@ -216,9 +220,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const dtotal = handValue(dealer);
       await finish(dtotal > 21 || ptotal > dtotal ? 'win' : ptotal < dtotal ? 'lose' : 'push', dealer);
     }
-  }));
+  });
 
-  collector.on('end', bindGuild(gid, async (_c: unknown, reason: string) => {
+  collector.on('end', async (_c, reason) => {
     if (resolved) return;
     if (reason === 'time') {
       while (handValue(dealer) < cfg.dealer_stand_min) dealer.push(deck.pop()!);
@@ -226,5 +230,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const dtotal = handValue(dealer);
       await finish(dtotal > 21 || ptotal > dtotal ? 'win' : ptotal < dtotal ? 'lose' : 'push', dealer);
     }
-  }));
+  });
 }

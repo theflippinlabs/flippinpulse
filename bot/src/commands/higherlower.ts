@@ -7,8 +7,8 @@ import {
   ButtonInteraction,
   ComponentType,
   Message,
+  ModalSubmitInteraction,
 } from 'discord.js';
-import { bindGuild } from '../guildContext.js';
 import { spendPulse, getBalance } from '../services/economy.js';
 import {
   getGameConfig,
@@ -21,6 +21,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { buildPostGameRow } from '../utils/postgame.js';
 
 const MIN = 1;
 const MAX = 100;
@@ -34,6 +35,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const bet = interaction.options.getInteger('bet', true);
+  await runHigherLower(interaction, bet);
+}
+
+export async function runHigherLower(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
   if (!isGameEnabled('higherlower')) {
     await interaction.reply({ embeds: [errorEmbed('Higher or Lower is currently disabled.')], ephemeral: true });
     return;
@@ -48,7 +54,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const feePercent = conf.fee_percent ?? 5;
   const maxRounds = conf.max_rounds ?? 10;
 
-  const bet = interaction.options.getInteger('bet', true);
   if (bet < minBet || bet > maxBet) {
     await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${minBet} and ${maxBet} PULSE.`)], ephemeral: true });
     return;
@@ -66,7 +71,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const sessionId = await createGameSession('higherlower', interaction.channelId, { bet });
+  const sessionId = await createGameSession('higherlower', interaction.channelId ?? '', { bet });
   if (!sessionId) {
     await earnPulse(interaction.user.id, bet, 'higherlower_refund');
     await interaction.reply({ embeds: [errorEmbed('Failed to start game. Bet refunded.')], ephemeral: true });
@@ -109,7 +114,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const reply = await interaction.reply({ ...render(), fetchReply: true }) as Message;
 
-  const gid = interaction.guildId!;
   const collector = reply.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000,
@@ -132,11 +136,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await saveGameResult(sessionId, { result: 'cashed_out', rounds: round, payout: pot, bet });
     await btn.update({
       embeds: [successEmbed(`🎉 Cashed out after **${round}** correct guess${round === 1 ? '' : 'es'}!\n\n💰 You won **${pot}** PULSE (bet was ${bet}).`)],
-      components: [],
+      components: [buildPostGameRow('higherlower', bet)],
     });
   };
 
-  collector.on('collect', bindGuild(gid, async (btn: ButtonInteraction) => {
+  collector.on('collect', async (btn) => {
     if (finished) return;
 
     if (btn.customId === `hl_cash_${sessionId}`) {
@@ -156,7 +160,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           `Next number was **${next}** — ${guessHigher ? 'not higher' : 'not lower'}. 💥\n\n` +
           `You lost **${bet}** PULSE${round > 0 ? ` (and a pot of ${pot})` : ''}.`
         ).setTitle('🎴 Higher or Lower')],
-        components: [],
+        components: [buildPostGameRow('higherlower', bet)],
       });
       return;
     }
@@ -172,9 +176,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     await btn.update(render());
-  }));
+  });
 
-  collector.on('end', bindGuild(gid, async (_c: unknown, reason: string) => {
+  collector.on('end', async (_c, reason) => {
     if (finished || reason === 'done') return;
     // Timed out: keep winnings if any, otherwise the bet is lost.
     if (round > 0) {
@@ -194,5 +198,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         components: [],
       }).catch(() => {});
     }
-  }));
+  });
 }

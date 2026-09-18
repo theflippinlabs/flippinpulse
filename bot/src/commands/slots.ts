@@ -1,6 +1,8 @@
 import {
   ChatInputCommandInteraction,
   MessageFlags,
+  ModalSubmitInteraction,
+  ButtonInteraction,
   SlashCommandBuilder,
 } from 'discord.js';
 import { spendPulse, getBalance } from '../services/economy.js';
@@ -15,6 +17,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { buildPostGameRow } from '../utils/postgame.js';
 
 interface SlotsConfig {
   min_bet: number;
@@ -69,6 +72,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const bet = interaction.options.getInteger('bet', true);
+  await runSlots(interaction, bet);
+}
+
+export async function runSlots(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
   if (!isGameEnabled('slots')) {
     await interaction.reply({ embeds: [errorEmbed('Slots is currently disabled.')], flags: MessageFlags.Ephemeral });
     return;
@@ -77,7 +85,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const raw = getGameConfig('slots')?.config_json as Partial<SlotsConfig> | undefined;
   const cfg: SlotsConfig = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
 
-  const bet = interaction.options.getInteger('bet', true);
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
     await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
@@ -95,7 +102,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const sessionId = await createGameSession('slots', interaction.channelId, { bet });
+  const sessionId = await createGameSession('slots', interaction.channelId ?? '', { bet });
   if (sessionId) await addGamePlayer(sessionId, interaction.user.id, bet);
 
   const reels = ['🎰', '🎰', '🎰'];
@@ -134,5 +141,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     ? successEmbed(`[ ${final.join(' | ')} ]\n\n🎉 **${multiplier}x** payout! You win **${payout}** PULSE.`).setTitle('🎰 Slots')
     : errorEmbed(`[ ${final.join(' | ')} ]\n\nNo match. You lose **${bet}** PULSE.`).setTitle('🎰 Slots');
 
-  await interaction.editReply({ embeds: [result] });
+  await interaction.editReply({ embeds: [result], components: [buildPostGameRow('slots', bet)] });
 }

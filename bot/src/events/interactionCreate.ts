@@ -67,7 +67,7 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
     return;
   }
 
-  if (interaction.isButton() && interaction.customId.startsWith('hub:')) {
+  if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('hub:')) {
     if (!interaction.guildId) return;
     try {
       await runWithGuild(interaction.guildId, () => handleHubInteraction(interaction));
