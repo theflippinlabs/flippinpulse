@@ -44,6 +44,7 @@ import * as welcome from './welcome.js';
 import * as rankup from './rankup.js';
 import * as modlog from './modlog.js';
 import * as panel from './panel.js';
+import * as jeux from './jeux.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -59,6 +60,7 @@ const commandList: Command[] = [
   givepulse, removepulse, setpulse, pulseinfo, moduleCmd, seteconomy, shopadmin,
   higherlower, lottery, battleroyale, diceroyale,
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
+  jeux,
 ];
 
 export const commands = new Map<string, Command>();
