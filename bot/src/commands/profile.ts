@@ -1,6 +1,5 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
-import { currentGuildId } from '../guildContext.js';
 import { getRankForPoints } from '../services/ranks.js';
 import { pulseEmbed, errorEmbed } from '../utils/embeds.js';
 
@@ -14,7 +13,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: user } = await supabase
     .from('discord_users')
     .select('*')
-    .eq('guild_id', currentGuildId())
     .eq('discord_id', targetUser.id)
     .single();
 
@@ -23,14 +21,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const nextRank = getRankForPoints((user.points_total ?? 0) + 1);
+  const points = user.points_total ?? 0;
+  const rankNow = getRankForPoints(points);
+  const rankNext = getRankForPoints(points + 1);
+  const showBar = rankNext && rankNext.threshold > (rankNow?.threshold ?? 0);
+  const barWidth = 12;
+  let progressLine = '';
+  if (showBar) {
+    const pct = Math.max(0, Math.min(1, points / rankNext.threshold));
+    const filled = Math.round(pct * barWidth);
+    progressLine = `\n\`${'\u2593'.repeat(filled)}${'\u2591'.repeat(barWidth - filled)}\` ${points}/${rankNext.threshold} \u2192 **${rankNext.rank_name}**`;
+  }
+
   const embed = pulseEmbed(`${targetUser.username}'s Profile`)
     .setThumbnail(targetUser.displayAvatarURL({ size: 128 }))
+    .setDescription(`\ud83c\udfc6 **Rank:** ${user.rank_name ?? 'Unranked'}${progressLine}`)
     .addFields(
-      { name: 'Rank', value: user.rank_name ?? 'Unranked', inline: true },
-      { name: 'Streak', value: `${user.streak ?? 0} days`, inline: true },
-      { name: '\u200b', value: '\u200b', inline: true },
-      { name: 'Total Points', value: `${user.points_total ?? 0}`, inline: true },
+      { name: '\ud83d\udd25 Streak', value: `${user.streak ?? 0} days`, inline: true },
       { name: 'Weekly', value: `${user.points_week ?? 0}`, inline: true },
       { name: 'Monthly', value: `${user.points_month ?? 0}`, inline: true },
       { name: 'PULSE Balance', value: `${user.balance_pulse ?? 0} PULSE`, inline: true },
