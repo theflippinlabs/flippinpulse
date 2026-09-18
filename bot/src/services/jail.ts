@@ -30,16 +30,28 @@ export async function setJailRole(roleId: string): Promise<void> {
   await setSetting('jail_config', { ...cur, role_id: roleId });
 }
 
-// Ensures a "Jailed" role exists and is denied ViewChannel on every channel except the jail.
-export async function ensureJailRole(guild: Guild, jailChannelId: string): Promise<Role | null> {
+// Ensures a jail role exists (or reuses a preferred one) and is denied
+// ViewChannel on every channel except the jail. When preferRoleId is set,
+// that role is used instead of the auto-created "Jailed" role.
+export async function ensureJailRole(
+  guild: Guild,
+  jailChannelId: string,
+  preferRoleId?: string,
+): Promise<Role | null> {
   const cfg = getJailConfig();
   let role: Role | null = null;
 
-  if (cfg.role_id) {
+  if (preferRoleId) {
+    role = await guild.roles.fetch(preferRoleId).catch(() => null);
+  }
+  if (!role && cfg.role_id) {
     role = await guild.roles.fetch(cfg.role_id).catch(() => null);
   }
   if (!role) {
-    role = guild.roles.cache.find(r => r.name.toLowerCase() === 'jailed') ?? null;
+    // Try existing roles the community likely already uses.
+    role = guild.roles.cache.find(r =>
+      ['jailed', 'jail inmate', 'jail-inmate', 'inmate'].includes(r.name.toLowerCase()),
+    ) ?? null;
   }
   if (!role) {
     role = await guild.roles.create({
