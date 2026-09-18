@@ -356,6 +356,19 @@ CREATE TABLE IF NOT EXISTS public.challenge_claims (
 CREATE INDEX IF NOT EXISTS idx_challenge_claims_cid ON public.challenge_claims (challenge_id);
 ALTER TABLE public.challenge_claims ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE IF NOT EXISTS public.jailed_members (
+  guild_id TEXT NOT NULL,
+  discord_id TEXT NOT NULL,
+  moderator_id TEXT,
+  reason TEXT,
+  jailed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  previous_roles_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  PRIMARY KEY (guild_id, discord_id)
+);
+ALTER TABLE public.jailed_members ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_jailed_members_expires ON public.jailed_members(expires_at);
+
 -- ---------- updated_at triggers ----------
 DROP TRIGGER IF EXISTS update_discord_users_updated_at ON public.discord_users;
 CREATE TRIGGER update_discord_users_updated_at BEFORE UPDATE ON public.discord_users FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
