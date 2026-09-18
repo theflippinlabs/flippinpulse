@@ -176,7 +176,61 @@ export async function applyJail(
     log('ERROR', 'Failed to add jailed role', err),
   );
 
+  // If they're in voice, boot them so they can't hide in a call.
+  if (member.voice?.channelId) {
+    await member.voice.disconnect('Novus jail: kicked from voice').catch(() => null);
+  }
+
   return { previousRoles: previous };
+}
+
+// Extended duration parser for /jail: accepts s/m/h/d/w/mo/y and treats
+// life / forever / perma / permanent / à vie / ∞ as an indefinite sentence.
+// Returns { seconds: null } for indefinite so the DB expires_at stays NULL.
+export interface JailDuration {
+  seconds: number | null;
+  label: string;
+  forLife: boolean;
+}
+
+const LIFE_KEYWORDS = new Set([
+  'life', 'forlife', 'for-life', 'for_life', 'lifetime',
+  'forever', 'perma', 'permanent',
+  'vie', 'avie', 'à-vie', 'a-vie',
+  '∞', 'inf', 'infinity', 'infinite',
+]);
+
+export function parseJailDuration(input: string | null | undefined): JailDuration | null {
+  if (!input) return { seconds: null, label: 'indefinite', forLife: false };
+  const raw = input.trim().toLowerCase().replace(/\s+/g, '');
+  if (!raw) return { seconds: null, label: 'indefinite', forLife: false };
+  if (LIFE_KEYWORDS.has(raw.replace(/[^a-z∞]/g, ''))) {
+    return { seconds: null, label: 'FOR LIFE 🔒', forLife: true };
+  }
+
+  const m = raw.match(/^(\d+)(s|min|m|mo|mon|month|months|mth|h|hr|hour|hours|d|day|days|w|wk|week|weeks|y|yr|year|years)$/);
+  if (!m) return null;
+  const value = parseInt(m[1], 10);
+  if (!Number.isFinite(value) || value <= 0) return null;
+
+  const unit = m[2];
+  const secondsPer: Record<string, number> = {
+    s: 1,
+    m: 60, min: 60,
+    h: 3600, hr: 3600, hour: 3600, hours: 3600,
+    d: 86_400, day: 86_400, days: 86_400,
+    w: 604_800, wk: 604_800, week: 604_800, weeks: 604_800,
+    mo: 2_592_000, mon: 2_592_000, month: 2_592_000, months: 2_592_000, mth: 2_592_000, // 30 days
+    y: 31_536_000, yr: 31_536_000, year: 31_536_000, years: 31_536_000, // 365 days
+  };
+  const per = secondsPer[unit];
+  if (!per) return null;
+  const seconds = value * per;
+
+  // Cap ordinary durations at ~100 years to keep timestamps sane; longer → treat as life.
+  if (seconds > 100 * 31_536_000) return { seconds: null, label: 'FOR LIFE 🔒', forLife: true };
+
+  return { seconds, label: `${value}${unit}`, forLife: false };
 }
 
 export async function releaseJail(
