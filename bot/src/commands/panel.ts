@@ -26,11 +26,13 @@ import { getAutoQuizConfig, launchQuiz } from '../services/communityQuiz.js';
 import { getPulsarConfig, pulsarPostNow } from '../services/pulsar.js';
 import { launchFlash, launchRiddle, launchObjective, listActiveChallenges, endAllChallenges } from '../services/challenges.js';
 import { grantPulse, revokePulse, setPulse } from '../services/economy.js';
+import { listGameConfigs, setGameEnabled, updateGameConfigJson, getGameConfig } from '../services/games.js';
+import { memberIsLord, requireLord } from '../services/lord.js';
 import { supabase } from '../supabase.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
-type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop' | 'pulsar' | 'missions';
+type Section = 'home' | 'modules' | 'channels' | 'quiz' | 'economy' | 'pulse' | 'shop' | 'pulsar' | 'missions' | 'games';
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
 
 const SHOP_CATEGORIES = ['role', 'perk', 'ticket', 'cosmetic', 'irl'];
@@ -66,6 +68,7 @@ function navRow(): Row {
       { label: 'Shop', value: 'shop', emoji: '🛒' },
       { label: 'Novus (AI Community Manager)', value: 'pulsar', emoji: '🧠' },
       { label: 'Missions', value: 'missions', emoji: '🎯' },
+      { label: 'Games', value: 'games', emoji: '🎮' },
     );
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(select);
 }
@@ -209,6 +212,7 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
     };
   }
 
+  if (section === 'games') return renderGames();
   if (section === 'pulse') return renderPulse();
   if (section === 'shop') return renderShop();
 
@@ -223,7 +227,7 @@ function render(section: Section): { embeds: ReturnType<typeof pulseEmbed>[]; co
       'Use the **section menu** above to configure everything.\n\n' +
       `**Modules:** ${modLines}\n` +
       `**Auto-quiz:** ${getAutoQuizConfig().enabled ? 'ON ✅' : 'OFF ⛔'} · **Novus:** ${getPulsarConfig().enabled ? 'ON ✅' : 'OFF ⛔'}\n\n` +
-      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop · Novus.*'
+      '*Sections: Modules · Channels · Auto-quiz · Economy · Give/remove PULSE · Shop · Novus · Missions · Games.*'
     )],
     components: rows,
   };
@@ -248,6 +252,82 @@ function renderPulse(selectedUserId?: string): { embeds: ReturnType<typeof pulse
         ? `Selected: <@${selectedUserId}>\n\nChoose an action below — you'll be asked for an amount.`
         : 'Pick a member, then choose **Give**, **Remove**, or **Set exact**.'
     )],
+    components: rows,
+  };
+}
+
+// Game keys → display labels for the panel.
+const GAME_LABELS: Record<string, string> = {
+  crash: '💥 Crash',
+  slots: '🎰 Slots',
+  blackjack: '🃏 Blackjack',
+  roulette: '🎡 Roulette',
+  wheel: '🎯 Wheel',
+  higherlower: '🔼 Higher or Lower',
+  rps: '✊ Rock-Paper-Scissors',
+  duel: '⚔️ Duel',
+  quiz: '🧠 Quiz',
+  treasure_drop: '💰 Treasure drop',
+  typing_race: '⌨️ Typing race',
+  battle_royale: '🏆 Battle Royale',
+  dice_royale: '🎲 Dice Royale',
+};
+
+function labelFor(key: string): string {
+  return GAME_LABELS[key] ?? key;
+}
+
+function renderGames(selectedKey?: string): { embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] } {
+  const rows: Row[] = [navRow()];
+  const configs = listGameConfigs();
+
+  // Games picker (up to 25 options — we have ≤13).
+  const options = configs.slice(0, 25).map(c => ({
+    label: labelFor(c.game_key).slice(0, 100),
+    value: c.game_key,
+    description: (c.is_enabled ? 'ON — tap to configure' : 'OFF — tap to configure').slice(0, 100),
+    emoji: c.is_enabled ? '✅' : '⛔',
+    default: c.game_key === selectedKey,
+  }));
+
+  rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('panel:gamespick')
+      .setPlaceholder('🎮 Pick a game to configure…')
+      .addOptions(options),
+  ));
+
+  let description =
+    'Turn a game **on / off**, or edit its **bets, cooldown, and house edge (win chance)**.\n\n' +
+    configs.map(c => `${c.is_enabled ? '✅' : '⛔'} ${labelFor(c.game_key)}`).join('  ·  ');
+
+  if (selectedKey) {
+    const cfg = getGameConfig(selectedKey);
+    const j = (cfg?.config_json ?? {}) as Record<string, unknown>;
+    const fmt = (k: string, fallback: string) => (j[k] === undefined ? fallback : String(j[k]));
+    const feePct = fmt('fee_percent', '—');
+    description = `**${labelFor(selectedKey)}** — ${cfg?.is_enabled ? '✅ ON' : '⛔ OFF'}\n\n` +
+      `**Min bet:** ${fmt('min_bet', '—')} PULSE · **Max bet:** ${fmt('max_bet', '—')} PULSE\n` +
+      `**House edge:** ${feePct}%  *(higher = lower win chance for the player)*\n` +
+      `**Cooldown:** ${fmt('cooldown_seconds', '—')}s\n\n` +
+      `Use the buttons to toggle or edit.`;
+
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`panel:gametoggle:${selectedKey}`)
+        .setLabel(cfg?.is_enabled ? 'Turn OFF' : 'Turn ON')
+        .setEmoji(cfg?.is_enabled ? '⛔' : '✅')
+        .setStyle(cfg?.is_enabled ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`panel:gameedit:${selectedKey}`)
+        .setLabel('Edit bets & win chance')
+        .setEmoji('⚙️')
+        .setStyle(ButtonStyle.Primary),
+    ));
+  }
+
+  return {
+    embeds: [pulseEmbed('🎮 Games').setDescription(description)],
     components: rows,
   };
 }
@@ -278,13 +358,34 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!(await requireLord(interaction))) return;
   await interaction.reply({ ...render('home'), flags: MessageFlags.Ephemeral });
 }
 
 export async function handlePanelInteraction(interaction: Interaction): Promise<void> {
+  // Gate every panel action on the Lord role.
+  if (interaction.isRepliable()) {
+    const member = interaction.member && 'guild' in interaction.member ? interaction.member : null;
+    if (!memberIsLord(member as never)) {
+      if (!interaction.replied) {
+        await interaction.reply({
+          embeds: [errorEmbed('This panel is Lord-only.')],
+          flags: MessageFlags.Ephemeral,
+        }).catch(() => null);
+      }
+      return;
+    }
+  }
+
   // Navigation
   if (interaction.isStringSelectMenu() && interaction.customId === 'panel:nav') {
     await interaction.update(render(interaction.values[0] as Section));
+    return;
+  }
+
+  // Games section
+  if (interaction.isStringSelectMenu() && interaction.customId === 'panel:gamespick') {
+    await interaction.update(renderGames(interaction.values[0]));
     return;
   }
 
@@ -319,6 +420,30 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
     const id = interaction.customId;
 
     if (id === 'panel:refresh') { await interaction.update(render('home')); return; }
+
+    // Games — toggle enabled
+    if (id.startsWith('panel:gametoggle:')) {
+      const key = id.slice('panel:gametoggle:'.length);
+      const cur = getGameConfig(key);
+      if (!cur) { await interaction.reply({ embeds: [errorEmbed(`Unknown game "${key}".`)], flags: MessageFlags.Ephemeral }); return; }
+      try {
+        await setGameEnabled(key, !cur.is_enabled);
+      } catch {
+        await interaction.reply({ embeds: [errorEmbed('Could not toggle that game.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      await interaction.update(renderGames(key));
+      return;
+    }
+
+    // Games — edit modal
+    if (id.startsWith('panel:gameedit:')) {
+      const key = id.slice('panel:gameedit:'.length);
+      const cur = getGameConfig(key);
+      if (!cur) { await interaction.reply({ embeds: [errorEmbed(`Unknown game "${key}".`)], flags: MessageFlags.Ephemeral }); return; }
+      await interaction.showModal(gameEditModal(key));
+      return;
+    }
 
     if (id === 'panel:quiztoggle') { await patch('auto_quiz', { enabled: !getAutoQuizConfig().enabled }); await interaction.update(render('quiz')); return; }
     if (id === 'panel:quizbonus') { await patch('auto_quiz', { bonus_enabled: !getAutoQuizConfig().bonus_enabled }); await interaction.update(render('quiz')); return; }
@@ -515,6 +640,39 @@ export async function handlePanelInteraction(interaction: Interaction): Promise<
         return;
       }
 
+      if (id.startsWith('panel:modal:gameedit:')) {
+        const key = id.slice('panel:modal:gameedit:'.length);
+        const cur = getGameConfig(key);
+        if (!cur) { await interaction.reply({ embeds: [errorEmbed(`Unknown game "${key}".`)], flags: MessageFlags.Ephemeral }); return; }
+        const j = (cur.config_json ?? {}) as Record<string, unknown>;
+        const num = (cid: string, fallback: number, min: number, max: number): number => {
+          const raw = interaction.fields.getTextInputValue(cid).trim();
+          if (!raw) return fallback;
+          const n = Number(raw);
+          if (!Number.isFinite(n)) return fallback;
+          return Math.min(max, Math.max(min, n));
+        };
+        const patchJson: Record<string, unknown> = {
+          min_bet: num('min', (j.min_bet as number) ?? 0, 0, 1_000_000),
+          max_bet: num('max', (j.max_bet as number) ?? 0, 0, 10_000_000),
+          fee_percent: num('fee', (j.fee_percent as number) ?? 0, 0, 100),
+          cooldown_seconds: num('cd', (j.cooldown_seconds as number) ?? 0, 0, 86_400),
+        };
+        try {
+          await updateGameConfigJson(key, patchJson);
+        } catch {
+          await interaction.reply({ embeds: [errorEmbed(`Failed to save ${key}.`)], flags: MessageFlags.Ephemeral });
+          return;
+        }
+        await interaction.reply({
+          embeds: [successEmbed(
+            `**${labelFor(key)}** updated — min ${patchJson.min_bet}, max ${patchJson.max_bet}, house edge ${patchJson.fee_percent}%, cooldown ${patchJson.cooldown_seconds}s.`,
+          )],
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
       if (id === 'panel:modal:shopremove' || id === 'panel:modal:shopprice') {
         const name = interaction.fields.getTextInputValue('name').trim();
         const { data: item } = await supabase.from('shop_items').select('id, name').ilike('name', name).limit(1).maybeSingle();
@@ -608,6 +766,24 @@ function pulsarModal(): ModalBuilder {
       new TextInputBuilder().setCustomId('l').setLabel('Language (e.g. English, French)').setStyle(TextInputStyle.Short).setValue(c.language).setRequired(true)),
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder().setCustomId('r').setLabel('Daily recap time (UTC, e.g. 20:00)').setStyle(TextInputStyle.Short).setValue(c.recap_time_utc).setRequired(true)));
+}
+
+function gameEditModal(key: string): ModalBuilder {
+  const cur = getGameConfig(key);
+  const j = (cur?.config_json ?? {}) as Record<string, unknown>;
+  const val = (k: string, fallback: string) => (j[k] === undefined ? fallback : String(j[k]));
+  const row = (cid: string, label: string, value: string) =>
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId(cid).setLabel(label).setStyle(TextInputStyle.Short).setValue(value).setRequired(false));
+  return new ModalBuilder()
+    .setCustomId(`panel:modal:gameedit:${key}`)
+    .setTitle(`Edit ${labelFor(key).replace(/^[^\p{L}\d]+/u, '').slice(0, 40)}`)
+    .addComponents(
+      row('min', 'Min bet (PULSE)', val('min_bet', '0')),
+      row('max', 'Max bet (PULSE)', val('max_bet', '0')),
+      row('fee', 'House edge % (0-100, higher = less wins)', val('fee_percent', '0')),
+      row('cd', 'Cooldown seconds', val('cooldown_seconds', '0')),
+    );
 }
 
 function shopPriceModal(): ModalBuilder {

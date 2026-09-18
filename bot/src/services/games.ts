@@ -30,6 +30,40 @@ export function isGameEnabled(key: string): boolean {
   return configCache.get(key)?.is_enabled ?? false;
 }
 
+export function listGameConfigs(): GameConfig[] {
+  return Array.from(configCache.values()).sort((a, b) => a.game_key.localeCompare(b.game_key));
+}
+
+export async function setGameEnabled(key: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('games_config')
+    .update({ is_enabled: enabled, updated_at: new Date().toISOString() })
+    .eq('game_key', key);
+  if (error) {
+    log('ERROR', `Failed to toggle game ${key}`, error);
+    throw error;
+  }
+  const cur = configCache.get(key);
+  if (cur) configCache.set(key, { ...cur, is_enabled: enabled });
+}
+
+export async function updateGameConfigJson(
+  key: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const cur = configCache.get(key);
+  const merged = { ...(cur?.config_json ?? {}), ...patch };
+  const { error } = await supabase
+    .from('games_config')
+    .update({ config_json: merged, updated_at: new Date().toISOString() })
+    .eq('game_key', key);
+  if (error) {
+    log('ERROR', `Failed to update config for ${key}`, error);
+    throw error;
+  }
+  if (cur) configCache.set(key, { ...cur, config_json: merged });
+}
+
 export async function createGameSession(
   gameKey: string,
   channelId: string,
