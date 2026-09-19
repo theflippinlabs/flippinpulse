@@ -49,9 +49,10 @@ export async function hasCompletedMission(discordId: string, missionId: string):
 export async function completeMission(
   discordId: string,
   missionId: string,
-  rewardPoints: number
+  rewardPoints: number,
+  opts: { allowRepeat?: boolean } = {},
 ): Promise<boolean> {
-  if (await hasCompletedMission(discordId, missionId)) return false;
+  if (!opts.allowRepeat && await hasCompletedMission(discordId, missionId)) return false;
   const guildId = currentGuildId();
 
   const { error } = await supabase.from('mission_completions').insert({
