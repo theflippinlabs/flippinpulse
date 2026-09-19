@@ -4,6 +4,11 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Novarys // Command Deck',
   description: 'Live stats and admin for the Novarys community.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Novarys',
+  },
 };
 
 export const viewport: Viewport = {
