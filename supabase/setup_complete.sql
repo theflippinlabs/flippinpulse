@@ -587,6 +587,20 @@ CREATE TABLE IF NOT EXISTS public.user_cosmetics (
 ALTER TABLE public.user_cosmetics ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_user_cosmetics_expires ON public.user_cosmetics(name_color_expires_at);
 
+-- ---------- Dashboard command queue (bot polls this, runs Discord-side actions) ----------
+CREATE TABLE IF NOT EXISTS public.dashboard_commands (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  command TEXT NOT NULL,                       -- 'announce' | 'release_jail' | 'grant_pulse' | 'revoke_pulse'
+  payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status TEXT NOT NULL DEFAULT 'pending',      -- pending | done | failed
+  created_by TEXT,                             -- Discord ID of the Lord who queued it
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  processed_at TIMESTAMPTZ,
+  error TEXT
+);
+ALTER TABLE public.dashboard_commands ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_dashboard_commands_status ON public.dashboard_commands(status, created_at);
+
 INSERT INTO public.achievements (achievement_key, category, tier, emoji, name, description, reward_pulse, sort_order) VALUES
   -- Economy (lifetime PULSE earned)
   ('econ_100',    'economy',  1, '💰', 'First PULSE',    'Earn 100 PULSE total',       10,  10),
