@@ -38,10 +38,10 @@ export default async function CosmeticsPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-bold mb-2">Cosmetics</h1>
-      <p className="text-pulse-mute mb-6 text-sm">Who bought what.</p>
+      <h1 className="text-xl md:text-2xl font-bold mb-2">Cosmetics</h1>
+      <p className="text-pulse-mute mb-4 md:mb-6 text-sm">Who bought what.</p>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
         <div className="bg-pulse-card border border-pulse-border rounded-xl p-5">
           <div className="text-xs uppercase text-pulse-mute">Titles owned</div>
           <div className="text-3xl font-bold mt-1">{titleCount}</div>
@@ -56,8 +56,8 @@ export default async function CosmeticsPage() {
         </div>
       </div>
 
-      <div className="bg-pulse-card border border-pulse-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-pulse-card border border-pulse-border rounded-xl overflow-x-auto -mx-4 md:mx-0 md:rounded-xl">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-pulse-border/40 text-pulse-mute uppercase text-xs">
             <tr>
               <th className="text-left px-4 py-2">Member</th>

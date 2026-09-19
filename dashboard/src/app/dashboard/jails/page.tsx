@@ -22,10 +22,10 @@ export default async function JailsPage() {
   const jails = await loadJails();
   return (
     <>
-      <h1 className="text-2xl font-bold mb-2">Jails</h1>
-      <p className="text-pulse-mute mb-6 text-sm">{jails.length} member{jails.length === 1 ? '' : 's'} currently jailed.</p>
-      <div className="bg-pulse-card border border-pulse-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      <h1 className="text-xl md:text-2xl font-bold mb-2">Jails</h1>
+      <p className="text-pulse-mute mb-4 md:mb-6 text-sm">{jails.length} member{jails.length === 1 ? '' : 's'} currently jailed.</p>
+      <div className="bg-pulse-card border border-pulse-border rounded-xl overflow-x-auto -mx-4 md:mx-0 md:rounded-xl">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-pulse-border/40 text-pulse-mute uppercase text-xs">
             <tr>
               <th className="text-left px-4 py-2">Inmate</th>

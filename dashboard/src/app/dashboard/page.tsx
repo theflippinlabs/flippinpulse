@@ -54,10 +54,10 @@ async function loadRecent() {
 
 function Card({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="bg-pulse-card border border-pulse-border rounded-xl p-5">
-      <div className="text-xs uppercase tracking-wide text-pulse-mute">{label}</div>
-      <div className="mt-1 text-3xl font-bold">{value}</div>
-      {hint && <div className="mt-1 text-xs text-pulse-mute">{hint}</div>}
+    <div className="bg-pulse-card border border-pulse-border rounded-xl p-3 md:p-5">
+      <div className="text-[10px] md:text-xs uppercase tracking-wide text-pulse-mute">{label}</div>
+      <div className="mt-1 text-xl md:text-3xl font-bold">{value}</div>
+      {hint && <div className="mt-1 text-[10px] md:text-xs text-pulse-mute">{hint}</div>}
     </div>
   );
 }
@@ -68,8 +68,8 @@ export default async function Overview() {
   const [stats, recent] = await Promise.all([loadStats(), loadRecent()]);
   return (
     <>
-      <h1 className="text-2xl font-bold mb-6">Overview</h1>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Overview</h1>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         <Card label="Members tracked" value={fmt(stats.members)} />
         <Card label="PULSE in wallets" value={fmt(stats.totalPulseInWallets)} hint="Sum of every balance" />
         <Card label="Active tournois" value={fmt(stats.activeTournois)} hint="open + running" />
@@ -78,7 +78,7 @@ export default async function Overview() {
         <Card label="Badges unlocked" value={fmt(stats.achievementsUnlocked)} hint="Across the community" />
       </div>
 
-      <section className="mt-10 grid md:grid-cols-2 gap-6">
+      <section className="mt-6 md:mt-10 grid md:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-pulse-card border border-pulse-border rounded-xl p-5">
           <h2 className="font-semibold mb-3">🏆 Top members</h2>
           <ol className="space-y-2 text-sm">
@@ -109,10 +109,11 @@ export default async function Overview() {
         </div>
       </section>
 
-      <section className="mt-6">
-        <div className="bg-pulse-card border border-pulse-border rounded-xl p-5">
+      <section className="mt-4 md:mt-6">
+        <div className="bg-pulse-card border border-pulse-border rounded-xl p-4 md:p-5">
           <h2 className="font-semibold mb-3">🏟️ Latest tournaments</h2>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+            <table className="w-full text-sm min-w-[520px]">
             <thead className="text-pulse-mute uppercase text-xs">
               <tr><th className="text-left py-2">Title</th><th className="text-left">Status</th><th className="text-right">Pot</th><th className="text-right">Created</th></tr>
             </thead>
@@ -130,6 +131,7 @@ export default async function Overview() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </>
