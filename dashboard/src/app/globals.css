@@ -7,7 +7,7 @@
 }
 
 html, body {
-  background: #0B0F1A;
+  background: #080B14;
   color: #E5E7EB;
   min-height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
@@ -15,7 +15,19 @@ html, body {
 }
 
 @layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+  .brand-text {
+    background: linear-gradient(135deg, #22D3EE 0%, #A855F7 55%, #EC4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }

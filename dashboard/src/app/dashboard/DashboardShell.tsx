@@ -1,20 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-const NAV = [
-  { href: '/dashboard', label: 'Overview', emoji: '🏠', short: 'Home' },
-  { href: '/dashboard/members', label: 'Members', emoji: '👥', short: 'Members' },
-  { href: '/dashboard/jails', label: 'Jails', emoji: '🔒', short: 'Jails' },
-  { href: '/dashboard/announce', label: 'Announce', emoji: '📣', short: 'Post' },
-  { href: '/dashboard/more', label: 'More', emoji: '⋯', short: 'More' },
+const NAV_LEFT = [
+  { href: '/dashboard', label: 'Home', emoji: '🏠' },
+  { href: '/dashboard/members', label: 'Members', emoji: '👥' },
 ];
+const NAV_RIGHT = [
+  { href: '/dashboard/announce', label: 'Post', emoji: '📣' },
+  { href: '/dashboard/jails', label: 'Jails', emoji: '🔒' },
+];
+const HUB = { href: '/dashboard/hub', label: 'Hub', emoji: '⚡' };
 
-const MORE_NAV = [
+const DESKTOP_NAV = [
+  { href: '/dashboard', label: '🏠 Home' },
+  { href: '/dashboard/members', label: '👥 Members' },
+  { href: '/dashboard/announce', label: '📣 Announce' },
+  { href: '/dashboard/jails', label: '🔒 Jails' },
+  { href: '/dashboard/hub', label: '⚡ Hub' },
+  { href: '/dashboard/games', label: '🎮 Games' },
   { href: '/dashboard/tournaments', label: '🏟️ Tournaments' },
   { href: '/dashboard/cosmetics', label: '✨ Cosmetics' },
+  { href: '/dashboard/lottery', label: '🎫 Lottery' },
 ];
 
 interface Props {
@@ -23,55 +31,75 @@ interface Props {
   children: React.ReactNode;
 }
 
+function isActive(pathname: string, href: string): boolean {
+  if (href === '/dashboard') return pathname === '/dashboard';
+  if (href === '/dashboard/hub') {
+    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery']
+      .some(p => pathname === p || pathname.startsWith(p + '/'));
+  }
+  return pathname === href || pathname.startsWith(href + '/');
+}
+
 export default function DashboardShell({ username, avatarUrl, children }: Props) {
-  const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard';
-    if (href === '/dashboard/more') return pathname === '/dashboard/tournaments' || pathname === '/dashboard/cosmetics' || pathname === '/dashboard/more';
-    return pathname.startsWith(href);
+  const NavItem = ({ href, label, emoji }: { href: string; label: string; emoji: string }) => {
+    const active = isActive(pathname, href);
+    return (
+      <Link
+        href={href}
+        className={`flex flex-col items-center pt-2 pb-1 gap-0.5 ${active ? 'text-pulse-brand' : 'text-pulse-mute'}`}
+      >
+        <span className="text-lg leading-none">{emoji}</span>
+        <span className="text-[10px] leading-none">{label}</span>
+      </Link>
+    );
   };
+
+  const hubActive = isActive(pathname, HUB.href);
 
   return (
     <div className="min-h-screen md:flex">
-      {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-pulse-card border-b border-pulse-border">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg">⚡</span>
-          <span className="font-bold">NOVARYS</span>
-          <span className="text-xs text-pulse-mute truncate">Command Deck</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full" />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-pulse-border" />
-          )}
-          <a href="/api/auth/logout" className="text-xs text-pulse-mute px-2 py-1 rounded border border-pulse-border">
-            Sign out
-          </a>
+      {/* Mobile top bar — respects iOS safe area */}
+      <header className="md:hidden sticky top-0 z-30 bg-pulse-card/95 backdrop-blur border-b border-pulse-border pt-safe">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-lg">⚡</span>
+            <span className="font-bold brand-text">NOVARYS</span>
+            <span className="text-xs text-pulse-mute truncate">Command Deck</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-pulse-border" />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-pulse-border" />
+            )}
+            <a href="/api/auth/logout" className="text-xs text-pulse-mute px-2 py-1 rounded border border-pulse-border">
+              Sign out
+            </a>
+          </div>
         </div>
       </header>
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:w-64 md:shrink-0 bg-pulse-card border-r border-pulse-border flex-col">
         <div className="px-6 py-6 border-b border-pulse-border">
-          <div className="text-lg font-bold">⚡ NOVARYS</div>
+          <div className="text-lg font-bold brand-text">⚡ NOVARYS</div>
           <div className="text-xs text-pulse-mute">Command Deck</div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {[...NAV.slice(0, 4), ...MORE_NAV].map(item => (
+          {DESKTOP_NAV.map(item => (
             <Link
               key={item.href}
               href={item.href}
               className={`block px-3 py-2 rounded-lg transition-colors ${
                 pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-                  ? 'bg-pulse-border text-pulse-brand' : 'hover:bg-pulse-border/50'
+                  ? 'bg-pulse-brand/10 text-pulse-brand border border-pulse-brand/20'
+                  : 'hover:bg-pulse-border/50 border border-transparent'
               }`}
             >
-              {'emoji' in item ? `${item.emoji} ${item.label}` : item.label}
+              {item.label}
             </Link>
           ))}
         </nav>
@@ -79,7 +107,7 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
           <div className="flex items-center gap-3">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full" />
+              <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full ring-1 ring-pulse-brand/50" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-pulse-border" />
             )}
@@ -93,24 +121,29 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 px-4 pt-5 pb-24 md:px-8 md:py-8 overflow-x-hidden">{children}</main>
+      <main className="flex-1 min-w-0 px-4 pt-5 pb-28 md:px-8 md:py-8 overflow-x-hidden">{children}</main>
 
-      {/* Bottom nav (mobile only) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-pulse-card border-t border-pulse-border pb-safe">
-        <div className="grid grid-cols-5">
-          {NAV.map(item => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center py-2 gap-0.5 ${active ? 'text-pulse-brand' : 'text-pulse-mute'}`}
-              >
-                <span className="text-lg leading-none">{item.emoji}</span>
-                <span className="text-[10px] leading-none">{item.short}</span>
-              </Link>
-            );
-          })}
+      {/* Bottom nav (mobile only) — Hub in the middle, raised */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-pulse-card/95 backdrop-blur border-t border-pulse-border pb-safe">
+        <div className="relative grid grid-cols-5 items-end">
+          {NAV_LEFT.map(item => <NavItem key={item.href} {...item} />)}
+
+          {/* Hub center button — raised circle with gradient */}
+          <div className="flex justify-center relative">
+            <Link
+              href={HUB.href}
+              className={`absolute -top-6 flex flex-col items-center justify-center w-14 h-14 rounded-full bg-brand-gradient shadow-brand ring-2 ring-pulse-bg ${
+                hubActive ? 'scale-105' : ''
+              } transition-transform`}
+            >
+              <span className="text-2xl leading-none">{HUB.emoji}</span>
+            </Link>
+            <span className={`text-[10px] leading-none mt-9 mb-1 ${hubActive ? 'text-pulse-brand' : 'text-pulse-mute'}`}>
+              {HUB.label}
+            </span>
+          </div>
+
+          {NAV_RIGHT.map(item => <NavItem key={item.href} {...item} />)}
         </div>
       </nav>
     </div>
