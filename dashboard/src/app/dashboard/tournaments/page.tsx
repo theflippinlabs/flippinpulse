@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import BackLink from '../BackLink';
+import LaunchForm from './LaunchForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +52,10 @@ export default async function TournamentsPage() {
   const counts = await playerCounts(tournaments.map(t => t.id));
   return (
     <>
-      <h1 className="text-xl md:text-2xl font-bold mb-2">Tournaments</h1>
+      <BackLink />
+      <h1 className="text-xl md:text-2xl font-bold mb-2">🏟️ Tournaments</h1>
+      <p className="text-pulse-mute mb-4 text-sm">Launch a new tournament, or scroll to see past ones.</p>
+      <LaunchForm />
       <p className="text-pulse-mute mb-4 md:mb-6 text-sm">Latest {tournaments.length} tournaments in the arena.</p>
       <div className="bg-pulse-card border border-pulse-border rounded-xl overflow-x-auto -mx-4 md:mx-0 md:rounded-xl">
         <table className="w-full text-sm min-w-[720px]">

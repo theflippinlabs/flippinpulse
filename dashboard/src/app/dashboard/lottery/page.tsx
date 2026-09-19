@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import BackLink from '../BackLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export default async function LotteryPage() {
   const { current, recent } = await load();
   return (
     <>
+      <BackLink />
       <h1 className="text-xl md:text-2xl font-bold mb-2">🎫 Lottery</h1>
       <p className="text-pulse-mute mb-4 md:mb-6 text-sm">Track the current jackpot and past winners.</p>
 

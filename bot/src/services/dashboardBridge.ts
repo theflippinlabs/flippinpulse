@@ -1,7 +1,16 @@
-import { Client, EmbedBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  Client,
+  EmbedBuilder,
+  MessageActionRowComponentBuilder,
+  TextChannel,
+} from 'discord.js';
 import { supabase } from '../supabase.js';
 import { grantPulse, revokePulse } from './economy.js';
 import { clearJail, fetchActiveJail, getJailConfig, releaseJail } from './jail.js';
+import { createTournament, listPlayers } from './tournaments.js';
 import { log } from '../utils/logger.js';
 
 interface DashboardCommand {
@@ -105,12 +114,57 @@ async function handleReleaseJail(client: Client, cmd: DashboardCommand): Promise
   await clearJail(guild_id, discord_id);
 }
 
+async function handleCreateTournament(client: Client, cmd: DashboardCommand): Promise<void> {
+  const { channel_id, title, buy_in, max_players } = cmd.payload_json as {
+    channel_id?: string; title?: string; buy_in?: number; max_players?: number;
+  };
+  if (!channel_id || !title || typeof buy_in !== 'number' || typeof max_players !== 'number') {
+    throw new Error('create_tournament: bad payload');
+  }
+  const channel = await client.channels.fetch(channel_id).catch(() => null) as TextChannel | null;
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) {
+    throw new Error('create_tournament: channel not text-based');
+  }
+
+  const t = await createTournament({
+    guildId: channel.guildId!,
+    title,
+    buyIn: buy_in,
+    maxPlayers: max_players,
+    channelId: channel_id,
+    createdBy: cmd.created_by ?? 'dashboard',
+  });
+  if (!t) throw new Error('create_tournament: DB insert failed');
+
+  // Post the lobby message with Join / Start / Cancel buttons.
+  const players = await listPlayers(t.id);
+  const embed = new EmbedBuilder()
+    .setColor(0x9F7AEA)
+    .setTitle(`🏟️ ${t.title}`)
+    .setDescription(
+      `**Buy-in:** ${t.buy_in} PULSE · **Pot:** ${t.pot_pulse} PULSE\n` +
+      `**Players:** ${players.length} / ${t.max_players}\n\n` +
+      '_No one yet — press Join!_',
+    )
+    .setFooter({ text: 'Press Join to enter the arena.' })
+    .setTimestamp();
+
+  const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`tour:join:${t.id}`).setLabel(`Join (${t.buy_in} PULSE)`).setEmoji('⚔️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`tour:start:${t.id}`).setLabel('Start (Lord)').setEmoji('▶️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`tour:cancel:${t.id}`).setLabel('Cancel (Lord)').setEmoji('✖️').setStyle(ButtonStyle.Danger),
+  );
+  const msg = await channel.send({ embeds: [embed], components: [row] });
+  await supabase.from('tournaments').update({ message_id: msg.id }).eq('id', t.id);
+}
+
 async function processOne(client: Client, cmd: DashboardCommand): Promise<void> {
   try {
     if (cmd.command === 'announce') await handleAnnounce(client, cmd);
     else if (cmd.command === 'grant_pulse') await handleGrantPulse(cmd);
     else if (cmd.command === 'revoke_pulse') await handleRevokePulse(cmd);
     else if (cmd.command === 'release_jail') await handleReleaseJail(client, cmd);
+    else if (cmd.command === 'create_tournament') await handleCreateTournament(client, cmd);
     else throw new Error(`Unknown command: ${cmd.command}`);
     await markDone(cmd.id);
     log('INFO', `Dashboard cmd ${cmd.command} ${cmd.id} done`);

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import BackLink from '../BackLink';
 import GamesClient, { type Game } from './GamesClient';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export default async function GamesPage() {
   const games = await loadGames();
   return (
     <>
+      <BackLink />
       <h1 className="text-xl md:text-2xl font-bold mb-2">🎮 Games</h1>
       <p className="text-pulse-mute mb-4 md:mb-6 text-sm">
         Turn a game on or off in one tap. Members lose access instantly the next time they try to play.
