@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,30 @@ async function loadStats() {
   };
 }
 
+interface TopMember {
+  discord_id: string;
+  username: string;
+  points_total: number;
+  balance_pulse: number;
+  rank_name: string | null;
+}
+
+interface RecentJail {
+  discord_id: string;
+  jailed_at: string;
+  expires_at: string | null;
+  reason: string | null;
+}
+
+interface RecentTour {
+  id: string;
+  title: string;
+  status: string;
+  pot_pulse: number;
+  winner_id: string | null;
+  created_at: string;
+}
+
 async function loadRecent() {
   const [topMembers, recentJails, lastTournois] = await Promise.all([
     supabase
@@ -38,7 +63,7 @@ async function loadRecent() {
       .from('jailed_members')
       .select('discord_id, jailed_at, expires_at, reason')
       .order('jailed_at', { ascending: false })
-      .limit(5),
+      .limit(3),
     supabase
       .from('tournaments')
       .select('id, title, status, pot_pulse, winner_id, created_at')
@@ -46,9 +71,9 @@ async function loadRecent() {
       .limit(5),
   ]);
   return {
-    topMembers: (topMembers.data ?? []) as Array<{ discord_id: string; username: string; points_total: number; balance_pulse: number; rank_name: string | null }>,
-    recentJails: (recentJails.data ?? []) as Array<{ discord_id: string; jailed_at: string; expires_at: string | null; reason: string | null }>,
-    lastTournois: (lastTournois.data ?? []) as Array<{ id: string; title: string; status: string; pot_pulse: number; winner_id: string | null; created_at: string }>,
+    topMembers: (topMembers.data ?? []) as TopMember[],
+    recentJails: (recentJails.data ?? []) as RecentJail[],
+    lastTournois: (lastTournois.data ?? []) as RecentTour[],
   };
 }
 
@@ -65,6 +90,8 @@ function Card({ label, value, hint }: { label: string; value: string | number; h
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
+const medal = (i: number) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`);
+
 export default async function Overview() {
   const [stats, recent] = await Promise.all([loadStats(), loadRecent()]);
   return (
@@ -79,60 +106,112 @@ export default async function Overview() {
         <Card label="Badges unlocked" value={fmt(stats.achievementsUnlocked)} hint="Across the community" />
       </div>
 
-      <section className="mt-6 md:mt-10 grid md:grid-cols-2 gap-4 md:gap-6">
-        <div className="bg-pulse-card border border-pulse-border rounded-xl p-5">
-          <h2 className="font-semibold mb-3">🏆 Top members</h2>
-          <ol className="space-y-2 text-sm">
+      {/* Top members — clean two-line rows, no wrapping mess */}
+      <section className="mt-6 md:mt-10">
+        <div className="bg-pulse-card border border-pulse-border rounded-xl p-4 md:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">🏆 Top members</h2>
+            <Link href="/dashboard/members" className="text-xs text-pulse-mute hover:text-pulse-gold">View all ›</Link>
+          </div>
+          <ul className="divide-y divide-pulse-border/60">
             {recent.topMembers.map((m, i) => (
-              <li key={m.discord_id} className="flex justify-between border-b border-pulse-border/60 pb-2 last:border-b-0">
-                <span>#{i + 1} · {m.username || m.discord_id.slice(-6)} <span className="text-pulse-mute">· {m.rank_name ?? '—'}</span></span>
-                <span className="font-mono">{fmt(m.points_total ?? 0)} pts · {fmt(m.balance_pulse ?? 0)} PULSE</span>
-              </li>
-            ))}
-            {recent.topMembers.length === 0 && <li className="text-pulse-mute">No members yet.</li>}
-          </ol>
-        </div>
-
-        <div className="bg-pulse-card border border-pulse-border rounded-xl p-5">
-          <h2 className="font-semibold mb-3">🔒 Recent jails</h2>
-          <ol className="space-y-2 text-sm">
-            {recent.recentJails.map(j => (
-              <li key={j.discord_id + j.jailed_at} className="border-b border-pulse-border/60 pb-2 last:border-b-0">
-                <div className="font-mono text-xs text-pulse-mute">{new Date(j.jailed_at).toLocaleString()}</div>
-                <div><span className="text-pulse-brand">{j.discord_id.slice(-6)}</span> · {j.reason ?? '_no reason_'}</div>
-                <div className="text-xs text-pulse-mute">
-                  {j.expires_at ? `Ends ${new Date(j.expires_at).toLocaleString()}` : '⛓️ For life'}
+              <li key={m.discord_id} className="py-2.5 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-full bg-pulse-bg border border-pulse-border flex items-center justify-center text-sm">
+                    {medal(i)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold truncate">{m.username || m.discord_id.slice(-6)}</div>
+                      {m.rank_name && (
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-pulse-gold/10 text-pulse-gold border border-pulse-gold/20">
+                          {m.rank_name}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-pulse-mute font-mono mt-0.5 truncate">
+                      {fmt(m.points_total ?? 0)} pts · {fmt(m.balance_pulse ?? 0)} PULSE
+                    </div>
+                  </div>
                 </div>
               </li>
             ))}
-            {recent.recentJails.length === 0 && <li className="text-pulse-mute">No jails on record.</li>}
-          </ol>
+            {recent.topMembers.length === 0 && (
+              <li className="text-pulse-mute py-2 text-sm">No members yet.</li>
+            )}
+          </ul>
         </div>
       </section>
 
+      {/* Recent jails — collapsible, only shows 3 with a link to see all */}
+      <section className="mt-4 md:mt-6">
+        <details className="bg-pulse-card border border-pulse-border rounded-xl group open:rounded-b-none">
+          <summary className="list-none cursor-pointer p-4 md:p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-lg">🔒</div>
+              <div>
+                <div className="font-semibold">Recent jails</div>
+                <div className="text-xs text-pulse-mute">
+                  {stats.activeJails} member{stats.activeJails === 1 ? '' : 's'} currently jailed
+                </div>
+              </div>
+            </div>
+            <span className="text-pulse-mute text-xl group-open:rotate-180 transition-transform">›</span>
+          </summary>
+          <div className="px-4 pb-4 md:px-5 md:pb-5 border-t border-pulse-border/60">
+            <ul className="divide-y divide-pulse-border/60">
+              {recent.recentJails.map(j => (
+                <li key={j.discord_id + j.jailed_at} className="py-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="text-lg">🔒</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-mono truncate">{j.discord_id}</div>
+                      <div className="text-xs text-pulse-mute truncate">{j.reason ?? 'No reason'}</div>
+                    </div>
+                    <div className="text-xs text-right shrink-0">
+                      {j.expires_at
+                        ? <span className="text-pulse-mute">{new Date(j.expires_at).toLocaleDateString()}</span>
+                        : <span className="text-pulse-gold">⛓️ Life</span>}
+                    </div>
+                  </div>
+                </li>
+              ))}
+              {recent.recentJails.length === 0 && (
+                <li className="text-pulse-mute py-2 text-sm text-center">Nobody in jail. Peaceful.</li>
+              )}
+            </ul>
+            {stats.activeJails > 3 && (
+              <Link href="/dashboard/jails" className="block mt-3 text-center text-xs text-pulse-gold hover:underline">
+                See all {stats.activeJails} jails ›
+              </Link>
+            )}
+          </div>
+        </details>
+      </section>
+
+      {/* Latest tournaments — compact list */}
       <section className="mt-4 md:mt-6">
         <div className="bg-pulse-card border border-pulse-border rounded-xl p-4 md:p-5">
-          <h2 className="font-semibold mb-3">🏟️ Latest tournaments</h2>
-          <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-            <table className="w-full text-sm min-w-[520px]">
-            <thead className="text-pulse-mute uppercase text-xs">
-              <tr><th className="text-left py-2">Title</th><th className="text-left">Status</th><th className="text-right">Pot</th><th className="text-right">Created</th></tr>
-            </thead>
-            <tbody>
-              {recent.lastTournois.map(t => (
-                <tr key={t.id} className="border-t border-pulse-border/60">
-                  <td className="py-2">{t.title}</td>
-                  <td className="capitalize">{t.status}</td>
-                  <td className="text-right font-mono">{fmt(t.pot_pulse)} PULSE</td>
-                  <td className="text-right text-pulse-mute">{new Date(t.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-              {recent.lastTournois.length === 0 && (
-                <tr><td colSpan={4} className="text-pulse-mute py-2">No tournaments yet.</td></tr>
-              )}
-            </tbody>
-          </table>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">🏟️ Latest tournaments</h2>
+            <Link href="/dashboard/tournaments" className="text-xs text-pulse-mute hover:text-pulse-gold">View all ›</Link>
           </div>
+          <ul className="divide-y divide-pulse-border/60">
+            {recent.lastTournois.map(t => (
+              <li key={t.id} className="py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold truncate">{t.title}</div>
+                  <div className="text-xs text-pulse-mute capitalize">
+                    {t.status} · {new Date(t.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="font-mono text-sm text-pulse-gold shrink-0">{fmt(t.pot_pulse)} PULSE</div>
+              </li>
+            ))}
+            {recent.lastTournois.length === 0 && (
+              <li className="text-pulse-mute py-2 text-sm">No tournaments yet.</li>
+            )}
+          </ul>
         </div>
       </section>
     </>
