@@ -574,6 +574,19 @@ CREATE TABLE IF NOT EXISTS public.tournament_matches (
 ALTER TABLE public.tournament_matches ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_matches_tour ON public.tournament_matches(tournament_id, round);
 
+-- ---------- Cosmetics shop (personal profile customization) ----------
+CREATE TABLE IF NOT EXISTS public.user_cosmetics (
+  discord_id TEXT PRIMARY KEY,
+  title TEXT,                                 -- custom subtitle on /profile
+  color_hex TEXT,                             -- custom color for /profile embed (e.g. #E11D48)
+  name_color_role_id TEXT,                    -- Discord role that gives the name color
+  name_color_hex TEXT,
+  name_color_expires_at TIMESTAMPTZ,          -- when the name color reverts
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.user_cosmetics ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_user_cosmetics_expires ON public.user_cosmetics(name_color_expires_at);
+
 INSERT INTO public.achievements (achievement_key, category, tier, emoji, name, description, reward_pulse, sort_order) VALUES
   -- Economy (lifetime PULSE earned)
   ('econ_100',    'economy',  1, '💰', 'First PULSE',    'Earn 100 PULSE total',       10,  10),

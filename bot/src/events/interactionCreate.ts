@@ -11,6 +11,7 @@ import { handleLobbyButton } from '../services/lobby.js';
 import { handlePanelInteraction } from '../commands/panel.js';
 import { handleHubInteraction } from '../commands/hub.js';
 import { handleTournamentButton } from '../commands/tournoi.js';
+import { handleCosmeticsInteraction } from '../commands/cosmetics.js';
 import { handleChallengeInteraction } from '../services/challenges.js';
 import { log } from '../utils/logger.js';
 
@@ -79,6 +80,15 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handleTournamentButton(interaction);
     } catch (err) {
       log('ERROR', 'Tournament button handler crashed', err);
+    }
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('cos:')) {
+    try {
+      await handleCosmeticsInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Cosmetics interaction handler crashed', err);
     }
     return;
   }

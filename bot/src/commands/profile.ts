@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getRankForPoints } from '../services/ranks.js';
 import { listAllAchievements, listUnlocked } from '../services/achievements.js';
+import { getCosmetics, parseHex } from '../services/cosmetics.js';
 import { pulseEmbed, errorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -35,16 +36,21 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   // Latest 6 achievements (badges shelf on the profile).
-  const [all, unlockedKeys] = await Promise.all([listAllAchievements(), listUnlocked(targetUser.id)]);
+  const [all, unlockedKeys, cosmetics] = await Promise.all([
+    listAllAchievements(),
+    listUnlocked(targetUser.id),
+    getCosmetics(targetUser.id),
+  ]);
   const unlockedSet = new Set(unlockedKeys);
   const badges = all.filter(a => unlockedSet.has(a.achievement_key));
   const badgeLine = badges.length
     ? badges.slice(-8).map(a => `${a.emoji} ${a.name}`).join(' \u00b7 ')
     : '_None yet \u2014 play games, chat, claim daily\u2026_';
 
+  const titlePrefix = cosmetics?.title ? `_${cosmetics.title}_\n` : '';
   const embed = pulseEmbed(`${targetUser.username}'s Profile`)
     .setThumbnail(targetUser.displayAvatarURL({ size: 128 }))
-    .setDescription(`\ud83c\udfc6 **Rank:** ${user.rank_name ?? 'Unranked'}${progressLine}`)
+    .setDescription(`${titlePrefix}\ud83c\udfc6 **Rank:** ${user.rank_name ?? 'Unranked'}${progressLine}`)
     .addFields(
       { name: '\ud83d\udd25 Streak', value: `${user.streak ?? 0} days`, inline: true },
       { name: 'Weekly', value: `${user.points_week ?? 0}`, inline: true },
@@ -54,6 +60,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       { name: 'Lifetime Spent', value: `${user.lifetime_spent_pulse ?? 0}`, inline: true },
       { name: `\ud83c\udfc5 Badges (${badges.length}/${all.length})`, value: badgeLine.slice(0, 1024), inline: false },
     );
+
+  // Custom profile color overrides the brand color.
+  if (cosmetics?.color_hex) {
+    const n = parseHex(cosmetics.color_hex);
+    if (n !== null) embed.setColor(n);
+  }
 
   await interaction.reply({ embeds: [embed] });
 }
