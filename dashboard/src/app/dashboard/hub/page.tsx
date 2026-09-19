@@ -4,51 +4,46 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 async function loadQuickStats() {
-  const [games, tournois, cosmetics, lottery] = await Promise.all([
-    supabase.from('games_config').select('is_enabled', { count: 'exact' }),
+  const [games, tournois, cosmetics, lottery, pulsar, missions] = await Promise.all([
+    supabase.from('games_config').select('is_enabled'),
     supabase.from('tournaments').select('*', { count: 'exact', head: true }),
     supabase.from('user_cosmetics').select('*', { count: 'exact', head: true }),
     supabase.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
+    supabase.from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle(),
+    supabase.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
   ]);
   const enabled = (games.data ?? []).filter(g => (g as { is_enabled?: boolean }).is_enabled).length;
+  const pulsarCfg = (pulsar.data as { value_json?: { enabled?: boolean } } | null)?.value_json ?? {};
   return {
     gamesEnabled: enabled,
     gamesTotal: games.data?.length ?? 0,
     tournois: tournois.count ?? 0,
     cosmetics: cosmetics.count ?? 0,
     lotteryPot: (lottery.data as { pot_pulse?: number } | null)?.pot_pulse ?? 0,
+    novusOn: pulsarCfg.enabled === true,
+    activeMissions: missions.count ?? 0,
   };
 }
 
-const CARDS: { href: string; emoji: string; title: string; hint: (s: Awaited<ReturnType<typeof loadQuickStats>>) => string }[] = [
-  {
-    href: '/dashboard/games',
-    emoji: '🎮',
-    title: 'Games',
-    hint: s => `${s.gamesEnabled} / ${s.gamesTotal} enabled — tap to toggle & tune`,
-  },
-  {
-    href: '/dashboard/tournaments',
-    emoji: '🏟️',
-    title: 'Tournaments',
-    hint: s => `${s.tournois} tournaments held so far`,
-  },
-  {
-    href: '/dashboard/cosmetics',
-    emoji: '✨',
-    title: 'Cosmetics',
-    hint: s => `${s.cosmetics} member${s.cosmetics === 1 ? '' : 's'} personalized`,
-  },
-  {
-    href: '/dashboard/lottery',
-    emoji: '🎫',
-    title: 'Lottery',
-    hint: s => `Pot: ${s.lotteryPot.toLocaleString('en-US')} PULSE`,
-  },
-];
+interface Tile {
+  href: string;
+  emoji: string;
+  title: string;
+  hint: string;
+  accent?: string;
+}
 
 export default async function HubPage() {
   const s = await loadQuickStats();
+  const tiles: Tile[] = [
+    { href: '/dashboard/games',       emoji: '🎮', title: 'Games',       hint: `${s.gamesEnabled} / ${s.gamesTotal} ON` },
+    { href: '/dashboard/tournaments', emoji: '🏟️', title: 'Tournaments', hint: `${s.tournois} held` },
+    { href: '/dashboard/lottery',     emoji: '🎫', title: 'Lottery',     hint: `${s.lotteryPot.toLocaleString('en-US')} pot` },
+    { href: '/dashboard/novus',       emoji: '🧠', title: 'Novus',       hint: s.novusOn ? 'ON — AI running' : 'OFF' },
+    { href: '/dashboard/missions',    emoji: '🎯', title: 'Missions',    hint: `${s.activeMissions} active` },
+    { href: '/dashboard/cosmetics',   emoji: '✨', title: 'Cosmetics',   hint: `${s.cosmetics} bought` },
+  ];
+
   return (
     <>
       <h1 className="text-2xl md:text-3xl font-bold mb-1 tracking-wide">
@@ -56,32 +51,29 @@ export default async function HubPage() {
       </h1>
       <p className="text-pulse-mute mb-6 text-sm">Tune every knob of the community from here.</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {CARDS.map(c => (
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {tiles.map(t => (
           <Link
-            key={c.href}
-            href={c.href}
-            className="block bg-pulse-card border border-pulse-border hover:border-pulse-gold/40 rounded-2xl p-4 active:scale-[0.98] transition-all relative overflow-hidden group"
+            key={t.href}
+            href={t.href}
+            className="group relative aspect-square bg-pulse-card border border-pulse-border rounded-2xl overflow-hidden active:scale-[0.97] transition-transform hover:border-pulse-gold/50"
           >
-            <div className="absolute inset-0 bg-card-glow pointer-events-none opacity-70" />
-            <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="text-3xl">{c.emoji}</div>
-                <div>
-                  <div className="font-bold">{c.title}</div>
-                  <div className="text-xs text-pulse-mute mt-0.5">{c.hint(s)}</div>
-                </div>
-              </div>
-              <span className="text-pulse-mute group-hover:text-pulse-gold transition-colors">›</span>
+            <div className="absolute inset-0 bg-card-glow opacity-70 pointer-events-none" />
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-brand-glow pointer-events-none" />
+
+            <div className="relative h-full flex flex-col items-center justify-center p-3 text-center">
+              <div className="text-5xl leading-none mb-2">{t.emoji}</div>
+              <div className="font-bold text-sm tracking-wide">{t.title}</div>
+              <div className="text-[11px] text-pulse-mute mt-0.5 line-clamp-1">{t.hint}</div>
             </div>
           </Link>
         ))}
       </div>
 
-      <div className="mt-6 bg-pulse-card border border-pulse-border rounded-xl p-4">
+      <div className="mt-8 bg-pulse-card border border-pulse-border rounded-xl p-4">
         <div className="text-xs uppercase tracking-wide text-pulse-gold/70 mb-2">Coming soon</div>
         <div className="text-sm text-pulse-mute">
-          🧠 Novus (AI Community Manager) · 🛡️ Auto-mod tuning · 📊 Charts &amp; trends · 🎯 Missions launcher
+          🛡️ Auto-mod tuning · 📊 Charts &amp; trends
         </div>
       </div>
     </>

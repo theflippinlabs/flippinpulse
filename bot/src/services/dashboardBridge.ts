@@ -11,6 +11,8 @@ import { supabase } from '../supabase.js';
 import { grantPulse, revokePulse } from './economy.js';
 import { clearJail, fetchActiveJail, getJailConfig, releaseJail } from './jail.js';
 import { createTournament, listPlayers } from './tournaments.js';
+import { endAllChallenges, launchFlash, launchObjective, launchRiddle } from './challenges.js';
+import { getPulsarConfig, pulsarPostNow } from './pulsar.js';
 import { log } from '../utils/logger.js';
 
 interface DashboardCommand {
@@ -158,6 +160,43 @@ async function handleCreateTournament(client: Client, cmd: DashboardCommand): Pr
   await supabase.from('tournaments').update({ message_id: msg.id }).eq('id', t.id);
 }
 
+async function handleNovusPostNow(client: Client): Promise<void> {
+  const cfg = getPulsarConfig();
+  if (!cfg.enabled) throw new Error('novus_post_now: Novus is OFF');
+  if (!cfg.channel_id) throw new Error('novus_post_now: no channel set');
+  const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
+  if (!channel || !('guild' in channel)) throw new Error('novus_post_now: channel not found');
+  const guildId = (channel as { guildId: string | null }).guildId;
+  if (!guildId) throw new Error('novus_post_now: not in a guild');
+  const ok = await pulsarPostNow(client, guildId);
+  if (!ok) throw new Error('pulsarPostNow returned false');
+}
+
+async function handleLaunchMission(client: Client, cmd: DashboardCommand): Promise<void> {
+  const { kind } = cmd.payload_json as { kind?: 'flash' | 'riddle' | 'daily' | 'weekly' };
+  if (!kind) throw new Error('launch_mission: kind required');
+  const cfg = getPulsarConfig();
+  const ch = cfg.channel_id;
+  if (!ch) throw new Error('launch_mission: set the Novus channel first');
+  if (kind === 'flash') {
+    const ok = await launchFlash(client, ch, { reward: 50, maxWinners: 3, durationMin: 30 });
+    if (!ok) throw new Error('launchFlash failed');
+  } else if (kind === 'riddle') {
+    const ok = await launchRiddle(client, ch, { reward: 100, durationMin: 60 });
+    if (!ok) throw new Error('launchRiddle failed');
+  } else if (kind === 'daily') {
+    const ok = await launchObjective(client, ch, { kind: 'daily', metric: 'messages', goal: 20, reward: 60 });
+    if (!ok) throw new Error('launchObjective failed');
+  } else if (kind === 'weekly') {
+    const ok = await launchObjective(client, ch, { kind: 'weekly', metric: 'games_played', goal: 5, reward: 250 });
+    if (!ok) throw new Error('launchObjective failed');
+  }
+}
+
+async function handleEndAllMissions(client: Client): Promise<void> {
+  await endAllChallenges(client);
+}
+
 async function processOne(client: Client, cmd: DashboardCommand): Promise<void> {
   try {
     if (cmd.command === 'announce') await handleAnnounce(client, cmd);
@@ -165,6 +204,9 @@ async function processOne(client: Client, cmd: DashboardCommand): Promise<void> 
     else if (cmd.command === 'revoke_pulse') await handleRevokePulse(cmd);
     else if (cmd.command === 'release_jail') await handleReleaseJail(client, cmd);
     else if (cmd.command === 'create_tournament') await handleCreateTournament(client, cmd);
+    else if (cmd.command === 'novus_post_now') await handleNovusPostNow(client);
+    else if (cmd.command === 'launch_mission') await handleLaunchMission(client, cmd);
+    else if (cmd.command === 'end_all_missions') await handleEndAllMissions(client);
     else throw new Error(`Unknown command: ${cmd.command}`);
     await markDone(cmd.id);
     log('INFO', `Dashboard cmd ${cmd.command} ${cmd.id} done`);

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
-const ALLOWED = new Set(['announce', 'grant_pulse', 'revoke_pulse', 'release_jail', 'create_tournament']);
+const ALLOWED = new Set([
+  'announce', 'grant_pulse', 'revoke_pulse', 'release_jail',
+  'create_tournament', 'novus_post_now', 'launch_mission', 'end_all_missions',
+]);
 
 export async function POST(req: NextRequest) {
   const session = getSession();
