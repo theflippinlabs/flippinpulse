@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import NovusForm, { type PulsarConfig } from './NovusForm';
 
@@ -27,7 +28,7 @@ async function load(): Promise<PulsarConfig> {
 }
 
 export default async function NovusPage() {
-  const cfg = await load();
+  const [cfg, channels] = await Promise.all([load(), loadChannels()]);
   return (
     <>
       <BackLink />
@@ -35,7 +36,7 @@ export default async function NovusPage() {
       <p className="text-pulse-mute mb-6 text-sm">
         Your AI Community Manager. Every change saves the moment you tap it.
       </p>
-      <NovusForm initial={cfg} />
+      <NovusForm initial={cfg} channels={channels} />
     </>
   );
 }

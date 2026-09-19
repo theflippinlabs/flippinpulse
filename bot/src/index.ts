@@ -17,6 +17,7 @@ import { startAutomodCleanup } from './services/automod.js';
 import { startJailScheduler } from './services/jail.js';
 import { startCosmeticsScheduler } from './services/cosmetics.js';
 import { startDashboardBridge } from './services/dashboardBridge.js';
+import { startChannelSync } from './services/channelSync.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -70,6 +71,7 @@ client.once('ready', async () => {
   startJailScheduler(client);
   startCosmeticsScheduler(client);
   startDashboardBridge(client);
+  startChannelSync(client);
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });
 

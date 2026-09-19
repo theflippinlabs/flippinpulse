@@ -587,6 +587,22 @@ CREATE TABLE IF NOT EXISTS public.user_cosmetics (
 ALTER TABLE public.user_cosmetics ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_user_cosmetics_expires ON public.user_cosmetics(name_color_expires_at);
 
+-- ---------- Cached Discord channel directory (bot syncs on ready) ----------
+CREATE TABLE IF NOT EXISTS public.discord_channels (
+  channel_id TEXT PRIMARY KEY,
+  guild_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type INTEGER NOT NULL DEFAULT 0,    -- 0 text, 5 announcement, 15 forum, etc.
+  parent_id TEXT,                     -- category id, if any
+  position INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.discord_channels ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_discord_channels_guild ON public.discord_channels(guild_id, position);
+
+-- Add game_type to tournaments so they can be labelled (dice duel, coin flip…)
+ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS game_type TEXT NOT NULL DEFAULT 'dice_duel';
+
 -- ---------- Dashboard command queue (bot polls this, runs Discord-side actions) ----------
 CREATE TABLE IF NOT EXISTS public.dashboard_commands (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

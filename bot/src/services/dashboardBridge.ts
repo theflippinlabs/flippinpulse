@@ -117,8 +117,8 @@ async function handleReleaseJail(client: Client, cmd: DashboardCommand): Promise
 }
 
 async function handleCreateTournament(client: Client, cmd: DashboardCommand): Promise<void> {
-  const { channel_id, title, buy_in, max_players } = cmd.payload_json as {
-    channel_id?: string; title?: string; buy_in?: number; max_players?: number;
+  const { channel_id, title, buy_in, max_players, game_type } = cmd.payload_json as {
+    channel_id?: string; title?: string; buy_in?: number; max_players?: number; game_type?: string;
   };
   if (!channel_id || !title || typeof buy_in !== 'number' || typeof max_players !== 'number') {
     throw new Error('create_tournament: bad payload');
@@ -137,6 +137,12 @@ async function handleCreateTournament(client: Client, cmd: DashboardCommand): Pr
     createdBy: cmd.created_by ?? 'dashboard',
   });
   if (!t) throw new Error('create_tournament: DB insert failed');
+
+  // Best-effort — column may or may not exist yet.
+  if (game_type) {
+    const { error: gtErr } = await supabase.from('tournaments').update({ game_type }).eq('id', t.id);
+    if (gtErr) log('WARN', 'create_tournament: could not set game_type', gtErr);
+  }
 
   // Post the lobby message with Join / Start / Cancel buttons.
   const players = await listPlayers(t.id);

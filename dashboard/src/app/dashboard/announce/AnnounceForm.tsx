@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import ChannelPicker from '../ChannelPicker';
+import type { DiscordChannel } from '@/lib/channels';
 
-export default function AnnounceForm() {
+export default function AnnounceForm({ channels }: { channels: DiscordChannel[] }) {
   const [channelId, setChannelId] = useState('');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -14,8 +16,8 @@ export default function AnnounceForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!/^\d{16,20}$/.test(channelId.trim())) {
-      setError('Channel ID must be a Discord snowflake (17-19 digits).');
+    if (!channelId) {
+      setError('Pick a channel.');
       return;
     }
     if (!message.trim()) {
@@ -30,7 +32,7 @@ export default function AnnounceForm() {
         body: JSON.stringify({
           command: 'announce',
           payload: {
-            channel_id: channelId.trim(),
+            channel_id: channelId,
             title: title.trim() || undefined,
             message: message.trim(),
             embed,
@@ -54,18 +56,13 @@ export default function AnnounceForm() {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div>
-        <label className="text-xs uppercase text-pulse-mute">Channel ID</label>
-        <input
-          value={channelId}
-          onChange={e => setChannelId(e.target.value)}
-          placeholder="e.g. 1234567890123456789"
-          className="mt-1 w-full bg-pulse-card border border-pulse-border rounded-lg px-3 py-2 font-mono text-sm"
-        />
-        <div className="text-xs text-pulse-mute mt-1">
-          In Discord: right-click the channel → « Copy ID » (needs Developer Mode ON).
-        </div>
-      </div>
+      <ChannelPicker
+        channels={channels}
+        value={channelId}
+        onChange={setChannelId}
+        label="Channel"
+        placeholder="Pick where to post"
+      />
 
       <div>
         <label className="text-xs uppercase text-pulse-mute">Title (optional, embed only)</label>

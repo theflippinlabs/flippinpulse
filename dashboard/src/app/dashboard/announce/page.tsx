@@ -1,8 +1,10 @@
 import AnnounceForm from './AnnounceForm';
+import { loadChannels } from '@/lib/channels';
 
 export const dynamic = 'force-dynamic';
 
-export default function AnnouncePage() {
+export default async function AnnouncePage() {
+  const channels = await loadChannels();
   return (
     <>
       <h1 className="text-xl md:text-2xl font-bold mb-2">📣 Announce</h1>
@@ -10,7 +12,7 @@ export default function AnnouncePage() {
         Post an announcement to any Discord channel. The bot picks it up within ~15 seconds and sends it as its own message.
       </p>
       <div className="bg-pulse-card border border-pulse-border rounded-xl p-4 md:p-6">
-        <AnnounceForm />
+        <AnnounceForm channels={channels} />
       </div>
     </>
   );

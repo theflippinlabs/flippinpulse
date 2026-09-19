@@ -1,10 +1,20 @@
 'use client';
 
 import { useState } from 'react';
+import ChannelPicker from '../ChannelPicker';
+import type { DiscordChannel } from '@/lib/channels';
 
-export default function LaunchForm() {
+const GAME_TYPES: { key: string; emoji: string; label: string; hint: string }[] = [
+  { key: 'dice_duel', emoji: '🎲', label: 'Dice duel',       hint: 'Highest d100 roll wins each match' },
+  { key: 'coin_flip', emoji: '🪙', label: 'Coin flip',       hint: '50/50 heads or tails, best of 1' },
+  { key: 'higherlower', emoji: '🔼', label: 'Higher / Lower', hint: 'Two rolls, guess if next is higher' },
+  { key: 'trivia', emoji: '🧠', label: 'Trivia',            hint: 'Fastest correct answer wins' },
+];
+
+export default function LaunchForm({ channels }: { channels: DiscordChannel[] }) {
   const [open, setOpen] = useState(false);
   const [channelId, setChannelId] = useState('');
+  const [gameType, setGameType] = useState('dice_duel');
   const [title, setTitle] = useState('');
   const [buyIn, setBuyIn] = useState('100');
   const [maxPlayers, setMaxPlayers] = useState('16');
@@ -14,10 +24,7 @@ export default function LaunchForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!/^\d{16,20}$/.test(channelId.trim())) {
-      setError('Channel ID must be a Discord snowflake (17-19 digits).');
-      return;
-    }
+    if (!channelId) { setError('Pick a channel.'); return; }
     const b = Number(buyIn);
     const p = Number(maxPlayers);
     if (!Number.isFinite(b) || b < 0) { setError('Buy-in must be ≥ 0.'); return; }
@@ -31,10 +38,11 @@ export default function LaunchForm() {
         body: JSON.stringify({
           command: 'create_tournament',
           payload: {
-            channel_id: channelId.trim(),
+            channel_id: channelId,
             title: title.trim() || '⚔️ Novarys Arena',
             buy_in: Math.floor(b),
             max_players: Math.floor(p),
+            game_type: gameType,
           },
         }),
       });
@@ -66,20 +74,45 @@ export default function LaunchForm() {
   }
 
   return (
-    <form onSubmit={submit} className="bg-pulse-card border border-pulse-border rounded-xl p-4 mb-4 space-y-3">
+    <form onSubmit={submit} className="bg-pulse-card border border-pulse-border rounded-xl p-4 mb-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="font-semibold">Launch a tournament</div>
         <button type="button" onClick={() => setOpen(false)} className="text-pulse-mute text-xl leading-none">✕</button>
       </div>
 
+      <ChannelPicker
+        channels={channels}
+        value={channelId}
+        onChange={setChannelId}
+        label="Room (Discord channel)"
+        placeholder="Pick where the lobby is posted"
+      />
+
       <div>
-        <label className="text-xs uppercase text-pulse-mute">Channel ID</label>
-        <input
-          value={channelId}
-          onChange={e => setChannelId(e.target.value)}
-          placeholder="e.g. 1234567890123456789"
-          className="mt-1 w-full bg-pulse-bg border border-pulse-border rounded-lg px-3 py-2 font-mono text-sm"
-        />
+        <label className="text-xs uppercase text-pulse-mute">Game</label>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          {GAME_TYPES.map(g => {
+            const active = gameType === g.key;
+            return (
+              <button
+                key={g.key}
+                type="button"
+                onClick={() => setGameType(g.key)}
+                className={`text-left rounded-lg border px-3 py-2 ${
+                  active
+                    ? 'bg-pulse-gold/10 border-pulse-gold text-pulse-gold'
+                    : 'bg-pulse-bg border-pulse-border text-pulse-text/80'
+                }`}
+              >
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <span>{g.emoji}</span>
+                  <span>{g.label}</span>
+                </div>
+                <div className="text-[11px] text-pulse-mute mt-0.5">{g.hint}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div>

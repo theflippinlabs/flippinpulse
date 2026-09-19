@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import ChannelPicker from '../ChannelPicker';
+import type { DiscordChannel } from '@/lib/channels';
 
 export interface PulsarConfig {
   enabled: boolean;
@@ -18,7 +20,7 @@ export interface PulsarConfig {
   mission_interval_hours: number;
 }
 
-interface Props { initial: PulsarConfig }
+interface Props { initial: PulsarConfig; channels: DiscordChannel[] }
 
 function Toggle({ on, onClick, disabled }: { on: boolean; onClick: () => void; disabled?: boolean }) {
   return (
@@ -45,7 +47,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-export default function NovusForm({ initial }: Props) {
+export default function NovusForm({ initial, channels }: Props) {
   const [cfg, setCfg] = useState<PulsarConfig>(initial);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -112,15 +114,13 @@ export default function NovusForm({ initial }: Props) {
 
       {/* Channel + language + cadence */}
       <div className="bg-pulse-card border border-pulse-border rounded-2xl p-4">
-        <div>
-          <label className="text-xs uppercase text-pulse-mute">Channel ID</label>
-          <input
-            defaultValue={cfg.channel_id ?? ''}
-            onBlur={e => save({ channel_id: e.target.value.trim() || null })}
-            placeholder="Where Novus posts"
-            className="mt-1 w-full bg-pulse-bg border border-pulse-border rounded-lg px-3 py-2 font-mono text-sm"
-          />
-        </div>
+        <ChannelPicker
+          channels={channels}
+          value={cfg.channel_id ?? ''}
+          onChange={id => save({ channel_id: id || null })}
+          label="Channel Novus posts in"
+          placeholder="Pick a channel"
+        />
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs uppercase text-pulse-mute">Language</label>
