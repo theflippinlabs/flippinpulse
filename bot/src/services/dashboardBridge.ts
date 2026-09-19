@@ -13,6 +13,7 @@ import { clearJail, fetchActiveJail, getJailConfig, releaseJail } from './jail.j
 import { createTournament, listPlayers } from './tournaments.js';
 import { endAllChallenges, launchFlash, launchObjective, launchRiddle } from './challenges.js';
 import { getPulsarConfig, pulsarPostNow } from './pulsar.js';
+import { forceLotteryDraw } from './lottery.js';
 import { log } from '../utils/logger.js';
 
 interface DashboardCommand {
@@ -213,6 +214,10 @@ async function processOne(client: Client, cmd: DashboardCommand): Promise<void> 
     else if (cmd.command === 'novus_post_now') await handleNovusPostNow(client);
     else if (cmd.command === 'launch_mission') await handleLaunchMission(client, cmd);
     else if (cmd.command === 'end_all_missions') await handleEndAllMissions(client);
+    else if (cmd.command === 'force_lottery_draw') {
+      const ok = await forceLotteryDraw(client);
+      if (!ok) throw new Error('force_lottery_draw: no active round');
+    }
     else throw new Error(`Unknown command: ${cmd.command}`);
     await markDone(cmd.id);
     log('INFO', `Dashboard cmd ${cmd.command} ${cmd.id} done`);

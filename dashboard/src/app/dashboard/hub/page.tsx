@@ -51,20 +51,20 @@ export default async function HubPage() {
       </h1>
       <p className="text-pulse-mute mb-6 text-sm">Tune every knob of the community from here.</p>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2.5">
         {tiles.map(t => (
           <Link
             key={t.href}
             href={t.href}
             className="group relative aspect-square bg-pulse-card border border-pulse-border rounded-2xl overflow-hidden active:scale-[0.97] transition-transform hover:border-pulse-gold/50"
           >
-            <div className="absolute inset-0 bg-card-glow opacity-70 pointer-events-none" />
+            <div className="absolute inset-0 bg-card-glow opacity-60 pointer-events-none" />
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-brand-glow pointer-events-none" />
 
-            <div className="relative h-full flex flex-col items-center justify-center p-3 text-center">
-              <div className="text-5xl leading-none mb-2">{t.emoji}</div>
-              <div className="font-bold text-sm tracking-wide">{t.title}</div>
-              <div className="text-[11px] text-pulse-mute mt-0.5 line-clamp-1">{t.hint}</div>
+            <div className="relative h-full flex flex-col items-center justify-center p-2 text-center">
+              <div className="text-3xl leading-none mb-1">{t.emoji}</div>
+              <div className="font-bold text-xs tracking-wide">{t.title}</div>
+              <div className="text-[10px] text-pulse-mute mt-0.5 line-clamp-1 px-1">{t.hint}</div>
             </div>
           </Link>
         ))}

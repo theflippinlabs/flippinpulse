@@ -141,6 +141,13 @@ export async function getStatus(discordId: string): Promise<{
   };
 }
 
+export async function forceLotteryDraw(client: Client): Promise<boolean> {
+  const round = await getOrCreateActiveRound();
+  if (!round) return false;
+  await drawRound(client, round);
+  return true;
+}
+
 async function drawRound(client: Client, round: LotteryRound): Promise<void> {
   const cfg = getLotteryConfig();
 

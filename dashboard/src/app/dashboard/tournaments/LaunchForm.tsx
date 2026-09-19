@@ -5,10 +5,22 @@ import ChannelPicker from '../ChannelPicker';
 import type { DiscordChannel } from '@/lib/channels';
 
 const GAME_TYPES: { key: string; emoji: string; label: string; hint: string }[] = [
-  { key: 'dice_duel', emoji: '🎲', label: 'Dice duel',       hint: 'Highest d100 roll wins each match' },
-  { key: 'coin_flip', emoji: '🪙', label: 'Coin flip',       hint: '50/50 heads or tails, best of 1' },
-  { key: 'higherlower', emoji: '🔼', label: 'Higher / Lower', hint: 'Two rolls, guess if next is higher' },
-  { key: 'trivia', emoji: '🧠', label: 'Trivia',            hint: 'Fastest correct answer wins' },
+  // Dashboard-only headliners
+  { key: 'dice_duel',        emoji: '🎲', label: 'Dice duel',      hint: 'Highest d100 wins each match' },
+  { key: 'coin_flip',        emoji: '🪙', label: 'Coin flip',      hint: '50/50 heads or tails' },
+  { key: 'russian_roulette', emoji: '🔫', label: 'Russian roulette', hint: 'One player out per round (1/6 boom)' },
+  { key: 'chicken_race',     emoji: '🐔', label: 'Chicken race',   hint: 'Last to chicken out wins the pot' },
+  // Existing bot games as tournament tags
+  { key: 'blackjack',        emoji: '🃏', label: 'Blackjack',      hint: 'Best hand wins each duel' },
+  { key: 'slots',            emoji: '🎰', label: 'Slots',          hint: 'Highest slot payout wins' },
+  { key: 'crash',            emoji: '💥', label: 'Crash',          hint: 'Highest multiplier wins' },
+  { key: 'roulette',         emoji: '🎡', label: 'Roulette',       hint: 'Bet, spin, highest gain wins' },
+  { key: 'wheel',            emoji: '🎯', label: 'Wheel',          hint: 'One spin, highest wedge wins' },
+  { key: 'higherlower',      emoji: '🔼', label: 'Higher / Lower', hint: 'Longest correct streak wins' },
+  { key: 'rps',              emoji: '✊', label: 'Rock-Paper-Scissors', hint: 'Classic best-of-3' },
+  { key: 'quiz',             emoji: '🧠', label: 'Trivia',         hint: 'Fastest correct answer wins' },
+  { key: 'typing_race',      emoji: '⌨️', label: 'Typing race',    hint: 'Fastest accurate typist wins' },
+  { key: 'battle_royale',    emoji: '🏆', label: 'Battle Royale',  hint: 'Free-for-all, last standing' },
 ];
 
 export default function LaunchForm({ channels }: { channels: DiscordChannel[] }) {
