@@ -113,7 +113,7 @@ export default function AnnounceForm() {
               onClick={() => setPing(k)}
               className={`px-3 py-1.5 rounded-lg border text-sm ${
                 ping === k
-                  ? 'bg-pulse-brand text-black border-pulse-brand'
+                  ? 'bg-pulse-gold text-black border-pulse-gold'
                   : 'bg-pulse-card border-pulse-border text-pulse-mute'
               }`}
             >
@@ -126,7 +126,7 @@ export default function AnnounceForm() {
       <button
         type="submit"
         disabled={status === 'sending'}
-        className="w-full bg-pulse-brand text-black font-semibold py-3 rounded-lg disabled:opacity-50"
+        className="w-full bg-pulse-gold text-black font-semibold py-3 rounded-lg disabled:opacity-50"
       >
         {status === 'sending' ? 'Queuing…' : status === 'sent' ? '✅ Queued! Bot will post within ~15 s.' : 'Post to Discord'}
       </button>

@@ -19,8 +19,8 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
       <div className="max-w-md w-full bg-pulse-card border border-pulse-border rounded-2xl p-8 shadow-xl relative overflow-hidden">
         <div className="absolute inset-x-0 -top-40 h-64 bg-brand-glow pointer-events-none" />
         <div className="text-center mb-6 relative">
-          <div className="text-5xl">⚡</div>
-          <h1 className="text-2xl font-bold mt-2 brand-text">NOVARYS // Command Deck</h1>
+          <div className="text-5xl text-pulse-gold">⚡</div>
+          <h1 className="text-2xl font-bold mt-2 tracking-wider">NOVARYS <span className="text-pulse-gold">//</span> Command Deck</h1>
           <p className="text-pulse-mute mt-2 text-sm">Live stats &amp; admin console for the community.</p>
         </div>
         {err && (
@@ -28,7 +28,7 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
         )}
         <a
           href="/api/auth/login"
-          className="block w-full text-center bg-brand-gradient hover:opacity-90 text-black font-semibold py-3 rounded-lg transition-opacity shadow-brand relative"
+          className="block w-full text-center bg-pulse-gold hover:opacity-90 text-black font-semibold py-3 rounded-lg transition-opacity shadow-brand relative"
         >
           Sign in with Discord
         </a>

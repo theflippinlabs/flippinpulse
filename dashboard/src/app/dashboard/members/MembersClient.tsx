@@ -116,7 +116,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => setSelected(m)}
-                    className="px-3 py-1 rounded bg-pulse-brand text-black text-xs font-semibold"
+                    className="px-3 py-1 rounded bg-pulse-gold text-black text-xs font-semibold"
                   >
                     Manage
                   </button>
@@ -190,7 +190,7 @@ export default function MembersClient({ initial }: { initial: Member[] }) {
             <button
               onClick={submit}
               disabled={status === 'sending'}
-              className="w-full bg-pulse-brand text-black font-semibold py-3 rounded-lg disabled:opacity-50"
+              className="w-full bg-pulse-gold text-black font-semibold py-3 rounded-lg disabled:opacity-50"
             >
               {status === 'sending' ? 'Sending…' : status === 'sent' ? '✅ Done' : `Confirm`}
             </button>

@@ -54,10 +54,11 @@ async function loadRecent() {
 
 function Card({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="bg-pulse-card border border-pulse-border rounded-xl p-3 md:p-5">
-      <div className="text-[10px] md:text-xs uppercase tracking-wide text-pulse-mute">{label}</div>
-      <div className="mt-1 text-xl md:text-3xl font-bold">{value}</div>
-      {hint && <div className="mt-1 text-[10px] md:text-xs text-pulse-mute">{hint}</div>}
+    <div className="bg-pulse-card border border-pulse-border rounded-xl p-3 md:p-5 relative overflow-hidden">
+      <div className="absolute inset-0 bg-card-glow pointer-events-none" />
+      <div className="relative text-[10px] md:text-xs uppercase tracking-wide text-pulse-mute">{label}</div>
+      <div className="relative mt-1 text-xl md:text-3xl font-bold text-pulse-gold">{value}</div>
+      {hint && <div className="relative mt-1 text-[10px] md:text-xs text-pulse-mute">{hint}</div>}
     </div>
   );
 }
@@ -68,7 +69,7 @@ export default async function Overview() {
   const [stats, recent] = await Promise.all([loadStats(), loadRecent()]);
   return (
     <>
-      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Overview</h1>
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 tracking-wide">Overview</h1>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         <Card label="Members tracked" value={fmt(stats.members)} />
         <Card label="PULSE in wallets" value={fmt(stats.totalPulseInWallets)} hint="Sum of every balance" />

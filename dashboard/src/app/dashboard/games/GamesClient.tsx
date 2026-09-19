@@ -77,7 +77,7 @@ export default function GamesClient({ initial }: { initial: Game[] }) {
                   onClick={() => toggle(g)}
                   disabled={busy === g.game_key}
                   className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                    g.is_enabled ? 'bg-pulse-brand' : 'bg-pulse-border'
+                    g.is_enabled ? 'bg-pulse-gold' : 'bg-pulse-border'
                   } ${busy === g.game_key ? 'opacity-60' : ''}`}
                   aria-label={g.is_enabled ? 'Disable' : 'Enable'}
                 >

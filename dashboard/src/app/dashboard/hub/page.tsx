@@ -20,34 +20,30 @@ async function loadQuickStats() {
   };
 }
 
-const CARDS: { href: string; emoji: string; title: string; hint: (s: Awaited<ReturnType<typeof loadQuickStats>>) => string; tint: string }[] = [
+const CARDS: { href: string; emoji: string; title: string; hint: (s: Awaited<ReturnType<typeof loadQuickStats>>) => string }[] = [
   {
     href: '/dashboard/games',
     emoji: '🎮',
     title: 'Games',
     hint: s => `${s.gamesEnabled} / ${s.gamesTotal} enabled — tap to toggle & tune`,
-    tint: 'from-pulse-brand/20 to-pulse-brand/5 border-pulse-brand/30',
   },
   {
     href: '/dashboard/tournaments',
     emoji: '🏟️',
     title: 'Tournaments',
     hint: s => `${s.tournois} tournaments held so far`,
-    tint: 'from-pulse-violet/20 to-pulse-violet/5 border-pulse-violet/30',
   },
   {
     href: '/dashboard/cosmetics',
     emoji: '✨',
     title: 'Cosmetics',
     hint: s => `${s.cosmetics} member${s.cosmetics === 1 ? '' : 's'} personalized`,
-    tint: 'from-pulse-magenta/20 to-pulse-magenta/5 border-pulse-magenta/30',
   },
   {
     href: '/dashboard/lottery',
     emoji: '🎫',
     title: 'Lottery',
     hint: s => `Pot: ${s.lotteryPot.toLocaleString('en-US')} PULSE`,
-    tint: 'from-pulse-gold/20 to-pulse-gold/5 border-pulse-gold/30',
   },
 ];
 
@@ -55,8 +51,8 @@ export default async function HubPage() {
   const s = await loadQuickStats();
   return (
     <>
-      <h1 className="text-2xl md:text-3xl font-bold mb-1">
-        <span className="brand-text">⚡ Hub</span>
+      <h1 className="text-2xl md:text-3xl font-bold mb-1 tracking-wide">
+        <span className="text-pulse-gold">⚡</span> Hub
       </h1>
       <p className="text-pulse-mute mb-6 text-sm">Tune every knob of the community from here.</p>
 
@@ -65,9 +61,10 @@ export default async function HubPage() {
           <Link
             key={c.href}
             href={c.href}
-            className={`block bg-gradient-to-br ${c.tint} border rounded-2xl p-4 active:scale-[0.98] transition-transform`}
+            className="block bg-pulse-card border border-pulse-border hover:border-pulse-gold/40 rounded-2xl p-4 active:scale-[0.98] transition-all relative overflow-hidden group"
           >
-            <div className="flex items-center justify-between">
+            <div className="absolute inset-0 bg-card-glow pointer-events-none opacity-70" />
+            <div className="relative flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="text-3xl">{c.emoji}</div>
                 <div>
@@ -75,14 +72,14 @@ export default async function HubPage() {
                   <div className="text-xs text-pulse-mute mt-0.5">{c.hint(s)}</div>
                 </div>
               </div>
-              <span className="text-pulse-mute">›</span>
+              <span className="text-pulse-mute group-hover:text-pulse-gold transition-colors">›</span>
             </div>
           </Link>
         ))}
       </div>
 
       <div className="mt-6 bg-pulse-card border border-pulse-border rounded-xl p-4">
-        <div className="text-xs uppercase tracking-wide text-pulse-mute mb-2">Coming soon in the Hub</div>
+        <div className="text-xs uppercase tracking-wide text-pulse-gold/70 mb-2">Coming soon</div>
         <div className="text-sm text-pulse-mute">
           🧠 Novus (AI Community Manager) · 🛡️ Auto-mod tuning · 📊 Charts &amp; trends · 🎯 Missions launcher
         </div>

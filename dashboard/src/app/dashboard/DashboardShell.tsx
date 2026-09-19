@@ -48,7 +48,7 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
     return (
       <Link
         href={href}
-        className={`flex flex-col items-center pt-2 pb-1 gap-0.5 ${active ? 'text-pulse-brand' : 'text-pulse-mute'}`}
+        className={`flex flex-col items-center pt-2 pb-1 gap-0.5 ${active ? 'text-pulse-gold' : 'text-pulse-mute'}`}
       >
         <span className="text-lg leading-none">{emoji}</span>
         <span className="text-[10px] leading-none">{label}</span>
@@ -61,17 +61,17 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
   return (
     <div className="min-h-screen md:flex">
       {/* Mobile top bar — respects iOS safe area */}
-      <header className="md:hidden sticky top-0 z-30 bg-pulse-card/95 backdrop-blur border-b border-pulse-border pt-safe">
+      <header className="md:hidden sticky top-0 z-30 bg-black/90 backdrop-blur border-b border-pulse-border pt-safe">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg">⚡</span>
-            <span className="font-bold brand-text">NOVARYS</span>
+            <span className="text-lg text-pulse-gold">⚡</span>
+            <span className="font-bold tracking-wider">NOVARYS</span>
             <span className="text-xs text-pulse-mute truncate">Command Deck</span>
           </div>
           <div className="flex items-center gap-2">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-pulse-border" />
+              <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-pulse-gold/40" />
             ) : (
               <div className="w-7 h-7 rounded-full bg-pulse-border" />
             )}
@@ -85,7 +85,7 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:w-64 md:shrink-0 bg-pulse-card border-r border-pulse-border flex-col">
         <div className="px-6 py-6 border-b border-pulse-border">
-          <div className="text-lg font-bold brand-text">⚡ NOVARYS</div>
+          <div className="text-lg font-bold tracking-wider"><span className="text-pulse-gold">⚡</span> NOVARYS</div>
           <div className="text-xs text-pulse-mute">Command Deck</div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -95,8 +95,8 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
               href={item.href}
               className={`block px-3 py-2 rounded-lg transition-colors ${
                 pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-                  ? 'bg-pulse-brand/10 text-pulse-brand border border-pulse-brand/20'
-                  : 'hover:bg-pulse-border/50 border border-transparent'
+                  ? 'bg-pulse-gold/10 text-pulse-gold border border-pulse-gold/20'
+                  : 'hover:bg-pulse-border/50 border border-transparent text-pulse-text/80'
               }`}
             >
               {item.label}
@@ -107,13 +107,13 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
           <div className="flex items-center gap-3">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full ring-1 ring-pulse-brand/50" />
+              <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full ring-1 ring-pulse-gold/40" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-pulse-border" />
             )}
             <div className="text-sm min-w-0 flex-1">
               <div className="font-semibold truncate">{username}</div>
-              <a href="/api/auth/logout" className="text-xs text-pulse-mute hover:text-pulse-brand">
+              <a href="/api/auth/logout" className="text-xs text-pulse-mute hover:text-pulse-gold">
                 Sign out
               </a>
             </div>
@@ -124,21 +124,23 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
       <main className="flex-1 min-w-0 px-4 pt-5 pb-28 md:px-8 md:py-8 overflow-x-hidden">{children}</main>
 
       {/* Bottom nav (mobile only) — Hub in the middle, raised */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-pulse-card/95 backdrop-blur border-t border-pulse-border pb-safe">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-black/95 backdrop-blur border-t border-pulse-border pb-safe">
         <div className="relative grid grid-cols-5 items-end">
           {NAV_LEFT.map(item => <NavItem key={item.href} {...item} />)}
 
-          {/* Hub center button — raised circle with gradient */}
+          {/* Hub center button — dark disc with gradient rim (like the logo) */}
           <div className="flex justify-center relative">
             <Link
               href={HUB.href}
-              className={`absolute -top-6 flex flex-col items-center justify-center w-14 h-14 rounded-full bg-brand-gradient shadow-brand ring-2 ring-pulse-bg ${
-                hubActive ? 'scale-105' : ''
+              className={`absolute -top-6 p-[2px] rounded-full bg-brand-gradient ${
+                hubActive ? 'shadow-gold scale-105' : 'shadow-brand'
               } transition-transform`}
             >
-              <span className="text-2xl leading-none">{HUB.emoji}</span>
+              <div className="w-14 h-14 rounded-full bg-black flex items-center justify-center ring-1 ring-pulse-border">
+                <span className="text-2xl leading-none text-pulse-gold">{HUB.emoji}</span>
+              </div>
             </Link>
-            <span className={`text-[10px] leading-none mt-9 mb-1 ${hubActive ? 'text-pulse-brand' : 'text-pulse-mute'}`}>
+            <span className={`text-[10px] leading-none mt-9 mb-1 ${hubActive ? 'text-pulse-gold' : 'text-pulse-mute'}`}>
               {HUB.label}
             </span>
           </div>
