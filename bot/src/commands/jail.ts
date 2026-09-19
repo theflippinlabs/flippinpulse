@@ -52,6 +52,10 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s =>
     s.setName('status')
       .setDescription('Show the jail configuration and current inmates'),
+  )
+  .addSubcommand(s =>
+    s.setName('sync')
+      .setDescription('Import members already wearing the jail role into my DB (life sentence)'),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -219,6 +223,48 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       `**Jailed role:** ${cfg.role_id ? `<@&${cfg.role_id}>` : '_none yet_'}`,
     ];
     await interaction.editReply({ embeds: [pulseEmbed('🔒 Jail').setDescription(lines.join('\n'))] });
+    return;
+  }
+
+  if (sub === 'sync') {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const cfg = getJailConfig();
+    if (!cfg.role_id) {
+      await interaction.editReply({ embeds: [errorEmbed('No jail role configured yet — run `/jail setup` first.')] });
+      return;
+    }
+    const role = await interaction.guild.roles.fetch(cfg.role_id).catch(() => null);
+    if (!role) {
+      await interaction.editReply({ embeds: [errorEmbed(`Configured jail role \`${cfg.role_id}\` no longer exists. Re-run \`/jail setup\`.`)] });
+      return;
+    }
+
+    await interaction.guild.members.fetch().catch(() => null);
+
+    let imported = 0, skipped = 0;
+    for (const member of role.members.values()) {
+      if (member.user.bot) continue;
+      const existing = await fetchActiveJail(interaction.guild.id, member.id);
+      if (existing) { skipped++; continue; }
+      await recordJail({
+        guildId: interaction.guild.id,
+        discordId: member.id,
+        moderatorId: interaction.user.id,
+        reason: 'Imported by /jail sync (life sentence)',
+        expiresAt: null,
+        previousRoles: [],
+      });
+      imported++;
+    }
+
+    await interaction.editReply({
+      embeds: [successEmbed(
+        `Sync complete for <@&${role.id}>.\n` +
+        `• **${imported}** member${imported === 1 ? '' : 's'} imported as life sentences.\n` +
+        `• **${skipped}** already tracked (left as-is).\n\n` +
+        `Use \`/jail remove user:@…\` to release any of them.`,
+      )],
+    });
     return;
   }
 }
