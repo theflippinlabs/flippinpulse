@@ -501,6 +501,78 @@ CREATE TABLE IF NOT EXISTS public.jailed_members (
 ALTER TABLE public.jailed_members ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_jailed_members_expires ON public.jailed_members(expires_at);
 
+-- ---------- Achievements & badges ----------
+CREATE TABLE IF NOT EXISTS public.achievements (
+  achievement_key TEXT PRIMARY KEY,
+  category TEXT NOT NULL,          -- economy | games | streak | social | quiz | missions | lottery | rank | special
+  tier INTEGER NOT NULL DEFAULT 1, -- 1 bronze, 2 silver, 3 gold, 4 platinum
+  emoji TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  reward_pulse INTEGER NOT NULL DEFAULT 0,
+  is_hidden BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.user_achievements (
+  discord_id TEXT NOT NULL,
+  achievement_key TEXT NOT NULL REFERENCES public.achievements(achievement_key) ON DELETE CASCADE,
+  unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (discord_id, achievement_key)
+);
+ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_user_achievements_uid ON public.user_achievements(discord_id);
+
+INSERT INTO public.achievements (achievement_key, category, tier, emoji, name, description, reward_pulse, sort_order) VALUES
+  -- Economy (lifetime PULSE earned)
+  ('econ_100',    'economy',  1, '💰', 'First PULSE',    'Earn 100 PULSE total',       10,  10),
+  ('econ_1k',    'economy',  1, '💵', 'Thousand-aire',  'Earn 1,000 PULSE total',     50,  11),
+  ('econ_10k',   'economy',  2, '💎', 'High Roller',    'Earn 10,000 PULSE total',   250,  12),
+  ('econ_100k',  'economy',  3, '🏆', 'Whale',          'Earn 100,000 PULSE total', 1000,  13),
+  ('econ_1m',    'economy',  4, '👑', 'True Baller',    'Earn 1,000,000 PULSE total', 5000, 14),
+  -- Games played
+  ('games_1',    'games',    1, '🎲', 'First Bet',      'Play your first game',        10,  20),
+  ('games_10',   'games',    1, '🎰', 'Casual',         'Play 10 games',               25,  21),
+  ('games_100',  'games',    2, '🎯', 'Regular',        'Play 100 games',             150,  22),
+  ('games_1000', 'games',    3, '🃏', 'Addicted',       'Play 1,000 games',           750,  23),
+  ('games_5000', 'games',    4, '💯', 'Legend',         'Play 5,000 games',          3000,  24),
+  -- Streaks
+  ('streak_3',   'streak',   1, '🔥', 'Warming Up',     'Reach a 3-day streak',        20,  30),
+  ('streak_7',   'streak',   1, '🔥', 'Week Warrior',   'Reach a 7-day streak',        75,  31),
+  ('streak_30',  'streak',   2, '🔥', 'Iron Streak',    'Reach a 30-day streak',      400,  32),
+  ('streak_100', 'streak',   3, '⛓️', 'Undying',        'Reach a 100-day streak',    2000,  33),
+  -- Social (messages / voice minutes)
+  ('msg_100',    'social',   1, '💬', 'Chatty',         'Send 100 messages',           15,  40),
+  ('msg_1k',     'social',   2, '🗣️', 'Chatterbox',     'Send 1,000 messages',        100,  41),
+  ('msg_10k',    'social',   3, '📣', 'Loud Legend',    'Send 10,000 messages',       750,  42),
+  ('voice_60',   'social',   1, '🎙️', 'On Air',         '60 minutes in voice',         25,  43),
+  ('voice_600',  'social',   2, '🎧', 'Voice Veteran',  '10 hours in voice',          250,  44),
+  -- Quiz
+  ('quiz_1',     'quiz',     1, '🧠', 'First Answer',   'Answer 1 quiz correctly',     10,  50),
+  ('quiz_50',    'quiz',     2, '🎓', 'Quiz Master',    'Answer 50 quiz questions',   200,  51),
+  ('quiz_500',   'quiz',     3, '📚', 'Brainiac',       'Answer 500 quiz questions', 1500,  52),
+  -- Missions
+  ('miss_10',    'missions', 1, '🎯', 'Mission Runner', 'Complete 10 missions',        50,  60),
+  ('miss_100',   'missions', 3, '🏹', 'Grinder',        'Complete 100 missions',      800,  61),
+  -- Lottery
+  ('lot_1',      'lottery',  1, '🎫', 'First Ticket',   'Buy your first lottery ticket', 5, 70),
+  ('lot_1k',     'lottery',  2, '🎟️', 'Lottery Fan',    'Buy 1,000 lottery tickets',  300, 71),
+  ('lot_win',    'lottery',  4, '🎉', 'Jackpot!',       'Win the lottery once',      2000, 72),
+  -- Rank
+  ('rank_max',   'rank',     4, '🌟', 'Ascendant',      'Reach the highest rank',    2500,  80),
+  -- Special
+  ('og',         'special',  4, '⚜️', 'OG',             'Founding member',              0, 90),
+  ('anniv_1y',   'special',  3, '🎂', 'Anniversary',    '1 year in the community',   1000,  91)
+ON CONFLICT (achievement_key) DO UPDATE SET
+  category = EXCLUDED.category,
+  tier = EXCLUDED.tier,
+  emoji = EXCLUDED.emoji,
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  reward_pulse = EXCLUDED.reward_pulse,
+  sort_order = EXCLUDED.sort_order;
+
 -- ---------- PART 9: ACTIVATE features (decay & cap stay OFF) ----------
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true'::jsonb) WHERE key = 'welcome_config';
 UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'true'::jsonb) WHERE key = 'rank_up_config';

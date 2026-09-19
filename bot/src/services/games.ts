@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { recordChallengeMetric } from './challenges.js';
+import { tickAchievements } from './achievements.js';
 import { log } from '../utils/logger.js';
 
 export interface GameConfig {
@@ -111,6 +112,7 @@ export async function addGamePlayer(
     payout: 0,
   });
   void recordChallengeMetric(null, discordId, null, 'games_played');
+  tickAchievements({ discordId });
 }
 
 export async function setPlayerPayout(
@@ -166,6 +168,12 @@ export async function earnPulse(
     reason,
     ref_id: refId,
     balance_after: newBalance,
+  });
+
+  tickAchievements({
+    discordId,
+    lifetimeEarned: currentEarned + amount,
+    lotteryWon: /lottery_win/i.test(reason) || undefined,
   });
 
   return newBalance;

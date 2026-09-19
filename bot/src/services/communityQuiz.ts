@@ -12,6 +12,7 @@ import { getRawSetting, setSetting } from './settings.js';
 import { generateQuizQuestions } from './aiQuiz.js';
 import { pulsarEventIntro } from './pulsar.js';
 import { recordChallengeMetric } from './challenges.js';
+import { tickAchievements } from './achievements.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
 
@@ -159,6 +160,14 @@ export async function runCommunityQuiz(channel: GuildTextBasedChannel, opts: Run
         s.correct++;
         s.points += points;
         void recordChallengeMetric(channel.client, uid, s.name, 'quiz_correct');
+        // Persistent counter for the quiz achievements.
+        void supabase.from('activity_events').insert({
+          discord_id: uid,
+          type: 'quiz_correct',
+          channel_id: channel.id,
+          points_awarded: 0,
+        });
+        tickAchievements({ discordId: uid });
       }
     }
 

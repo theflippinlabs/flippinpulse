@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getRankForPoints } from '../services/ranks.js';
+import { listAllAchievements, listUnlocked } from '../services/achievements.js';
 import { pulseEmbed, errorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -33,6 +34,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     progressLine = `\n\`${'\u2593'.repeat(filled)}${'\u2591'.repeat(barWidth - filled)}\` ${points}/${rankNext.threshold} \u2192 **${rankNext.rank_name}**`;
   }
 
+  // Latest 6 achievements (badges shelf on the profile).
+  const [all, unlockedKeys] = await Promise.all([listAllAchievements(), listUnlocked(targetUser.id)]);
+  const unlockedSet = new Set(unlockedKeys);
+  const badges = all.filter(a => unlockedSet.has(a.achievement_key));
+  const badgeLine = badges.length
+    ? badges.slice(-8).map(a => `${a.emoji} ${a.name}`).join(' \u00b7 ')
+    : '_None yet \u2014 play games, chat, claim daily\u2026_';
+
   const embed = pulseEmbed(`${targetUser.username}'s Profile`)
     .setThumbnail(targetUser.displayAvatarURL({ size: 128 }))
     .setDescription(`\ud83c\udfc6 **Rank:** ${user.rank_name ?? 'Unranked'}${progressLine}`)
@@ -43,6 +52,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       { name: 'PULSE Balance', value: `${user.balance_pulse ?? 0} PULSE`, inline: true },
       { name: 'Lifetime Earned', value: `${user.lifetime_earned_pulse ?? 0}`, inline: true },
       { name: 'Lifetime Spent', value: `${user.lifetime_spent_pulse ?? 0}`, inline: true },
+      { name: `\ud83c\udfc5 Badges (${badges.length}/${all.length})`, value: badgeLine.slice(0, 1024), inline: false },
     );
 
   await interaction.reply({ embeds: [embed] });

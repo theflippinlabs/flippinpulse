@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { getStreakConfig } from './settings.js';
+import { tickAchievements } from './achievements.js';
 import { log } from '../utils/logger.js';
 
 export interface StreakResult {
@@ -55,6 +56,8 @@ export async function applyDailyStreak(
   if (error) {
     log('ERROR', `Failed to update streak for ${discordId}`, error);
   }
+
+  tickAchievements({ discordId, streak });
 
   return { streak, bonusPercent, bonusPulse };
 }

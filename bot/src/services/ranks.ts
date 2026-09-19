@@ -2,6 +2,7 @@ import { ChannelType, EmbedBuilder, Guild, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getRankUpConfig } from './settings.js';
 import { pulsarCelebrate } from './pulsar.js';
+import { tickAchievements } from './achievements.js';
 import { log } from '../utils/logger.js';
 
 interface RankConfig {
@@ -99,6 +100,16 @@ export async function checkRankUp(
   await announceRankUp(guild, member, newRank, user?.rank_name ?? null).catch(err =>
     log('ERROR', `Failed to announce rank-up for ${discordId}`, err),
   );
+
+  // Highest-threshold rank achieved?
+  const maxThreshold = ranksCache.reduce((m, r) => Math.max(m, r.threshold), 0);
+  const reachedMax = newRank.threshold >= maxThreshold && maxThreshold > 0;
+  tickAchievements({
+    discordId,
+    client: guild.client,
+    guildId: guild.id,
+    reachedMaxRank: reachedMax || undefined,
+  });
 }
 
 function parseHexColor(input: string | null | undefined): number {

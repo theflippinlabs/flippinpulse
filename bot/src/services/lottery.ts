@@ -4,6 +4,7 @@ import { spendPulse } from './economy.js';
 import { earnPulse } from './games.js';
 import { getRawSetting, setSetting } from './settings.js';
 import { pulsarEventIntro } from './pulsar.js';
+import { tickAchievements } from './achievements.js';
 import { log } from '../utils/logger.js';
 
 export interface LotteryConfig {
@@ -106,6 +107,14 @@ export async function buyTickets(
     .from('lottery_rounds')
     .update({ pot_pulse: newPot, total_tickets: round.total_tickets + count })
     .eq('id', round.id);
+
+  // Total tickets this user ever bought (across all rounds).
+  const { data: totalRows } = await supabase
+    .from('lottery_tickets')
+    .select('tickets')
+    .eq('discord_id', discordId);
+  const totalTickets = (totalRows ?? []).reduce((s, r) => s + (r as { tickets: number }).tickets, 0);
+  tickAchievements({ discordId, lotteryTicketsBought: totalTickets });
 
   return { success: true, tickets: userTickets, pot: newPot, drawAt: round.draw_at };
 }

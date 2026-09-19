@@ -4,6 +4,7 @@ import { getEconomyConfig } from './settings.js';
 import { checkRankUp } from './ranks.js';
 import { getPulseHourMultiplier } from './pulseHour.js';
 import { applyDailyCap } from './dailyCap.js';
+import { tickAchievements } from './achievements.js';
 import { log } from '../utils/logger.js';
 
 interface AwardOptions {
@@ -80,6 +81,14 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
 
     // Check rank up
     await checkRankUp(discordId, newTotal, guild, member);
+
+    // Fire-and-forget achievement checks against the fresh totals.
+    tickAchievements({
+      discordId,
+      client: guild.client,
+      guildId: guild.id,
+      lifetimeEarned: currentLifetimeEarned + pulseEarned,
+    });
   } catch (err) {
     log('ERROR', `Failed to award points to ${discordId}`, err);
   }

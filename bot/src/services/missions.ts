@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getEconomyConfig } from './settings.js';
+import { tickAchievements } from './achievements.js';
 
 interface Mission {
   id: string;
@@ -98,5 +99,6 @@ export async function completeMission(
   }
 
   log('INFO', `Mission completed: ${discordId} → ${missionId} (+${rewardPoints} pts)`);
+  tickAchievements({ discordId });
   return true;
 }
