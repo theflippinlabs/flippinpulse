@@ -22,6 +22,7 @@ const LABELS: Record<string, { name: string; emoji: string }> = {
   typing_race:   { name: 'Typing race',        emoji: '⌨️' },
   battle_royale: { name: 'Battle Royale',      emoji: '🏆' },
   dice_royale:   { name: 'Dice Royale',        emoji: '🎲' },
+  chicken_race:  { name: 'Chicken Race',       emoji: '🐔' },
 };
 
 export default function GamesClient({ initial }: { initial: Game[] }) {

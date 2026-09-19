@@ -12,6 +12,7 @@ import { handlePanelInteraction } from '../commands/panel.js';
 import { handleHubInteraction } from '../commands/hub.js';
 import { handleTournamentButton } from '../commands/tournoi.js';
 import { handleCosmeticsInteraction } from '../commands/cosmetics.js';
+import { handleChickenButton } from '../services/chickenRace.js';
 import { handleChallengeInteraction } from '../services/challenges.js';
 import { log } from '../utils/logger.js';
 
@@ -80,6 +81,15 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handleTournamentButton(interaction);
     } catch (err) {
       log('ERROR', 'Tournament button handler crashed', err);
+    }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('chicken:')) {
+    try {
+      await handleChickenButton(interaction);
+    } catch (err) {
+      log('ERROR', 'Chicken race button handler crashed', err);
     }
     return;
   }
