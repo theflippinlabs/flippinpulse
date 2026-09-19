@@ -524,6 +524,56 @@ CREATE TABLE IF NOT EXISTS public.user_achievements (
 ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_user_achievements_uid ON public.user_achievements(discord_id);
 
+-- ---------- Tournaments ----------
+CREATE TABLE IF NOT EXISTS public.tournaments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guild_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',   -- open | running | done | cancelled
+  title TEXT NOT NULL,
+  buy_in INTEGER NOT NULL DEFAULT 0,
+  max_players INTEGER NOT NULL DEFAULT 16,
+  pot_pulse INTEGER NOT NULL DEFAULT 0,
+  channel_id TEXT,
+  message_id TEXT,
+  created_by TEXT,
+  winner_id TEXT,
+  runner_up_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ
+);
+ALTER TABLE public.tournaments ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_tournaments_status ON public.tournaments(status);
+CREATE INDEX IF NOT EXISTS idx_tournaments_guild ON public.tournaments(guild_id);
+
+CREATE TABLE IF NOT EXISTS public.tournament_players (
+  tournament_id UUID NOT NULL REFERENCES public.tournaments(id) ON DELETE CASCADE,
+  discord_id TEXT NOT NULL,
+  username TEXT NOT NULL,
+  seed INTEGER,
+  eliminated_round INTEGER,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tournament_id, discord_id)
+);
+ALTER TABLE public.tournament_players ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.tournament_matches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tournament_id UUID NOT NULL REFERENCES public.tournaments(id) ON DELETE CASCADE,
+  round INTEGER NOT NULL,
+  match_index INTEGER NOT NULL,
+  player1_id TEXT,
+  player2_id TEXT,
+  winner_id TEXT,
+  score1 INTEGER,
+  score2 INTEGER,
+  status TEXT NOT NULL DEFAULT 'pending',   -- pending | done
+  resolved_at TIMESTAMPTZ,
+  UNIQUE (tournament_id, round, match_index)
+);
+ALTER TABLE public.tournament_matches ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_matches_tour ON public.tournament_matches(tournament_id, round);
+
 INSERT INTO public.achievements (achievement_key, category, tier, emoji, name, description, reward_pulse, sort_order) VALUES
   -- Economy (lifetime PULSE earned)
   ('econ_100',    'economy',  1, '💰', 'First PULSE',    'Earn 100 PULSE total',       10,  10),

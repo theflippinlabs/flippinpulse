@@ -10,6 +10,7 @@ import {
 import { handleLobbyButton } from '../services/lobby.js';
 import { handlePanelInteraction } from '../commands/panel.js';
 import { handleHubInteraction } from '../commands/hub.js';
+import { handleTournamentButton } from '../commands/tournoi.js';
 import { handleChallengeInteraction } from '../services/challenges.js';
 import { log } from '../utils/logger.js';
 
@@ -69,6 +70,15 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handleHubInteraction(interaction);
     } catch (err) {
       log('ERROR', 'Hub interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('tour:')) {
+    try {
+      await handleTournamentButton(interaction);
+    } catch (err) {
+      log('ERROR', 'Tournament button handler crashed', err);
     }
     return;
   }

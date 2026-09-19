@@ -49,6 +49,7 @@ import * as hub from './hub.js';
 import * as setupaccueil from './setupaccueil.js';
 import * as jail from './jail.js';
 import * as achievements from './achievements.js';
+import * as tournoi from './tournoi.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -64,7 +65,7 @@ const commandList: Command[] = [
   givepulse, removepulse, setpulse, pulseinfo, moduleCmd, seteconomy, shopadmin,
   higherlower, lottery, battleroyale, diceroyale,
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
-  jeux, hub, setupaccueil, jail, achievements,
+  jeux, hub, setupaccueil, jail, achievements, tournoi,
 ];
 
 export const commands = new Map<string, Command>();
