@@ -13,7 +13,7 @@ import {
 } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getRankForPoints } from '../services/ranks.js';
-import { getActiveMissions, completeMission, hasCompletedMission } from '../services/missions.js';
+import { getActiveMissions, completeMission } from '../services/missions.js';
 import { applyDailyStreak } from '../services/streak.js';
 import { earnPulse } from '../services/games.js';
 import { getEconomyConfig } from '../services/settings.js';
@@ -315,11 +315,22 @@ async function claimDaily(interaction: Interaction, discordId: string): Promise<
     return { embeds: [errorEmbed(fr ? 'Aucune mission daily active.' : 'No daily mission active.')], components: navRows() };
   }
   const mission = dailies[0];
-  const already = await hasCompletedMission(discordId, mission.id);
-  if (already) {
-    return { embeds: [errorEmbed(fr ? 'Déjà réclamé aujourd\'hui — reviens demain !' : 'Already claimed today — come back tomorrow!')], components: navRows() };
+  // Gate on the same 24h cooldown the hub display uses, so people who claimed
+  // this mission on a previous day are not blocked forever.
+  const { data: userRow } = await supabase
+    .from('discord_users')
+    .select('last_daily_at')
+    .eq('discord_id', discordId)
+    .maybeSingle();
+  const hSince = hoursSince(userRow?.last_daily_at ?? null);
+  if (hSince < 24) {
+    const remain = Math.ceil(24 - hSince);
+    return {
+      embeds: [errorEmbed(fr ? `Déjà réclamé — reviens dans ${remain}h.` : `Already claimed — come back in ${remain}h.`)],
+      components: navRows(),
+    };
   }
-  const ok = await completeMission(discordId, mission.id, mission.reward_points);
+  const ok = await completeMission(discordId, mission.id, mission.reward_points, { allowRepeat: true });
   if (!ok) {
     return { embeds: [errorEmbed(fr ? 'Impossible de réclamer la récompense.' : 'Could not claim the reward.')], components: navRows() };
   }

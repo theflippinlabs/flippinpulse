@@ -1,8 +1,9 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
-import { getActiveMissions, completeMission, hasCompletedMission } from '../services/missions.js';
+import { getActiveMissions, completeMission } from '../services/missions.js';
 import { applyDailyStreak } from '../services/streak.js';
 import { earnPulse } from '../services/games.js';
 import { getEconomyConfig } from '../services/settings.js';
+import { supabase } from '../supabase.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
@@ -19,13 +20,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const mission = dailyMissions[0];
-  const alreadyCompleted = await hasCompletedMission(interaction.user.id, mission.id);
-  if (alreadyCompleted) {
-    await interaction.editReply({ embeds: [errorEmbed('You already claimed today\'s daily! Come back tomorrow.')] });
+  const { data: userRow } = await supabase
+    .from('discord_users')
+    .select('last_daily_at')
+    .eq('discord_id', interaction.user.id)
+    .maybeSingle();
+  const lastClaim = userRow?.last_daily_at ? new Date(userRow.last_daily_at).getTime() : 0;
+  const hoursSince = lastClaim ? (Date.now() - lastClaim) / 3_600_000 : Infinity;
+  if (hoursSince < 24) {
+    const remain = Math.ceil(24 - hoursSince);
+    await interaction.editReply({ embeds: [errorEmbed(`Already claimed — come back in ${remain}h.`)] });
     return;
   }
 
-  const success = await completeMission(interaction.user.id, mission.id, mission.reward_points);
+  const success = await completeMission(interaction.user.id, mission.id, mission.reward_points, { allowRepeat: true });
   if (!success) {
     await interaction.editReply({ embeds: [errorEmbed('Failed to claim daily mission.')] });
     return;
