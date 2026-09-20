@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
 
 interface Result { outcome: 'heads' | 'tails'; choice: 'heads' | 'tails'; won: boolean; bet: number; payout: number; newBalance: number }
 

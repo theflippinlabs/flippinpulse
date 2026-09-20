@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
 import ChickenSprite from './ChickenSprite';
 
 function multiplierAt(elapsedMs: number): number {

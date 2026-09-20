@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
 
 // Symbols shown in the machine, in visual order. Repeated in the reel strip
 // below to make the vertical scroll seamless when it wraps.
