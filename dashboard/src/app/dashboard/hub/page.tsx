@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 async function loadQuickStats() {
-  const [games, tournois, cosmetics, lottery, pulsar, missions, mod] = await Promise.all([
+  const [games, tournois, cosmetics, lottery, pulsar, missions, mod, jails] = await Promise.all([
     supabase.from('games_config').select('is_enabled'),
     supabase.from('tournaments').select('*', { count: 'exact', head: true }),
     supabase.from('user_cosmetics').select('*', { count: 'exact', head: true }),
@@ -12,6 +12,7 @@ async function loadQuickStats() {
     supabase.from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle(),
     supabase.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('settings').select('value_json').eq('key', 'mod_config').maybeSingle(),
+    supabase.from('jailed_members').select('*', { count: 'exact', head: true }),
   ]);
   const enabled = (games.data ?? []).filter(g => (g as { is_enabled?: boolean }).is_enabled).length;
   const pulsarCfg = (pulsar.data as { value_json?: { enabled?: boolean } } | null)?.value_json ?? {};
@@ -25,6 +26,7 @@ async function loadQuickStats() {
     novusOn: pulsarCfg.enabled === true,
     activeMissions: missions.count ?? 0,
     automodOn: modCfg.automod_enabled === true,
+    jailed: jails.count ?? 0,
   };
 }
 
@@ -49,7 +51,7 @@ export default async function HubPage() {
     { href: '/dashboard/missions',    emoji: '🎯', title: 'Missions',    hint: `${s.activeMissions} active` },
     { href: '/dashboard/cosmetics',   emoji: '✨', title: 'Cosmetics',   hint: `${s.cosmetics} bought` },
     { href: '/dashboard/automod',     emoji: '🛡️', title: 'Auto-mod',    hint: s.automodOn ? 'ON — guarding chat' : 'OFF' },
-    { href: '/dashboard/charts',      emoji: '📊', title: 'Charts',      hint: 'Last 14 days trends' },
+    { href: '/dashboard/jails',       emoji: '🔒', title: 'Jails',       hint: `${s.jailed} jailed` },
   ];
 
   return (

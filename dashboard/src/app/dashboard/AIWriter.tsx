@@ -1,10 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Kind = 'announce' | 'tournament' | 'mission' | 'free';
 
 interface Message { role: 'user' | 'assistant'; content: string }
+
+// Web Speech API surface — declared inline so we don't need to add a
+// separate .d.ts file. iOS Safari exposes it as webkitSpeechRecognition.
+interface SpeechRecogEvent { results: { [k: number]: { [k: number]: { transcript: string }, isFinal: boolean } }; resultIndex: number }
+interface SpeechRecog {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechRecogEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+}
 
 interface Props {
   kind: Kind;
@@ -23,6 +37,64 @@ export default function AIWriter({ kind, onInsert, seed, buttonLabel = '✨ Aide
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const recogRef = useRef<SpeechRecog | null>(null);
+
+  useEffect(() => {
+    // Detect Web Speech API on mount so we don't render a mic that won't work.
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecog;
+      webkitSpeechRecognition?: new () => SpeechRecog;
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    setVoiceSupported(!!Ctor);
+  }, []);
+
+  const toggleVoice = () => {
+    if (listening) {
+      recogRef.current?.stop();
+      return;
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecog;
+      webkitSpeechRecognition?: new () => SpeechRecog;
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return;
+
+    const recog = new Ctor();
+    recog.lang = 'fr-FR';
+    recog.continuous = false;
+    recog.interimResults = true;
+
+    // Track what's been finalized so intermediate chunks don't stack up.
+    let finalSoFar = '';
+    recog.onresult = e => {
+      let interim = '';
+      for (let i = e.resultIndex; i < Object.keys(e.results).length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalSoFar += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setInput(prev => {
+        // Rebuild the input from what existed BEFORE we started listening
+        // (recogRef.current!.__seed) plus the running transcript.
+        const seed = (recog as unknown as { __seed?: string }).__seed ?? prev;
+        return `${seed}${seed && !seed.endsWith(' ') ? ' ' : ''}${finalSoFar}${interim}`.trimStart();
+      });
+    };
+    recog.onerror = e => {
+      setError(`Voice error: ${e.error}`);
+      setListening(false);
+    };
+    recog.onend = () => setListening(false);
+
+    (recog as unknown as { __seed?: string }).__seed = input;
+    recogRef.current = recog;
+    setListening(true);
+    try { recog.start(); } catch (err) { setError(String(err)); setListening(false); }
+  };
 
   const openDrawer = () => {
     setOpen(true);
@@ -82,7 +154,7 @@ export default function AIWriter({ kind, onInsert, seed, buttonLabel = '✨ Aide
       {open && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end md:items-center justify-center p-0 md:p-6" onClick={close}>
           <div
-            className="w-full md:max-w-xl bg-pulse-card border border-pulse-border rounded-t-2xl md:rounded-2xl max-h-[92vh] flex flex-col"
+            className="w-full md:max-w-xl bg-pulse-card border border-pulse-border rounded-t-2xl md:rounded-2xl h-[85vh] md:h-auto md:max-h-[85vh] md:min-h-[600px] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
@@ -160,17 +232,33 @@ export default function AIWriter({ kind, onInsert, seed, buttonLabel = '✨ Aide
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); }
                 }}
-                placeholder="Explique ce que tu veux…"
+                placeholder={listening ? '🎤 J\'écoute…' : 'Explique ce que tu veux…'}
                 rows={2}
                 className="flex-1 bg-pulse-bg border border-pulse-border rounded-lg px-3 py-2 text-sm resize-none"
               />
-              <button
-                onClick={send}
-                disabled={busy || !input.trim()}
-                className="px-4 py-2 rounded-lg bg-pulse-gold text-black font-bold text-sm disabled:opacity-50"
-              >
-                {busy ? '…' : 'Envoyer'}
-              </button>
+              <div className="flex flex-col gap-1">
+                {voiceSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleVoice}
+                    aria-label={listening ? 'Arrêter la dictée' : 'Parler'}
+                    className={`w-11 h-11 rounded-lg font-bold flex items-center justify-center text-lg ${
+                      listening
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-pulse-border/60 text-pulse-text hover:bg-pulse-border'
+                    }`}
+                  >
+                    🎤
+                  </button>
+                )}
+                <button
+                  onClick={send}
+                  disabled={busy || !input.trim()}
+                  className="px-4 py-2 rounded-lg bg-pulse-gold text-black font-bold text-sm disabled:opacity-50"
+                >
+                  {busy ? '…' : 'Envoyer'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -9,7 +9,7 @@ const NAV_LEFT = [
 ];
 const NAV_RIGHT = [
   { href: '/dashboard/announce', label: 'Post', emoji: '📣' },
-  { href: '/dashboard/jails', label: 'Jails', emoji: '🔒' },
+  { href: '/dashboard/charts', label: 'Charts', emoji: '📊' },
 ];
 const HUB = { href: '/dashboard/hub', label: 'Hub', emoji: '⚡' };
 
@@ -38,7 +38,7 @@ interface Props {
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
   if (href === '/dashboard/hub') {
-    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/charts', '/dashboard/play']
+    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/play', '/dashboard/reserve', '/dashboard/shop', '/dashboard/jails']
       .some(p => pathname === p || pathname.startsWith(p + '/'));
   }
   return pathname === href || pathname.startsWith(href + '/');
