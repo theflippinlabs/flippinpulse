@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ChannelPicker from '../ChannelPicker';
+import AIWriter from '../AIWriter';
 import type { DiscordChannel } from '@/lib/channels';
 
 export default function AnnounceForm({ channels }: { channels: DiscordChannel[] }) {
@@ -76,7 +77,14 @@ export default function AnnounceForm({ channels }: { channels: DiscordChannel[] 
       </div>
 
       <div>
-        <label className="text-xs uppercase text-pulse-mute">Message</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs uppercase text-pulse-mute">Message</label>
+          <AIWriter
+            kind="announce"
+            seed={message.trim() || undefined}
+            onInsert={text => setMessage(text)}
+          />
+        </div>
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}

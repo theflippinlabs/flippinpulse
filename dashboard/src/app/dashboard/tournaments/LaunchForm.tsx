@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ChannelPicker from '../ChannelPicker';
+import AIWriter from '../AIWriter';
 import type { DiscordChannel } from '@/lib/channels';
 
 const GAME_TYPES: { key: string; emoji: string; label: string; hint: string }[] = [
@@ -128,7 +129,20 @@ export default function LaunchForm({ channels }: { channels: DiscordChannel[] })
       </div>
 
       <div>
-        <label className="text-xs uppercase text-pulse-mute">Title (optional)</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs uppercase text-pulse-mute">Title (optional)</label>
+          <AIWriter
+            kind="tournament"
+            seed={title.trim() || undefined}
+            onInsert={text => {
+              // AI returns "TITRE: xxx\nDESCRIPTION: yyy". Grab just the title
+              // for this field; the description goes wherever the operator
+              // wants to paste it (usually the announcement embed).
+              const m = text.match(/TITRE\s*:\s*(.+)/i);
+              setTitle(m ? m[1].trim() : text.split('\n')[0].trim());
+            }}
+          />
+        </div>
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}

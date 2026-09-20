@@ -97,6 +97,7 @@ export default function ManageClient({ initial }: { initial: ShopItem[] }) {
           max_per_user: editing.max_per_user, cooldown_hours: 0,
           is_active: editing.is_active, auto_apply: editing.auto_apply,
           image_url: editing.image_url,
+          metadata_json: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }, ...prev]);

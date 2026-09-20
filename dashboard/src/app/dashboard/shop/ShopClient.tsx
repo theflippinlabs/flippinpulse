@@ -53,7 +53,9 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setBalance(data.newBalance);
-      const msg = data.orderStatus === 'FULFILLED'
+      const msg = data.mysteryReward !== undefined
+        ? `🎉 Tu as gagné ${data.mysteryReward.toLocaleString('en-US')} PULSE de la boîte !`
+        : data.orderStatus === 'FULFILLED'
         ? '✅ Acheté — appliqué immédiatement !'
         : '✅ Acheté — en attente d\'approbation admin.';
       setFeedback({ item: item.id, ok: true, text: msg });
