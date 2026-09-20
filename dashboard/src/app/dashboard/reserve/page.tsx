@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
-import ReserveClient from './ReserveClient';
+import ReserveClient, { type MemberOption } from './ReserveClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ interface RecentGiveaway {
 }
 
 async function loadReserveStats() {
-  const [totalMinted, totalInWallets, giveaways, memberCount] = await Promise.all([
+  const [totalMinted, totalInWallets, giveaways, memberCount, members] = await Promise.all([
     // Every positive pulse_transactions row is PULSE that entered the economy.
     supabase.from('pulse_transactions').select('amount').gt('amount', 0),
     supabase.from('discord_users').select('balance_pulse'),
@@ -26,6 +26,11 @@ async function loadReserveStats() {
       .order('created_at', { ascending: false })
       .limit(6),
     supabase.from('discord_users').select('*', { count: 'exact', head: true }),
+    supabase
+      .from('discord_users')
+      .select('discord_id, username, avatar_url, balance_pulse')
+      .order('points_total', { ascending: false })
+      .limit(500),
   ]);
 
   const minted = (totalMinted.data ?? []).reduce(
@@ -41,6 +46,7 @@ async function loadReserveStats() {
     inWallets,
     giveaways: (giveaways.data ?? []) as RecentGiveaway[],
     memberCount: memberCount.count ?? 0,
+    members: (members.data ?? []) as MemberOption[],
   };
 }
 
@@ -73,7 +79,7 @@ export default async function ReservePage() {
         </div>
       </div>
 
-      <ReserveClient channels={channels} memberCount={stats.memberCount} />
+      <ReserveClient channels={channels} memberCount={stats.memberCount} members={stats.members} />
 
       {/* Recent giveaways */}
       <section className="mt-6">
