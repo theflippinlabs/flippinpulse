@@ -2,23 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-// Bottom nav for members. Home is the app hub with tiles; the other four
-// are the quick-access rooms they'll use most.
-const NAV_LEFT = [
-  { href: '/app',              label: 'Home',  emoji: '🏠' },
-  { href: '/app/leaderboard',  label: 'Top',   emoji: '🏆' },
-];
-const NAV_RIGHT = [
-  { href: '/app/shop',         label: 'Shop',  emoji: '🛍️' },
-  { href: '/app/novus',        label: 'Novus', emoji: '🧠' },
-];
-const CENTER = { href: '/app/play', label: 'Play', emoji: '🎮' };
+import { LocaleContext, useT, type Locale } from '@/lib/i18n-client';
+import LocaleToggle from './LocaleToggle';
 
 interface Props {
   username: string;
   avatarUrl: string | null;
   isLord: boolean;
+  locale: Locale;
   children: React.ReactNode;
 }
 
@@ -27,8 +18,19 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-export default function MemberShell({ username, avatarUrl, isLord, children }: Props) {
+function ShellInner({ username, avatarUrl, isLord, children }: Omit<Props, 'locale'>) {
   const pathname = usePathname();
+  const t = useT();
+
+  const NAV_LEFT = [
+    { href: '/app',              label: t('nav.home'), emoji: '🏠' },
+    { href: '/app/leaderboard',  label: t('nav.top'),  emoji: '🏆' },
+  ];
+  const NAV_RIGHT = [
+    { href: '/app/shop',         label: t('nav.shop'),  emoji: '🛍️' },
+    { href: '/app/novus',        label: t('nav.novus'), emoji: '🧠' },
+  ];
+  const CENTER = { href: '/app/play', label: t('nav.play'), emoji: '🎮' };
 
   const NavItem = ({ href, label, emoji }: { href: string; label: string; emoji: string }) => {
     const active = isActive(pathname, href);
@@ -56,19 +58,20 @@ export default function MemberShell({ username, avatarUrl, isLord, children }: P
             <span className="text-xs text-pulse-mute truncate">Pulse</span>
           </div>
           <div className="flex items-center gap-2">
+            <LocaleToggle />
             {isLord && (
               <a href="/dashboard" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-gold/20 text-pulse-gold border border-pulse-gold/40 font-semibold">
-                Command Deck
+                {t('nav.command_deck')}
               </a>
             )}
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-pulse-gold/40" />
+              <img src={avatarUrl} alt={username} className="w-7 h-7 rounded-full ring-1 ring-pulse-gold/40" />
             ) : (
               <div className="w-7 h-7 rounded-full bg-pulse-border" />
             )}
             <a href="/api/auth/logout" className="text-xs text-pulse-mute px-2 py-1 rounded border border-pulse-border">
-              Sign out
+              {t('nav.sign_out')}
             </a>
           </div>
         </div>
@@ -76,7 +79,7 @@ export default function MemberShell({ username, avatarUrl, isLord, children }: P
 
       <main className="px-4 pt-5 pb-28 overflow-x-hidden">{children}</main>
 
-      {/* Bottom nav — Play in the middle, raised */}
+      {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-black/95 backdrop-blur border-t border-pulse-border pb-safe">
         <div className="relative grid grid-cols-5 items-end">
           {NAV_LEFT.map(item => <NavItem key={item.href} {...item} />)}
@@ -99,5 +102,13 @@ export default function MemberShell({ username, avatarUrl, isLord, children }: P
         </div>
       </nav>
     </div>
+  );
+}
+
+export default function MemberShell({ locale, ...rest }: Props) {
+  return (
+    <LocaleContext.Provider value={locale}>
+      <ShellInner {...rest} />
+    </LocaleContext.Provider>
   );
 }

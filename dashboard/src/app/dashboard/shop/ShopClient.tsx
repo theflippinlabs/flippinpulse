@@ -2,23 +2,32 @@
 
 import { useMemo, useState } from 'react';
 import type { ShopItem, ShopCategory } from '@/lib/shop';
+import { useT, useLocale, interpolate } from '@/lib/i18n-client';
+import { translations } from '@/lib/translations';
 
-const CATEGORY_META: Record<ShopCategory, { emoji: string; label: string; tint: string }> = {
-  role:     { emoji: '👑', label: 'Rôles',     tint: 'from-purple-500/20 to-purple-500/5 border-purple-500/30' },
-  perk:     { emoji: '⚡', label: 'Perks',     tint: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/30' },
-  ticket:   { emoji: '🎟️', label: 'Tickets',   tint: 'from-orange-500/20 to-orange-500/5 border-orange-500/30' },
-  cosmetic: { emoji: '✨', label: 'Cosmétique', tint: 'from-pink-500/20 to-pink-500/5 border-pink-500/30' },
-  irl:      { emoji: '📦', label: 'IRL',       tint: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30' },
+const CATEGORY_META: Record<ShopCategory, { emoji: string; tint: string }> = {
+  role:     { emoji: '👑', tint: 'from-purple-500/20 to-purple-500/5 border-purple-500/30' },
+  perk:     { emoji: '⚡', tint: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/30' },
+  ticket:   { emoji: '🎟️', tint: 'from-orange-500/20 to-orange-500/5 border-orange-500/30' },
+  cosmetic: { emoji: '✨', tint: 'from-pink-500/20 to-pink-500/5 border-pink-500/30' },
+  irl:      { emoji: '📦', tint: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30' },
 };
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 export default function ShopClient({ items, initialBalance }: { items: ShopItem[]; initialBalance: number }) {
+  const t = useT();
+  const locale = useLocale();
   const [balance, setBalance] = useState(initialBalance);
   const [filter, setFilter] = useState<ShopCategory | 'all'>('all');
   const [buying, setBuying] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ item: string; ok: boolean; text: string } | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
+
+  const catLabel = (c: ShopCategory): string => {
+    const dict = translations[locale].shop.cat as Record<string, string>;
+    return dict[c] ?? c;
+  };
 
   const visible = useMemo(
     () => (filter === 'all' ? items : items.filter(i => i.category === filter)),
@@ -38,10 +47,11 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
   const buy = async (item: ShopItem) => {
     if (buying) return;
     if (balance < item.price_pulse) {
-      setFeedback({ item: item.id, ok: false, text: `Il te manque ${fmt(item.price_pulse - balance)} PULSE.` });
+      setFeedback({ item: item.id, ok: false, text: `${t('shop.missing')} ${fmt(item.price_pulse - balance)} PULSE.` });
       return;
     }
-    if (!confirm(`Acheter "${item.name}" pour ${fmt(item.price_pulse)} PULSE ?`)) return;
+    const prompt = interpolate(t('shop.confirm_buy'), { name: item.name, price: fmt(item.price_pulse) });
+    if (!confirm(prompt)) return;
     setBuying(item.id);
     setFeedback(null);
     try {
@@ -54,16 +64,16 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setBalance(data.newBalance);
       const msg = data.mysteryReward !== undefined
-        ? `🎉 Tu as gagné ${data.mysteryReward.toLocaleString('en-US')} PULSE de la boîte !`
+        ? interpolate(t('shop.mystery_win'), { amount: data.mysteryReward.toLocaleString('en-US') })
         : data.orderStatus === 'FULFILLED'
-        ? '✅ Acheté — appliqué immédiatement !'
-        : '✅ Acheté — en attente d\'approbation admin.';
+        ? t('shop.buy_ok_auto')
+        : t('shop.buy_ok_pending');
       setFeedback({ item: item.id, ok: true, text: msg });
       if (data.orderStatus === 'PENDING') {
         setPending(p => new Set(p).add(item.id));
       }
     } catch (err) {
-      setFeedback({ item: item.id, ok: false, text: err instanceof Error ? err.message : 'Échec.' });
+      setFeedback({ item: item.id, ok: false, text: err instanceof Error ? err.message : t('common.error') });
     } finally {
       setBuying(null);
     }
@@ -71,19 +81,17 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
 
   return (
     <>
-      {/* Balance chip visible while scrolling */}
       <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-pulse-bg/80 backdrop-blur border-b border-pulse-border/60 mb-3 flex items-center justify-between">
-        <div className="text-xs uppercase text-pulse-mute">Ton solde</div>
+        <div className="text-xs uppercase text-pulse-mute">{t('common.balance')}</div>
         <div className="text-lg font-bold text-pulse-gold">{fmt(balance)} PULSE</div>
       </div>
 
-      {/* Category filter */}
       <div className="flex gap-2 mb-4 overflow-x-auto -mx-4 px-4 pb-1">
         <button
           onClick={() => setFilter('all')}
           className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${filter === 'all' ? 'bg-pulse-gold text-black' : 'bg-pulse-border/40 text-pulse-mute'}`}
         >
-          Tout
+          {t('shop.filter_all')}
         </button>
         {(Object.keys(CATEGORY_META) as ShopCategory[]).map(c => {
           const meta = CATEGORY_META[c];
@@ -96,7 +104,7 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
               className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${filter === c ? 'bg-pulse-gold text-black' : 'bg-pulse-border/40 text-pulse-mute'}`}
             >
               <span>{meta.emoji}</span>
-              <span>{meta.label}</span>
+              <span>{catLabel(c)}</span>
               <span className="opacity-70">{count}</span>
             </button>
           );
@@ -106,19 +114,18 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
       {items.length === 0 && (
         <div className="bg-pulse-card border border-pulse-border rounded-xl p-6 text-center">
           <div className="text-4xl mb-2">🕸️</div>
-          <div className="font-semibold">Boutique vide</div>
-          <div className="text-sm text-pulse-mute mt-1">Ajoute des articles via la page <a href="/dashboard/shop/manage" className="text-pulse-gold underline">Gérer</a>.</div>
+          <div className="font-semibold">{t('shop.empty_title')}</div>
+          <div className="text-sm text-pulse-mute mt-1">{t('shop.empty_hint')}</div>
         </div>
       )}
 
-      {/* Sections by category */}
       {Array.from(grouped.entries()).map(([cat, list]) => {
         const meta = CATEGORY_META[cat];
         return (
           <section key={cat} className="mb-5">
             <div className="text-xs uppercase tracking-wide text-pulse-mute mb-2 flex items-center gap-2">
               <span className="text-base">{meta.emoji}</span>
-              <span className="font-semibold">{meta.label}</span>
+              <span className="font-semibold">{catLabel(cat)}</span>
               <span className="text-pulse-border">·</span>
               <span>{list.length}</span>
             </div>
@@ -150,9 +157,9 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
                           <div className="text-xs text-pulse-mute mt-0.5 line-clamp-2">{item.description}</div>
                         )}
                         <div className="flex items-center gap-2 mt-1 text-[10px] text-pulse-mute">
-                          {stock !== null && <span className={outOfStock ? 'text-red-300' : ''}>Stock: {stock}</span>}
-                          {item.max_per_user && <span>· max {item.max_per_user}/pers</span>}
-                          {!item.auto_apply && <span>· approbation manuelle</span>}
+                          {stock !== null && <span className={outOfStock ? 'text-red-300' : ''}>{t('shop.stock')}: {stock}</span>}
+                          {item.max_per_user && <span>· {t('shop.max_per_person')} {item.max_per_user}{t('shop.per_person_short')}</span>}
+                          {!item.auto_apply && <span>· {t('shop.approval_manual')}</span>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -166,7 +173,11 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
                       disabled={isBuying || outOfStock || cantAfford || isPending}
                       className="w-full mt-3 py-2 rounded-lg bg-pulse-gold text-black font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed shadow-brand"
                     >
-                      {isBuying ? 'Achat…' : isPending ? '✅ Acheté' : outOfStock ? 'Rupture' : cantAfford ? 'PULSE insuffisant' : `🛒 Acheter — ${fmt(item.price_pulse)}`}
+                      {isBuying ? t('shop.buying')
+                        : isPending ? `✅ ${t('shop.bought')}`
+                        : outOfStock ? t('shop.out_of_stock')
+                        : cantAfford ? t('common.insufficient')
+                        : `🛒 ${t('shop.buy')} — ${fmt(item.price_pulse)}`}
                     </button>
 
                     {fb && (

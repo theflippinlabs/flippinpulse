@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
+import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,17 +36,17 @@ export default async function Leaderboard() {
     <>
       <Link href="/app" className="inline-flex items-center gap-1 text-sm text-pulse-mute hover:text-pulse-gold mb-3">
         <span className="text-lg leading-none">‹</span>
-        <span>Retour</span>
+        <span>{t('common.back')}</span>
       </Link>
-      <h1 className="text-2xl font-bold mb-1">🏆 Classement</h1>
-      <p className="text-pulse-mute text-sm mb-4">Top 50 par points totaux.</p>
+      <h1 className="text-2xl font-bold mb-1">🏆 {t('leaderboard.title')}</h1>
+      <p className="text-pulse-mute text-sm mb-4">{t('leaderboard.subtitle')}</p>
 
       {meIdx >= 0 && meIdx > 2 && (
         <div className="bg-pulse-gold/10 border border-pulse-gold/40 rounded-xl p-3 mb-4 flex items-center gap-3">
           <div className="text-lg font-black text-pulse-gold w-8 text-center">#{meIdx + 1}</div>
           <div className="flex-1 min-w-0">
-            <div className="font-bold truncate">Toi — {rows[meIdx].username}</div>
-            <div className="text-xs text-pulse-mute">{fmt(rows[meIdx].points_total)} pts · {fmt(rows[meIdx].balance_pulse)} PULSE</div>
+            <div className="font-bold truncate">{t('leaderboard.you_label')} — {rows[meIdx].username}</div>
+            <div className="text-xs text-pulse-mute">{fmt(rows[meIdx].points_total)} {t('common.points')} · {fmt(rows[meIdx].balance_pulse)} PULSE</div>
           </div>
         </div>
       )}
@@ -79,13 +80,13 @@ export default async function Leaderboard() {
                   )}
                 </div>
                 <div className="text-xs text-pulse-mute font-mono mt-0.5">
-                  {fmt(r.points_total)} pts · {fmt(r.balance_pulse)} PULSE
+                  {fmt(r.points_total)} {t('common.points')} · {fmt(r.balance_pulse)} PULSE
                 </div>
               </div>
               {r.points_week > 0 && (
                 <div className="text-right text-xs">
                   <div className="text-pulse-gold font-mono">+{fmt(r.points_week)}</div>
-                  <div className="text-[9px] text-pulse-mute uppercase">7j</div>
+                  <div className="text-[9px] text-pulse-mute uppercase">{t('common.week_short')}</div>
                 </div>
               )}
             </li>

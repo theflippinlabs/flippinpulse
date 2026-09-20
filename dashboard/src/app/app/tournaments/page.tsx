@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { t } from '@/lib/i18n';
 import TournamentsClient from './TournamentsClient';
 
 export const dynamic = 'force-dynamic';
@@ -33,8 +34,7 @@ export default async function TournamentsPage() {
   if (!session) redirect('/');
   const { tournaments, joined } = await load(session.id);
 
-  // Player counts in one round trip.
-  const ids = tournaments.map(t => t.id);
+  const ids = tournaments.map(x => x.id);
   const counts = new Map<string, number>();
   if (ids.length) {
     const { data } = await supabase.from('tournament_players').select('tournament_id').in('tournament_id', ids);
@@ -43,20 +43,20 @@ export default async function TournamentsPage() {
     }
   }
 
-  const enriched = tournaments.map(t => ({
-    ...t,
-    players_count: counts.get(t.id) ?? 0,
-    joined: joined.has(t.id),
+  const enriched = tournaments.map(x => ({
+    ...x,
+    players_count: counts.get(x.id) ?? 0,
+    joined: joined.has(x.id),
   }));
 
   return (
     <>
       <Link href="/app" className="inline-flex items-center gap-1 text-sm text-pulse-mute hover:text-pulse-gold mb-3">
         <span className="text-lg leading-none">‹</span>
-        <span>Retour</span>
+        <span>{t('common.back')}</span>
       </Link>
-      <h1 className="text-2xl font-bold mb-1">🏟️ Tournois</h1>
-      <p className="text-pulse-mute text-sm mb-4">Inscris-toi et affronte les autres membres.</p>
+      <h1 className="text-2xl font-bold mb-1">🏟️ {t('tournaments.title')}</h1>
+      <p className="text-pulse-mute text-sm mb-4">{t('tournaments.subtitle')}</p>
       <TournamentsClient tournaments={enriched} />
     </>
   );

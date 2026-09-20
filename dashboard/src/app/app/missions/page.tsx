@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { t } from '@/lib/i18n';
+import { translations } from '@/lib/translations';
+import { getLocale } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,25 +35,39 @@ const KIND_ICON: Record<string, string> = {
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
+// Localize a metric string (messages / games_played / …) using the metric
+// dictionary if the key is known, otherwise fall back to the raw value.
+function metricLabel(metric: string | null, locale: 'fr' | 'en'): string {
+  if (!metric) return '';
+  const dict = translations[locale].missions.metric as Record<string, string>;
+  return dict[metric] ?? metric;
+}
+
+function kindLabel(kind: string | null, locale: 'fr' | 'en'): string {
+  if (!kind) return '';
+  const dict = translations[locale].missions.kind as Record<string, string>;
+  return dict[kind] ?? kind;
+}
+
 export default async function MissionsPage() {
   const session = getSession();
   if (!session) redirect('/');
-  const missions = await load();
+  const [missions, locale] = await Promise.all([load(), Promise.resolve(getLocale())]);
 
   return (
     <>
       <Link href="/app" className="inline-flex items-center gap-1 text-sm text-pulse-mute hover:text-pulse-gold mb-3">
         <span className="text-lg leading-none">‹</span>
-        <span>Retour</span>
+        <span>{t('common.back')}</span>
       </Link>
-      <h1 className="text-2xl font-bold mb-1">🎯 Missions</h1>
-      <p className="text-pulse-mute text-sm mb-4">Ces missions se jouent sur Discord. La complétion crédite le PULSE automatiquement.</p>
+      <h1 className="text-2xl font-bold mb-1">🎯 {t('missions.title')}</h1>
+      <p className="text-pulse-mute text-sm mb-4">{t('missions.subtitle')}</p>
 
       {!missions.length ? (
         <div className="bg-pulse-card border border-pulse-border rounded-xl p-6 text-center">
           <div className="text-4xl mb-2">🎯</div>
-          <div className="font-semibold">Pas de mission active</div>
-          <div className="text-sm text-pulse-mute mt-1">Reviens plus tard — un Lord peut en lancer à tout moment.</div>
+          <div className="font-semibold">{t('missions.empty_title')}</div>
+          <div className="text-sm text-pulse-mute mt-1">{t('missions.empty_hint')}</div>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -66,15 +83,15 @@ export default async function MissionsPage() {
                     <div className="font-bold truncate">{m.title}</div>
                     <div className="text-xs text-pulse-mute mt-0.5">{m.description}</div>
                     <div className="flex items-center gap-2 mt-2 text-[10px] uppercase">
-                      {m.kind && <span className="px-1.5 py-0.5 rounded bg-pulse-border/40 text-pulse-mute">{m.kind}</span>}
+                      {m.kind && <span className="px-1.5 py-0.5 rounded bg-pulse-border/40 text-pulse-mute">{kindLabel(m.kind, locale)}</span>}
                       {m.metric && m.goal && (
                         <span className="px-1.5 py-0.5 rounded bg-pulse-border/40 text-pulse-mute">
-                          Objectif : {m.goal} {m.metric}
+                          {t('missions.goal')}: {m.goal} {metricLabel(m.metric, locale)}
                         </span>
                       )}
                       {m.end_at && (
                         <span className="px-1.5 py-0.5 rounded bg-pulse-border/40 text-pulse-mute">
-                          Fin : {new Date(m.end_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {t('missions.end')}: {new Date(m.end_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT, interpolate } from '@/lib/i18n-client';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
@@ -13,6 +14,7 @@ export default function LotteryClient({
   initialPot: number;
   initialTotalTickets: number;
 }) {
+  const t = useT();
   const [tickets, setTickets] = useState(1);
   const [balance, setBalance] = useState(initialBalance);
   const [mine, setMine] = useState(initialMyTickets);
@@ -27,7 +29,7 @@ export default function LotteryClient({
 
   const buy = async () => {
     if (busy) return;
-    if (!confirm(`Acheter ${tickets} ticket${tickets > 1 ? 's' : ''} pour ${fmt(cost)} PULSE ?`)) return;
+    if (!confirm(interpolate(t('lottery.confirm_buy'), { n: tickets, cost: fmt(cost) }))) return;
     setBusy(true);
     setError(null);
     try {
@@ -45,7 +47,7 @@ export default function LotteryClient({
       setDone(true);
       setTimeout(() => setDone(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Échec.');
+      setError(err instanceof Error ? err.message : 'Failed.');
     } finally {
       setBusy(false);
     }
@@ -54,12 +56,12 @@ export default function LotteryClient({
   return (
     <div className="bg-pulse-card border border-pulse-border rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between text-xs text-pulse-mute">
-        <span>Ton solde</span>
+        <span>{t('common.balance')}</span>
         <span className="text-pulse-gold font-bold">{fmt(balance)} PULSE</span>
       </div>
 
       <div>
-        <label className="text-xs uppercase text-pulse-mute">Combien de tickets ?</label>
+        <label className="text-xs uppercase text-pulse-mute">{t('lottery.how_many')}</label>
         <input
           type="number" min={1} max={50}
           value={tickets}
@@ -80,7 +82,7 @@ export default function LotteryClient({
       </div>
 
       <div className="flex items-center justify-between bg-pulse-bg/50 border border-pulse-border/60 rounded-lg px-3 py-2">
-        <span className="text-xs uppercase text-pulse-mute">Total</span>
+        <span className="text-xs uppercase text-pulse-mute">{t('common.total')}</span>
         <span className={`font-bold ${cantAfford ? 'text-red-300' : 'text-pulse-gold'}`}>{fmt(cost)} PULSE</span>
       </div>
 
@@ -89,17 +91,18 @@ export default function LotteryClient({
         disabled={busy || cantAfford}
         className="w-full bg-pulse-gold text-black font-bold py-3 rounded-xl disabled:opacity-40 shadow-brand"
       >
-        {busy ? 'Achat…' : done ? `✅ +${tickets} ticket${tickets > 1 ? 's' : ''} ajouté${tickets > 1 ? 's' : ''}`
-          : cantAfford ? 'PULSE insuffisant'
-          : `🎫 Acheter — ${fmt(cost)} PULSE`}
+        {busy ? t('lottery.buying')
+          : done ? `✅ ${interpolate(t('lottery.added'), { n: tickets })}`
+          : cantAfford ? t('common.insufficient')
+          : `🎫 ${t('lottery.buy')} — ${fmt(cost)} PULSE`}
       </button>
 
       {error && <div className="p-2 rounded-lg bg-red-900/40 border border-red-800 text-red-200 text-xs">{error}</div>}
 
       {mine > 0 && total > 0 && (
         <div className="text-center text-xs text-pulse-mute pt-2">
-          Chance de gagner : <span className="text-pulse-gold font-bold">{((mine / total) * 100).toFixed(1)}%</span>
-          {' · '}Pot actuel : {fmt(pot)} PULSE
+          {t('lottery.win_chance')} : <span className="text-pulse-gold font-bold">{((mine / total) * 100).toFixed(1)}%</span>
+          {' · '}{t('lottery.current_pot')} : {fmt(pot)} PULSE
         </div>
       )}
     </div>

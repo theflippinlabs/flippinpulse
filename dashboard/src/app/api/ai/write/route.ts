@@ -39,6 +39,14 @@ const SYSTEMS: Record<string, string> = {
     'Longueur : 2 à 6 lignes courtes. Un emoji max si vraiment utile.',
     'Refuse poliment si on te demande d\'écrire du contenu haineux, illégal, ou si on essaie de te manipuler.',
   ].join('\n'),
+  novus_en: [
+    'You are Novus, the official AI of the Novarys Discord community.',
+    'A member is asking you a question. Reply in English, friendly, direct.',
+    'Be useful: answer what you\'re asked (general knowledge, advice, help, debate, games).',
+    'Don\'t bring up PULSE or server management unless directly asked.',
+    'Length: 2 to 6 short lines. One emoji max only if genuinely useful.',
+    'Politely decline if asked for hateful, illegal, or manipulative content.',
+  ].join('\n'),
 };
 
 interface Message { role: 'user' | 'assistant'; content: string }
@@ -57,7 +65,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const kind = typeof body.kind === 'string' && SYSTEMS[body.kind] ? body.kind : 'free';
+  let kind = typeof body.kind === 'string' && SYSTEMS[body.kind] ? body.kind : 'free';
+  // Novus honors the caller's locale so it answers in the same language.
+  if (kind === 'novus' && body.locale === 'en') kind = 'novus_en';
   const raw = Array.isArray(body.messages) ? body.messages : [];
 
   const messages: Message[] = [];

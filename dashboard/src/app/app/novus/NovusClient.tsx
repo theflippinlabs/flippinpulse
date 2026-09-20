@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT, useLocale, tArray } from '@/lib/i18n-client';
 
 interface Message { role: 'user' | 'assistant'; content: string }
 
-// Web Speech API surface — declared inline (same shape used elsewhere).
 interface SpeechRecogEvent { results: { [k: number]: { [k: number]: { transcript: string }, isFinal: boolean } }; resultIndex: number }
 interface SpeechRecog {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -14,14 +14,11 @@ interface SpeechRecog {
   onerror: ((e: { error: string }) => void) | null;
 }
 
-const SUGGESTIONS = [
-  'C\'est quoi Novarys ?',
-  'Aide-moi à écrire un message d\'excuses stylé.',
-  'Résume-moi la théorie des jeux en 3 lignes.',
-  'Donne-moi un défi rigolo pour ce soir.',
-];
-
 export default function NovusClient() {
+  const t = useT();
+  const locale = useLocale();
+  const suggestions = tArray(locale, 'novus.suggestions');
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,13 +52,13 @@ export default function NovusClient() {
       const res = await fetch('/api/ai/write', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ kind: 'novus', messages: next }),
+        body: JSON.stringify({ kind: 'novus', messages: next, locale }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setMessages(m => [...m, { role: 'assistant', content: data.reply }]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Échec.');
+      setError(err instanceof Error ? err.message : 'Failed.');
     } finally {
       setBusy(false);
     }
@@ -76,7 +73,7 @@ export default function NovusClient() {
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) return;
     const recog = new Ctor();
-    recog.lang = 'fr-FR';
+    recog.lang = locale === 'en' ? 'en-US' : 'fr-FR';
     recog.continuous = false;
     recog.interimResults = true;
     let finalSoFar = '';
@@ -98,14 +95,13 @@ export default function NovusClient() {
 
   return (
     <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 240px)' }}>
-      {/* Messages */}
       <div className="flex-1 space-y-3 mb-3">
         {messages.length === 0 && (
           <div className="text-center py-6">
             <div className="text-6xl mb-3">🧠</div>
-            <div className="text-pulse-mute text-sm mb-4">Novus est prêt à répondre.</div>
+            <div className="text-pulse-mute text-sm mb-4">{t('novus.empty')}</div>
             <div className="grid grid-cols-1 gap-2 max-w-md mx-auto">
-              {SUGGESTIONS.map(s => (
+              {suggestions.map(s => (
                 <button
                   key={s}
                   onClick={() => send(s)}
@@ -131,7 +127,7 @@ export default function NovusClient() {
         {busy && (
           <div className="flex justify-start">
             <div className="bg-pulse-card border border-pulse-border rounded-2xl rounded-bl-sm px-3 py-2 text-sm text-pulse-mute">
-              <span className="inline-block animate-pulse">🧠 réfléchit…</span>
+              <span className="inline-block animate-pulse">🧠 {t('novus.thinking')}</span>
             </div>
           </div>
         )}
@@ -141,7 +137,6 @@ export default function NovusClient() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="sticky bottom-24 bg-black/95 backdrop-blur border-t border-pulse-border -mx-4 px-4 py-3 flex gap-2 items-end">
         <textarea
           value={input}
@@ -152,7 +147,7 @@ export default function NovusClient() {
               send(input);
             }
           }}
-          placeholder={listening ? '🎤 J\'écoute…' : 'Pose ta question…'}
+          placeholder={listening ? `🎤 ${t('novus.voice_listening')}` : t('novus.placeholder')}
           rows={2}
           className="flex-1 bg-pulse-bg border border-pulse-border rounded-lg px-3 py-2 text-sm resize-none"
         />
@@ -160,7 +155,7 @@ export default function NovusClient() {
           <button
             type="button"
             onClick={toggleVoice}
-            aria-label={listening ? 'Arrêter' : 'Parler'}
+            aria-label={listening ? t('novus.voice_stop') : t('novus.voice_start')}
             className={`w-11 h-11 rounded-lg font-bold flex items-center justify-center text-lg ${
               listening ? 'bg-red-500 text-white animate-pulse' : 'bg-pulse-border/60 text-pulse-text'
             }`}
@@ -173,7 +168,7 @@ export default function NovusClient() {
           disabled={busy || !input.trim()}
           className="px-4 py-2 rounded-lg bg-pulse-gold text-black font-bold text-sm disabled:opacity-50"
         >
-          {busy ? '…' : 'Envoyer'}
+          {busy ? '…' : t('common.send')}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
+import { t } from '@/lib/i18n';
 import { redirect } from 'next/navigation';
 import { getBalance } from '@/lib/play';
 import BlackjackClient from '@/app/dashboard/play/blackjack/BlackjackClient';
@@ -14,7 +15,7 @@ export default async function BlackjackPage() {
     <>
       <Link href="/app/play" className="inline-flex items-center gap-1 text-sm text-pulse-mute hover:text-pulse-gold mb-3">
         <span className="text-lg leading-none">‹</span>
-        <span>Retour aux jeux</span>
+        <span>{t('play.back_to_games')}</span>
       </Link>
       <h1 className="text-xl md:text-2xl font-bold mb-4">🃏 Blackjack</h1>
       <BlackjackClient initialBalance={balance} />

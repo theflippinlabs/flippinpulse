@@ -21,7 +21,7 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
         <div className="text-center mb-6 relative">
           <div className="text-5xl text-pulse-gold">⚡</div>
           <h1 className="text-2xl font-bold mt-2 tracking-wider">NOVARYS <span className="text-pulse-gold">//</span> Pulse</h1>
-          <p className="text-pulse-mute mt-2 text-sm">Games, boutique, tournois — signe-toi avec Discord.</p>
+          <p className="text-pulse-mute mt-2 text-sm">Games, shop, tournaments — sign in with Discord.</p>
         </div>
         {err && (
           <div className="mb-4 p-3 rounded-lg bg-red-900/40 border border-red-800 text-red-200 text-sm">{err}</div>
