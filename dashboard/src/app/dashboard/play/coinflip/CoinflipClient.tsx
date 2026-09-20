@@ -67,9 +67,12 @@ export default function CoinflipClient({ initialBalance, channels }: { initialBa
         {result && (
           <div className="mt-4 text-center">
             {result.won ? (
-              <div className="text-2xl font-bold text-pulse-gold">🎉 +{result.payout} PULSE</div>
+              <>
+                <div className="text-2xl font-bold text-pulse-gold">🎉 +{(result.payout - result.bet).toLocaleString('en-US')} PULSE net</div>
+                <div className="text-xs text-pulse-mute">({result.payout.toLocaleString('en-US')} back on a {result.bet.toLocaleString('en-US')} bet)</div>
+              </>
             ) : (
-              <div className="text-lg text-pulse-mute">Better luck next flip.</div>
+              <div className="text-lg text-red-300">– {result.bet.toLocaleString('en-US')} PULSE</div>
             )}
           </div>
         )}

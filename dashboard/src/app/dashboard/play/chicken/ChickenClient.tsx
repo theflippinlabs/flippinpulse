@@ -179,8 +179,11 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold text-pulse-gold">🎉 +{outcome.payout.toLocaleString('en-US')} PULSE</div>
-                <div className="text-xs text-pulse-mute mt-1">The chicken flew at <span className="text-red-400 font-semibold">{outcome.crash_mult.toFixed(2)}x</span></div>
+                <div className="text-2xl font-bold text-pulse-gold">🎉 +{(outcome.payout - outcome.bet).toLocaleString('en-US')} PULSE net</div>
+                <div className="text-xs text-pulse-mute mt-1">
+                  {outcome.payout.toLocaleString('en-US')} back on {outcome.bet.toLocaleString('en-US')} bet
+                  <br />The chicken flew at <span className="text-red-400 font-semibold">{outcome.crash_mult.toFixed(2)}x</span>
+                </div>
               </>
             )}
           </div>

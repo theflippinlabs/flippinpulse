@@ -65,9 +65,12 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
             <div className="text-xs text-pulse-mute">The roll was</div>
             <div className="text-5xl font-bold my-1">{result.roll}</div>
             {result.won ? (
-              <div className="text-lg font-bold text-pulse-gold">🎉 +{result.payout.toLocaleString('en-US')} PULSE ({result.multiplier}×)</div>
+              <>
+                <div className="text-lg font-bold text-pulse-gold">🎉 +{(result.payout - result.bet).toLocaleString('en-US')} PULSE net</div>
+                <div className="text-xs text-pulse-mute">{result.multiplier}× ({result.payout.toLocaleString('en-US')} back)</div>
+              </>
             ) : (
-              <div className="text-lg text-pulse-mute">– {result.bet.toLocaleString('en-US')} PULSE</div>
+              <div className="text-lg text-red-300">– {result.bet.toLocaleString('en-US')} PULSE</div>
             )}
           </div>
         )}

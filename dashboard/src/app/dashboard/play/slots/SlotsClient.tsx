@@ -64,10 +64,11 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
 
       setResult(data);
       setBalance(data.newBalance);
+      const netGain = data.payout - data.bet;
       setStats(s => ({
         plays: s.plays + 1,
-        wins: s.wins + (data.payout > 0 ? 1 : 0),
-        biggest: Math.max(s.biggest, data.payout),
+        wins: s.wins + (netGain > 0 ? 1 : 0), // real win = net > 0, ignore refunds
+        biggest: Math.max(s.biggest, netGain), // track biggest NET gain
       }));
     } catch (err) {
       clearInterval(spinInterval);
@@ -77,8 +78,10 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
     }
   };
 
-  const won = result && result.payout > 0;
-  const multi = result && result.bet > 0 ? Math.floor(result.payout / result.bet) : 0;
+  const net = result ? result.payout - result.bet : 0;
+  const won = net > 0;
+  const push = result && result.payout > 0 && net === 0;
+  const multi = result && result.bet > 0 ? (result.payout / result.bet) : 0;
 
   return (
     <>
@@ -109,11 +112,16 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
           <div className="text-center mt-3">
             {won ? (
               <div>
-                <div className="text-2xl font-bold text-pulse-gold">🎉 +{result.payout.toLocaleString('en-US')} PULSE</div>
-                <div className="text-sm text-pulse-mute">{multi}× your bet</div>
+                <div className="text-2xl font-bold text-pulse-gold">🎉 +{net.toLocaleString('en-US')} PULSE net</div>
+                <div className="text-sm text-pulse-mute">{multi.toFixed(1)}× your bet ({result.payout.toLocaleString('en-US')} back)</div>
+              </div>
+            ) : push ? (
+              <div>
+                <div className="text-lg text-pulse-mute">↩️ Push — bet refunded</div>
+                <div className="text-xs text-pulse-mute">Any 2 match pays back your stake</div>
               </div>
             ) : (
-              <div className="text-lg text-pulse-mute">– {result.bet.toLocaleString('en-US')} PULSE</div>
+              <div className="text-lg text-red-300">– {result.bet.toLocaleString('en-US')} PULSE</div>
             )}
           </div>
         )}
@@ -173,7 +181,7 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
 
       <div className="mt-4 bg-pulse-card border border-pulse-border rounded-xl p-3 text-xs text-pulse-mute">
         <div className="font-semibold text-pulse-text mb-1">Payouts (per bet)</div>
-        <div>3× 7️⃣ = <b className="text-pulse-gold">50×</b> · 3× 💎 = <b className="text-pulse-gold">20×</b> · 3× ⭐ = <b className="text-pulse-gold">10×</b> · 3× other = 5× · any 2 match = 1×</div>
+        <div>3× 7️⃣ = <b className="text-pulse-gold">50×</b> · 3× 💎 = <b className="text-pulse-gold">20×</b> · 3× ⭐ = <b className="text-pulse-gold">10×</b> · 3× other = 5× · any 2 match = 1.5×</div>
       </div>
     </>
   );
