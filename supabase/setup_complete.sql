@@ -680,6 +680,11 @@ UPDATE public.settings SET value_json = jsonb_set(value_json, '{enabled}', 'fals
 -- treasure_drop, quiz) is enabled by default. Safe: only touches games_config.
 UPDATE public.games_config SET is_enabled = true;
 
+-- Giveaways: optional PULSE prize per winner. When set the bot auto-grants
+-- this amount to each winner on end. Nullable so text-prize giveaways still
+-- work as before.
+ALTER TABLE public.giveaways ADD COLUMN IF NOT EXISTS prize_pulse INTEGER;
+
 -- ---------- VERIFY ----------
 SELECT 'Tables created' AS check, count(*) AS n
 FROM information_schema.tables WHERE table_schema = 'public';

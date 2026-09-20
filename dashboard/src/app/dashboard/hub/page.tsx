@@ -40,6 +40,7 @@ export default async function HubPage() {
   const s = await loadQuickStats();
   const tiles: Tile[] = [
     { href: '/dashboard/play',        emoji: '🎮', title: 'Play',        hint: 'Slots · Coin · H/L — live PULSE' },
+    { href: '/dashboard/reserve',     emoji: '💰', title: 'Réserve',     hint: 'Drops · Giveaways · PULSE gift' },
     { href: '/dashboard/games',       emoji: '⚙️', title: 'Games',       hint: `${s.gamesEnabled} / ${s.gamesTotal} ON` },
     { href: '/dashboard/tournaments', emoji: '🏟️', title: 'Tournaments', hint: `${s.tournois} held` },
     { href: '/dashboard/lottery',     emoji: '🎫', title: 'Lottery',     hint: `${s.lotteryPot.toLocaleString('en-US')} pot` },

@@ -6,6 +6,7 @@ const ALLOWED = new Set([
   'announce', 'grant_pulse', 'revoke_pulse', 'release_jail',
   'create_tournament', 'novus_post_now', 'launch_mission', 'end_all_missions',
   'force_lottery_draw',
+  'create_giveaway', 'bulk_drop',
 ]);
 
 export async function POST(req: NextRequest) {

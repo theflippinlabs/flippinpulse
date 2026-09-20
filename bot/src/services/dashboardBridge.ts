@@ -14,6 +14,13 @@ import { createTournament, listPlayers } from './tournaments.js';
 import { endAllChallenges, launchFlash, launchObjective, launchRiddle } from './challenges.js';
 import { getPulsarConfig, pulsarPostNow } from './pulsar.js';
 import { forceLotteryDraw } from './lottery.js';
+import {
+  buildEnterRow,
+  buildGiveawayEmbed,
+  createGiveaway,
+  getGiveaway,
+  setGiveawayMessage,
+} from './giveaways.js';
 import { log } from '../utils/logger.js';
 
 interface DashboardCommand {
@@ -204,6 +211,104 @@ async function handleEndAllMissions(client: Client): Promise<void> {
   await endAllChallenges(client);
 }
 
+async function handleCreateGiveaway(client: Client, cmd: DashboardCommand): Promise<void> {
+  const { channel_id, prize_label, prize_pulse, winners_count, duration_minutes } = cmd.payload_json as {
+    channel_id?: string;
+    prize_label?: string;
+    prize_pulse?: number;
+    winners_count?: number;
+    duration_minutes?: number;
+  };
+  if (!channel_id) throw new Error('create_giveaway: channel_id required');
+  if (typeof prize_pulse !== 'number' || prize_pulse <= 0) throw new Error('create_giveaway: prize_pulse required');
+  if (typeof winners_count !== 'number' || winners_count < 1) throw new Error('create_giveaway: winners_count required');
+  if (typeof duration_minutes !== 'number' || duration_minutes < 1) throw new Error('create_giveaway: duration_minutes required');
+
+  const channel = await client.channels.fetch(channel_id).catch(() => null) as TextChannel | null;
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) {
+    throw new Error('create_giveaway: channel not text-based');
+  }
+  const label = prize_label?.trim() || `${prize_pulse} PULSE`;
+
+  const giveawayId = await createGiveaway({
+    guildId: channel.guildId!,
+    channelId: channel_id,
+    hostId: cmd.created_by ?? 'dashboard',
+    prize: label,
+    prizePulse: Math.floor(prize_pulse),
+    winnersCount: winners_count,
+    durationMs: duration_minutes * 60_000,
+  });
+  if (!giveawayId) throw new Error('create_giveaway: DB insert failed');
+
+  const g = await getGiveaway(giveawayId);
+  if (!g) throw new Error('create_giveaway: lookup failed after creation');
+
+  const embed = buildGiveawayEmbed(g, 0);
+  const message = await channel.send({ embeds: [embed], components: [buildEnterRow()] });
+  await setGiveawayMessage(giveawayId, message.id);
+}
+
+async function handleBulkDrop(client: Client, cmd: DashboardCommand): Promise<void> {
+  const { channel_id, amount, winners_count, scope } = cmd.payload_json as {
+    channel_id?: string;
+    amount?: number;
+    winners_count?: number;
+    scope?: 'active_week' | 'top_50' | 'all';
+  };
+  if (!channel_id) throw new Error('bulk_drop: channel_id required');
+  if (typeof amount !== 'number' || amount <= 0) throw new Error('bulk_drop: amount required');
+  if (typeof winners_count !== 'number' || winners_count < 1) throw new Error('bulk_drop: winners_count required');
+
+  const channel = await client.channels.fetch(channel_id).catch(() => null) as TextChannel | null;
+  if (!channel || !channel.isTextBased()) throw new Error('bulk_drop: channel not text-based');
+
+  // Pick the candidate pool by scope. "all" is capped at 500 to keep it sane.
+  let query = supabase.from('discord_users').select('discord_id, username, avatar_url');
+  if (scope === 'active_week') {
+    query = query.order('points_week', { ascending: false }).limit(200);
+  } else if (scope === 'top_50') {
+    query = query.order('points_total', { ascending: false }).limit(50);
+  } else {
+    query = query.limit(500);
+  }
+  const { data: candidates } = await query;
+  const pool = (candidates ?? []) as Array<{ discord_id: string; username: string; avatar_url: string | null }>;
+  if (!pool.length) throw new Error('bulk_drop: no eligible members');
+
+  // Pick winners_count random members without replacement.
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const winners = shuffled.slice(0, Math.min(winners_count, shuffled.length));
+
+  for (const w of winners) {
+    try {
+      await grantPulse(
+        w.discord_id,
+        w.username ?? 'member',
+        w.avatar_url,
+        Math.floor(amount),
+        'Reserve drop from dashboard',
+        cmd.created_by ?? 'dashboard',
+      );
+    } catch (err) {
+      log('ERROR', `bulk_drop: grant to ${w.discord_id} failed`, err);
+    }
+  }
+
+  const mentions = winners.map(w => `<@${w.discord_id}>`).join(' ');
+  const embed = new EmbedBuilder()
+    .setColor(0xF5B62E)
+    .setTitle(`💸 PULSE Drop — ${amount.toLocaleString('en-US')} each`)
+    .setDescription(`${winners.length} winner${winners.length > 1 ? 's' : ''} just got **${amount} PULSE** each from the reserve.`)
+    .addFields({ name: 'Winners', value: mentions.slice(0, 1000) })
+    .setTimestamp();
+  await channel.send({ content: mentions, embeds: [embed] }).catch(() => null);
+}
+
 async function processOne(client: Client, cmd: DashboardCommand): Promise<void> {
   try {
     if (cmd.command === 'announce') await handleAnnounce(client, cmd);
@@ -218,6 +323,8 @@ async function processOne(client: Client, cmd: DashboardCommand): Promise<void> 
       const ok = await forceLotteryDraw(client);
       if (!ok) throw new Error('force_lottery_draw: no active round');
     }
+    else if (cmd.command === 'create_giveaway') await handleCreateGiveaway(client, cmd);
+    else if (cmd.command === 'bulk_drop') await handleBulkDrop(client, cmd);
     else throw new Error(`Unknown command: ${cmd.command}`);
     await markDone(cmd.id);
     log('INFO', `Dashboard cmd ${cmd.command} ${cmd.id} done`);

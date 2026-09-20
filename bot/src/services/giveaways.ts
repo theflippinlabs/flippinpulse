@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
+import { grantPulse } from './economy.js';
 
 export const GIVEAWAY_BUTTON_ID = 'giveaway:enter';
 const TICK_MS = 30_000;
@@ -21,6 +22,7 @@ interface Giveaway {
   message_id: string | null;
   host_discord_id: string;
   prize: string;
+  prize_pulse: number | null;
   winners_count: number;
   end_at: string;
   status: 'active' | 'ended' | 'cancelled';
@@ -67,6 +69,7 @@ export async function createGiveaway(params: {
   channelId: string;
   hostId: string;
   prize: string;
+  prizePulse?: number | null;
   winnersCount: number;
   durationMs: number;
 }): Promise<string | null> {
@@ -78,6 +81,7 @@ export async function createGiveaway(params: {
       channel_id: params.channelId,
       host_discord_id: params.hostId,
       prize: params.prize,
+      prize_pulse: params.prizePulse ?? null,
       winners_count: params.winnersCount,
       end_at: endAt,
       status: 'active',
@@ -177,8 +181,33 @@ export async function endGiveaway(client: Client, giveawayId: string): Promise<v
     }
   }
 
+  // Auto-payout PULSE prize: grant `prize_pulse` to each winner. Silent
+  // if the column is null (text-only prize) — old giveaways still work.
+  if (g.prize_pulse && g.prize_pulse > 0 && winners.length) {
+    for (const winnerId of winners) {
+      try {
+        const { data: user } = await supabase
+          .from('discord_users')
+          .select('username, avatar_url')
+          .eq('discord_id', winnerId)
+          .maybeSingle();
+        await grantPulse(
+          winnerId,
+          (user?.username as string) ?? 'winner',
+          (user?.avatar_url as string) ?? null,
+          Math.floor(g.prize_pulse),
+          `Giveaway prize: ${g.prize}`,
+          g.host_discord_id,
+        );
+      } catch (err) {
+        log('ERROR', `Giveaway ${giveawayId}: payout to ${winnerId} failed`, err);
+      }
+    }
+  }
+
+  const suffix = g.prize_pulse ? ` (${g.prize_pulse} PULSE each)` : '';
   const announce = winners.length
-    ? `🎉 Giveaway ended! Winner${winners.length > 1 ? 's' : ''} of **${g.prize}**: ${winners.map(id => `<@${id}>`).join(', ')}`
+    ? `🎉 Giveaway ended! Winner${winners.length > 1 ? 's' : ''} of **${g.prize}**${suffix}: ${winners.map(id => `<@${id}>`).join(', ')}`
     : `Giveaway ended: **${g.prize}** — no valid entries.`;
   await text.send(announce).catch(() => null);
 }

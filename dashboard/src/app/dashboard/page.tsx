@@ -34,6 +34,7 @@ interface TopMember {
   points_total: number;
   balance_pulse: number;
   rank_name: string | null;
+  avatar_url: string | null;
 }
 
 interface RecentJail {
@@ -56,7 +57,7 @@ async function loadRecent() {
   const [topMembers, recentJails, lastTournois] = await Promise.all([
     supabase
       .from('discord_users')
-      .select('discord_id, username, points_total, balance_pulse, rank_name')
+      .select('discord_id, username, points_total, balance_pulse, rank_name, avatar_url')
       .order('points_total', { ascending: false })
       .limit(5),
     supabase
@@ -90,7 +91,37 @@ function Card({ label, value, hint }: { label: string; value: string | number; h
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
-const medal = (i: number) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`);
+// Podium ring color per rank: gold / silver / bronze / rest.
+const PODIUM_RING: Record<number, string> = {
+  0: 'ring-4 ring-[#F5B62E] shadow-[0_0_25px_rgba(245,182,46,0.4)]',
+  1: 'ring-4 ring-[#C0C0C0] shadow-[0_0_20px_rgba(192,192,192,0.35)]',
+  2: 'ring-4 ring-[#CD7F32] shadow-[0_0_20px_rgba(205,127,50,0.35)]',
+};
+const MEDAL_BADGE: Record<number, string> = { 0: '🥇', 1: '🥈', 2: '🥉' };
+
+function Avatar({ url, name, rank }: { url: string | null; name: string; rank: number }) {
+  const initial = (name || '?').trim().charAt(0).toUpperCase();
+  const ring = PODIUM_RING[rank] ?? 'ring-1 ring-pulse-border';
+  return (
+    <div className={`relative rounded-full ${ring} bg-pulse-bg flex-shrink-0`}>
+      {url ? (
+        <img src={url} alt="" className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
+      ) : (
+        <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-pulse-gold bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5">
+          {initial}
+        </div>
+      )}
+      {MEDAL_BADGE[rank] && (
+        <div className="absolute -bottom-1 -right-1 text-lg leading-none drop-shadow">{MEDAL_BADGE[rank]}</div>
+      )}
+      {!MEDAL_BADGE[rank] && (
+        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-pulse-bg border border-pulse-border text-[10px] font-bold text-pulse-mute flex items-center justify-center">
+          {rank + 1}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default async function Overview() {
   const [stats, recent] = await Promise.all([loadStats(), loadRecent()]);
@@ -106,40 +137,74 @@ export default async function Overview() {
         <Card label="Badges unlocked" value={fmt(stats.achievementsUnlocked)} hint="Across the community" />
       </div>
 
-      {/* Top members — clean two-line rows, no wrapping mess */}
+      {/* Top members — podium for top 3, then a clean list */}
       <section className="mt-6 md:mt-10">
-        <div className="bg-pulse-card border border-pulse-border rounded-xl p-4 md:p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">🏆 Top members</h2>
-            <Link href="/dashboard/members" className="text-xs text-pulse-mute hover:text-pulse-gold">View all ›</Link>
+        <div className="bg-gradient-to-b from-pulse-card to-pulse-bg border border-pulse-border rounded-2xl p-4 md:p-5 overflow-hidden">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-bold text-lg">🏆 Leaderboard</h2>
+              <div className="text-xs text-pulse-mute">Top members by points</div>
+            </div>
+            <Link href="/dashboard/members" className="text-xs text-pulse-mute hover:text-pulse-gold underline-offset-2 hover:underline">View all ›</Link>
           </div>
-          <ul className="divide-y divide-pulse-border/60">
-            {recent.topMembers.map((m, i) => (
-              <li key={m.discord_id} className="py-2.5 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-full bg-pulse-bg border border-pulse-border flex items-center justify-center text-sm">
-                    {medal(i)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="font-semibold truncate">{m.username || m.discord_id.slice(-6)}</div>
-                      {m.rank_name && (
-                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-pulse-gold/10 text-pulse-gold border border-pulse-gold/20">
-                          {m.rank_name}
-                        </span>
-                      )}
+
+          {recent.topMembers.length === 0 ? (
+            <div className="text-pulse-mute py-4 text-sm text-center">No members yet.</div>
+          ) : (
+            <>
+              {/* Podium: #2 · #1 (raised, centered) · #3 */}
+              <div className="grid grid-cols-3 gap-2 md:gap-4 items-end mb-5">
+                {[1, 0, 2].map(idx => {
+                  const m = recent.topMembers[idx];
+                  if (!m) return <div key={idx} />;
+                  const heights = { 0: 'h-24 md:h-28', 1: 'h-16 md:h-20', 2: 'h-12 md:h-16' };
+                  const tints = {
+                    0: 'from-[#F5B62E]/30 to-[#F5B62E]/5 border-[#F5B62E]/40',
+                    1: 'from-[#C0C0C0]/20 to-[#C0C0C0]/5 border-[#C0C0C0]/30',
+                    2: 'from-[#CD7F32]/20 to-[#CD7F32]/5 border-[#CD7F32]/30',
+                  };
+                  return (
+                    <div key={m.discord_id} className="flex flex-col items-center">
+                      <Avatar url={m.avatar_url} name={m.username} rank={idx} />
+                      <div className="mt-2 text-center max-w-full">
+                        <div className="font-bold text-sm truncate max-w-[100px] md:max-w-none">{m.username || m.discord_id.slice(-6)}</div>
+                        <div className="text-[10px] md:text-xs text-pulse-mute font-mono">{fmt(m.points_total ?? 0)} pts</div>
+                      </div>
+                      <div className={`w-full mt-2 rounded-t-lg bg-gradient-to-t ${tints[idx as 0 | 1 | 2]} border border-b-0 ${heights[idx as 0 | 1 | 2]} flex items-start justify-center pt-1 md:pt-2`}>
+                        <div className="text-lg md:text-2xl font-black text-pulse-text">
+                          {idx === 0 ? '1' : idx === 1 ? '2' : '3'}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-pulse-mute font-mono mt-0.5 truncate">
-                      {fmt(m.points_total ?? 0)} pts · {fmt(m.balance_pulse ?? 0)} PULSE
-                    </div>
-                  </div>
-                </div>
-              </li>
-            ))}
-            {recent.topMembers.length === 0 && (
-              <li className="text-pulse-mute py-2 text-sm">No members yet.</li>
-            )}
-          </ul>
+                  );
+                })}
+              </div>
+
+              {/* Rest: rows 4+ */}
+              {recent.topMembers.length > 3 && (
+                <ul className="space-y-2">
+                  {recent.topMembers.slice(3).map((m, i) => (
+                    <li key={m.discord_id} className="flex items-center gap-3 bg-pulse-bg/60 border border-pulse-border/60 rounded-xl px-3 py-2.5">
+                      <Avatar url={m.avatar_url} name={m.username} rank={i + 3} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold truncate">{m.username || m.discord_id.slice(-6)}</div>
+                          {m.rank_name && (
+                            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-pulse-gold/10 text-pulse-gold border border-pulse-gold/20">
+                              {m.rank_name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-pulse-mute font-mono mt-0.5 truncate">
+                          {fmt(m.points_total ?? 0)} pts · {fmt(m.balance_pulse ?? 0)} PULSE
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
         </div>
       </section>
 
