@@ -25,6 +25,8 @@ const DESKTOP_NAV = [
   { href: '/dashboard/missions', label: '🎯 Missions' },
   { href: '/dashboard/cosmetics', label: '✨ Cosmetics' },
   { href: '/dashboard/lottery', label: '🎫 Lottery' },
+  { href: '/dashboard/automod', label: '🛡️ Auto-mod' },
+  { href: '/dashboard/charts', label: '📊 Charts' },
 ];
 
 interface Props {
@@ -36,7 +38,7 @@ interface Props {
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
   if (href === '/dashboard/hub') {
-    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions']
+    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/charts']
       .some(p => pathname === p || pathname.startsWith(p + '/'));
   }
   return pathname === href || pathname.startsWith(href + '/');

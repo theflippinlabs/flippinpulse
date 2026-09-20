@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 export interface Game {
@@ -30,7 +31,9 @@ export default function GamesClient({ initial }: { initial: Game[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const toggle = async (g: Game) => {
+  const toggle = async (e: React.MouseEvent, g: Game) => {
+    e.preventDefault();
+    e.stopPropagation();
     setBusy(g.game_key);
     setError(null);
     const nextEnabled = !g.is_enabled;
@@ -65,17 +68,24 @@ export default function GamesClient({ initial }: { initial: Game[] }) {
           const max = (j.max_bet as number | undefined) ?? 0;
           const fee = (j.fee_percent as number | undefined) ?? 0;
           return (
-            <div key={g.game_key} className="bg-pulse-card border border-pulse-border rounded-xl p-3">
+            <Link
+              key={g.game_key}
+              href={`/dashboard/games/${g.game_key}`}
+              className="block bg-pulse-card border border-pulse-border rounded-xl p-3 hover:border-pulse-gold/40 transition-colors"
+            >
               <div className="flex items-center gap-3">
                 <div className="text-2xl">{meta.emoji}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold">{meta.name}</div>
+                  <div className="font-semibold flex items-center gap-2">
+                    <span>{meta.name}</span>
+                    <span className="text-pulse-mute text-xs">›</span>
+                  </div>
                   <div className="text-xs text-pulse-mute">
                     Min {min} · Max {max} · House {fee}%
                   </div>
                 </div>
                 <button
-                  onClick={() => toggle(g)}
+                  onClick={e => toggle(e, g)}
                   disabled={busy === g.game_key}
                   className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
                     g.is_enabled ? 'bg-pulse-gold' : 'bg-pulse-border'
@@ -89,7 +99,7 @@ export default function GamesClient({ initial }: { initial: Game[] }) {
                   />
                 </button>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

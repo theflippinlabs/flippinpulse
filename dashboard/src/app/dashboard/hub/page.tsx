@@ -4,16 +4,18 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 async function loadQuickStats() {
-  const [games, tournois, cosmetics, lottery, pulsar, missions] = await Promise.all([
+  const [games, tournois, cosmetics, lottery, pulsar, missions, mod] = await Promise.all([
     supabase.from('games_config').select('is_enabled'),
     supabase.from('tournaments').select('*', { count: 'exact', head: true }),
     supabase.from('user_cosmetics').select('*', { count: 'exact', head: true }),
     supabase.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
     supabase.from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle(),
     supabase.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase.from('settings').select('value_json').eq('key', 'mod_config').maybeSingle(),
   ]);
   const enabled = (games.data ?? []).filter(g => (g as { is_enabled?: boolean }).is_enabled).length;
   const pulsarCfg = (pulsar.data as { value_json?: { enabled?: boolean } } | null)?.value_json ?? {};
+  const modCfg = (mod.data as { value_json?: { automod_enabled?: boolean } } | null)?.value_json ?? {};
   return {
     gamesEnabled: enabled,
     gamesTotal: games.data?.length ?? 0,
@@ -22,6 +24,7 @@ async function loadQuickStats() {
     lotteryPot: (lottery.data as { pot_pulse?: number } | null)?.pot_pulse ?? 0,
     novusOn: pulsarCfg.enabled === true,
     activeMissions: missions.count ?? 0,
+    automodOn: modCfg.automod_enabled === true,
   };
 }
 
@@ -42,6 +45,8 @@ export default async function HubPage() {
     { href: '/dashboard/novus',       emoji: '🧠', title: 'Novus',       hint: s.novusOn ? 'ON — AI running' : 'OFF' },
     { href: '/dashboard/missions',    emoji: '🎯', title: 'Missions',    hint: `${s.activeMissions} active` },
     { href: '/dashboard/cosmetics',   emoji: '✨', title: 'Cosmetics',   hint: `${s.cosmetics} bought` },
+    { href: '/dashboard/automod',     emoji: '🛡️', title: 'Auto-mod',    hint: s.automodOn ? 'ON — guarding chat' : 'OFF' },
+    { href: '/dashboard/charts',      emoji: '📊', title: 'Charts',      hint: 'Last 14 days trends' },
   ];
 
   return (
@@ -70,12 +75,6 @@ export default async function HubPage() {
         ))}
       </div>
 
-      <div className="mt-8 bg-pulse-card border border-pulse-border rounded-xl p-4">
-        <div className="text-xs uppercase tracking-wide text-pulse-gold/70 mb-2">Coming soon</div>
-        <div className="text-sm text-pulse-mute">
-          🛡️ Auto-mod tuning · 📊 Charts &amp; trends
-        </div>
-      </div>
     </>
   );
 }
