@@ -50,6 +50,7 @@ const MULTI: GameEntry[] = [
 const OTHER: GameEntry[] = [
   { name: 'treasure', emoji: '💰', desc: 'Chasse au trésor — ouvre des coffres' },
   { name: 'lottery',  emoji: '🎫', desc: 'Loterie — achète des tickets pour le jackpot' },
+  { name: 'music',    emoji: '🎵', desc: 'Partage une chanson — Spotify / Apple Music / Deezer' },
 ];
 
 function renderSection(title: string, entries: GameEntry[], ids: Map<string, string>): string {
