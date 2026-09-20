@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DiscordChannel } from '@/lib/channels';
+import ChickenSprite from './ChickenSprite';
 
 function multiplierAt(elapsedMs: number): number {
   const t = elapsedMs / 1000;
@@ -188,7 +189,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
     if (!session) return '';
     const now = phase === 'running' ? nowMs : session.started_at_ms + Math.min(nowMs - session.started_at_ms, session.crash_at_ms);
     const maxMult = Math.max(2, (session.crash_mult) * 1.05, displayMult * 1.05);
-    return multiplierPoints(session.started_at_ms, now, 300, 100, maxMult);
+    return multiplierPoints(session.started_at_ms, now, 300, 70, maxMult);
   }, [session, nowMs, phase, displayMult]);
 
   const tint = phase === 'crashing' || (phase === 'ended' && outcome?.crashed)
@@ -217,10 +218,10 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
       {/* Arena */}
       <div
         className={`relative bg-gradient-to-br ${tint} border rounded-2xl overflow-hidden mb-4 transition-colors duration-300 ${arenaShaking ? 'crash-shake' : ''}`}
-        style={{ height: '58vh', minHeight: '380px' }}
+        style={{ height: '34vh', minHeight: '240px', maxHeight: '340px' }}
       >
         {/* Top: multiplier */}
-        <div className="absolute inset-x-0 top-4 text-center z-10">
+        <div className="absolute inset-x-0 top-2 text-center z-10">
           <div className="text-[10px] tracking-widest uppercase text-pulse-mute">
             {phase === 'idle' && 'Ready'}
             {phase === 'running' && 'LIVE'}
@@ -228,19 +229,19 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
             {phase === 'ended' && (outcome?.crashed ? 'Wiped' : '💸 Cashed out')}
           </div>
           <div
-            className={`text-6xl md:text-7xl font-black text-pulse-gold ${highTension ? 'multi-pulse' : ''} ${phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? 'text-red-400' : ''}`}
+            className={`text-4xl md:text-5xl font-black text-pulse-gold ${highTension ? 'multi-pulse' : ''} ${phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? 'text-red-400' : ''}`}
           >
-            {displayMult.toFixed(2)}<span className="text-3xl">x</span>
+            {displayMult.toFixed(2)}<span className="text-xl">x</span>
           </div>
         </div>
 
         {/* Live curve chart */}
         {session && phase !== 'idle' && (
           <svg
-            className="absolute inset-x-0 top-32 mx-auto opacity-70"
+            className="absolute inset-x-0 bottom-14 mx-auto opacity-70"
             width="90%"
-            height="100"
-            viewBox="0 0 300 100"
+            height="70"
+            viewBox="0 0 300 70"
             preserveAspectRatio="none"
           >
             <defs>
@@ -252,7 +253,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
             {svgPoints && (
               <>
                 <polyline
-                  points={`${svgPoints} 300,100 0,100`}
+                  points={`${svgPoints} 300,70 0,70`}
                   fill="url(#lineGrad)"
                   stroke="none"
                 />
@@ -270,21 +271,25 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
         )}
 
         {/* Chicken sprite — walks in idle, runs while live, flies away on crash */}
-        <div className="absolute bottom-16 left-4 md:left-8 pointer-events-none">
+        <div className="absolute bottom-8 left-4 pointer-events-none">
           <div
             className={
-              phase === 'idle' ? 'chicken-walking text-5xl' :
-              phase === 'running' ? 'chicken-running text-5xl' :
-              phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? 'chicken-fleeing text-5xl' :
-              'text-5xl'
+              phase === 'idle' ? 'chicken-walking' :
+              phase === 'running' ? 'chicken-running' :
+              phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? 'chicken-fleeing' :
+              ''
             }
           >
-            🐔
+            <ChickenSprite
+              size={64}
+              flapping={phase === 'running' || phase === 'crashing'}
+              frightened={phase === 'crashing' || multiplier >= 4}
+            />
           </div>
         </div>
 
         {/* Ground / dust — animated when running */}
-        <div className="absolute inset-x-0 bottom-8 h-2 opacity-40">
+        <div className="absolute inset-x-0 bottom-4 h-1.5 opacity-40">
           <div
             className={`h-full ${phase === 'running' ? 'ground-scrolling' : ''}`}
             style={{
@@ -305,20 +310,17 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
           </div>
         ))}
 
-        {/* Outcome banner */}
+        {/* Outcome banner — compact, sits above the sprite */}
         {phase === 'ended' && outcome && (
-          <div className="absolute inset-x-0 bottom-4 text-center px-4">
+          <div className="absolute inset-x-3 bottom-2 text-center pointer-events-none">
             {outcome.crashed ? (
-              <div className="bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
-                <div className="text-lg font-bold text-red-300">💀 You stayed too long</div>
-                <div className="text-xs text-pulse-mute">Lost {outcome.bet.toLocaleString('en-US')} PULSE</div>
+              <div className="bg-red-500/25 border border-red-500/40 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+                <div className="text-sm font-bold text-red-300">💀 Lost {outcome.bet.toLocaleString('en-US')} PULSE</div>
               </div>
             ) : (
-              <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-xl px-4 py-3">
-                <div className="text-xl font-bold text-pulse-gold">🎉 +{(outcome.payout - outcome.bet).toLocaleString('en-US')} PULSE net</div>
-                <div className="text-xs text-pulse-mute">
-                  {outcome.payout.toLocaleString('en-US')} back · chicken flew at <span className="text-red-400 font-semibold">{outcome.crash_mult.toFixed(2)}x</span>
-                </div>
+              <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+                <div className="text-sm font-bold text-pulse-gold">🎉 +{(outcome.payout - outcome.bet).toLocaleString('en-US')} PULSE net</div>
+                <div className="text-[10px] text-pulse-mute">chicken flew at <span className="text-red-400 font-semibold">{outcome.crash_mult.toFixed(2)}x</span></div>
               </div>
             )}
           </div>
