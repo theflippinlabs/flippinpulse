@@ -44,6 +44,7 @@ export default async function HubPage() {
     { href: '/dashboard/play',        emoji: '🎮', title: 'Play',        hint: 'Slots · Coin · H/L — live PULSE' },
     { href: '/dashboard/shop',        emoji: '🛍️', title: 'Boutique',    hint: 'Dépense ton PULSE' },
     { href: '/dashboard/reserve',     emoji: '💰', title: 'Réserve',     hint: 'Drops · Giveaways · PULSE gift' },
+    { href: '/dashboard/wheel',       emoji: '🎡', title: 'Roue',        hint: 'Tirage au sort' },
     { href: '/dashboard/games',       emoji: '⚙️', title: 'Games',       hint: `${s.gamesEnabled} / ${s.gamesTotal} ON` },
     { href: '/dashboard/tournaments', emoji: '🏟️', title: 'Tournaments', hint: `${s.tournois} held` },
     { href: '/dashboard/lottery',     emoji: '🎫', title: 'Lottery',     hint: `${s.lotteryPot.toLocaleString('en-US')} pot` },
