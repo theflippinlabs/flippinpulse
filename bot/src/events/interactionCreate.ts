@@ -13,6 +13,7 @@ import { handleHubInteraction } from '../commands/hub.js';
 import { handleTournamentButton } from '../commands/tournoi.js';
 import { handleCosmeticsInteraction } from '../commands/cosmetics.js';
 import { handleChickenButton } from '../services/chickenRace.js';
+import { handleAutomodButton } from '../commands/automod.js';
 import { handleChallengeInteraction } from '../services/challenges.js';
 import { log } from '../utils/logger.js';
 
@@ -90,6 +91,15 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handleChickenButton(interaction);
     } catch (err) {
       log('ERROR', 'Chicken race button handler crashed', err);
+    }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('automod:')) {
+    try {
+      await handleAutomodButton(interaction);
+    } catch (err) {
+      log('ERROR', 'Automod button handler crashed', err);
     }
     return;
   }

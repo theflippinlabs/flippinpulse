@@ -50,6 +50,8 @@ import * as setupaccueil from './setupaccueil.js';
 import * as jail from './jail.js';
 import * as achievements from './achievements.js';
 import * as chicken from './chicken.js';
+import * as automod from './automod.js';
+import * as charts from './charts.js';
 import * as tournoi from './tournoi.js';
 import * as cosmetics from './cosmetics.js';
 
@@ -67,7 +69,7 @@ const commandList: Command[] = [
   givepulse, removepulse, setpulse, pulseinfo, moduleCmd, seteconomy, shopadmin,
   higherlower, lottery, battleroyale, diceroyale,
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
-  jeux, hub, setupaccueil, jail, achievements, tournoi, cosmetics, chicken,
+  jeux, hub, setupaccueil, jail, achievements, tournoi, cosmetics, chicken, automod, charts,
 ];
 
 export const commands = new Map<string, Command>();
