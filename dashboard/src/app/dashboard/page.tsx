@@ -59,7 +59,7 @@ async function loadRecent() {
       .from('discord_users')
       .select('discord_id, username, points_total, balance_pulse, rank_name, avatar_url')
       .order('points_total', { ascending: false })
-      .limit(5),
+      .limit(10),
     supabase
       .from('jailed_members')
       .select('discord_id, jailed_at, expires_at, reason')
@@ -180,28 +180,36 @@ export default async function Overview() {
                 })}
               </div>
 
-              {/* Rest: rows 4+ */}
+              {/* Rest: rows 4+ hidden behind a native <details> toggle so
+                  we stay a server component. Chevron rotates via group-open. */}
               {recent.topMembers.length > 3 && (
-                <ul className="space-y-2">
-                  {recent.topMembers.slice(3).map((m, i) => (
-                    <li key={m.discord_id} className="flex items-center gap-3 bg-pulse-bg/60 border border-pulse-border/60 rounded-xl px-3 py-2.5">
-                      <Avatar url={m.avatar_url} name={m.username} rank={i + 3} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="font-semibold truncate">{m.username || m.discord_id.slice(-6)}</div>
-                          {m.rank_name && (
-                            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-pulse-gold/10 text-pulse-gold border border-pulse-gold/20">
-                              {m.rank_name}
-                            </span>
-                          )}
+                <details className="group">
+                  <summary className="list-none cursor-pointer flex items-center justify-center gap-2 py-2 rounded-lg bg-pulse-bg/60 border border-pulse-border/60 text-sm text-pulse-mute hover:text-pulse-gold hover:border-pulse-gold/40 transition-colors">
+                    <span className="group-open:hidden">Show ranks 4–{recent.topMembers.length}</span>
+                    <span className="hidden group-open:inline">Hide the rest</span>
+                    <span className="text-lg group-open:rotate-180 transition-transform">›</span>
+                  </summary>
+                  <ul className="space-y-2 mt-3">
+                    {recent.topMembers.slice(3).map((m, i) => (
+                      <li key={m.discord_id} className="flex items-center gap-3 bg-pulse-bg/60 border border-pulse-border/60 rounded-xl px-3 py-2.5">
+                        <Avatar url={m.avatar_url} name={m.username} rank={i + 3} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="font-semibold truncate">{m.username || m.discord_id.slice(-6)}</div>
+                            {m.rank_name && (
+                              <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-pulse-gold/10 text-pulse-gold border border-pulse-gold/20">
+                                {m.rank_name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-pulse-mute font-mono mt-0.5 truncate">
+                            {fmt(m.points_total ?? 0)} pts · {fmt(m.balance_pulse ?? 0)} PULSE
+                          </div>
                         </div>
-                        <div className="text-xs text-pulse-mute font-mono mt-0.5 truncate">
-                          {fmt(m.points_total ?? 0)} pts · {fmt(m.balance_pulse ?? 0)} PULSE
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </>
           )}
