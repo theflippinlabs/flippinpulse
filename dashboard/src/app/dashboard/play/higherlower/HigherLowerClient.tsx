@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
 
 interface Result { seed: number; roll: number; choice: 'higher' | 'lower'; won: boolean; multiplier: number; bet: number; payout: number; newBalance: number }
 
@@ -63,7 +63,7 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
   const [channelId, setChannelId] = useState('');
   const [flipping, setFlipping] = useState(false);
 
-  useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
+  useEffect(() => setChannelId(pickDefaultShareChannel(channels)), [channels]);
 
   const play = async (choice: 'higher' | 'lower') => {
     if (busy) return;

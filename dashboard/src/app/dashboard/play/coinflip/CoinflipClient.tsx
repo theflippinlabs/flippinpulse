@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
 
 interface Result { outcome: 'heads' | 'tails'; choice: 'heads' | 'tails'; won: boolean; bet: number; payout: number; newBalance: number }
 
@@ -16,7 +16,7 @@ export default function CoinflipClient({ initialBalance, channels }: { initialBa
   const [share, setShare] = useState(true);
   const [channelId, setChannelId] = useState('');
 
-  useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
+  useEffect(() => setChannelId(pickDefaultShareChannel(channels)), [channels]);
 
   const flip = async () => {
     if (flipping) return;

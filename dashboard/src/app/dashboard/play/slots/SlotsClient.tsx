@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
 
 // Symbols shown in the machine, in visual order. Repeated in the reel strip
 // below to make the vertical scroll seamless when it wraps.
@@ -96,7 +96,7 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
   const [stats, setStats] = useState({ plays: 0, wins: 0, biggest: 0 });
   const [lever, setLever] = useState(false);
 
-  useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
+  useEffect(() => setChannelId(pickDefaultShareChannel(channels)), [channels]);
 
   const spin = async () => {
     if (spinning) return;

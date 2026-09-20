@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DiscordChannel } from '@/lib/channels';
+import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channels';
 import ChickenSprite from './ChickenSprite';
 
 function multiplierAt(elapsedMs: number): number {
@@ -70,7 +70,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
   const cashingRef = useRef(false);
   const coinIdRef = useRef(0);
 
-  useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
+  useEffect(() => setChannelId(pickDefaultShareChannel(channels)), [channels]);
 
   useEffect(() => {
     if (phase !== 'running' || !session) return;
