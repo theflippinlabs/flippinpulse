@@ -7,6 +7,7 @@ import BackLink from '../BackLink';
 export const dynamic = 'force-dynamic';
 
 const TILES: { href: string; emoji: string; title: string; hint: string }[] = [
+  { href: '/dashboard/play/chicken',     emoji: '🐔', title: 'Chicken Race', hint: 'Cash out before the chicken flies · up to 50×' },
   { href: '/dashboard/play/slots',       emoji: '🎰', title: 'Slots',        hint: 'Spin the reels · up to 50×' },
   { href: '/dashboard/play/coinflip',    emoji: '🪙', title: 'Coin Flip',    hint: 'Heads or tails · 2×' },
   { href: '/dashboard/play/higherlower', emoji: '🔼', title: 'Higher/Lower', hint: 'Beat the number · up to 90×' },
