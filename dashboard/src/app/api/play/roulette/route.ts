@@ -18,6 +18,8 @@ type BetKind =
   | { type: 'column'; value: 1 | 2 | 3 }
   | { type: 'straight'; value: number };
 
+interface WagerRow { kind: BetKind; amount: number }
+
 function parseBet(b: unknown): BetKind | null {
   if (!b || typeof b !== 'object') return null;
   const anyB = b as Record<string, unknown>;
@@ -34,12 +36,10 @@ function parseBet(b: unknown): BetKind | null {
   return null;
 }
 
-// Multiplier for a win, in "total returned per unit staked" (so 2 means you
-// get bet back plus the same amount, net +bet).
 function multiplier(kind: BetKind): number {
   if (kind.type === 'straight') return 36; // 35:1 → 36× return
-  if (kind.type === 'dozen' || kind.type === 'column') return 3; // 2:1 → 3× return
-  return 2; // even-money bets: 1:1 → 2× return
+  if (kind.type === 'dozen' || kind.type === 'column') return 3; // 2:1
+  return 2; // even-money
 }
 
 function isWin(n: number, kind: BetKind): boolean {
@@ -56,31 +56,60 @@ function isWin(n: number, kind: BetKind): boolean {
   return n === kind.value;
 }
 
+// Compact human label for the announce embed.
+function label(kind: BetKind): string {
+  if (kind.type === 'color') return kind.value === 'red' ? 'Rouge' : 'Noir';
+  if (kind.type === 'parity') return kind.value === 'even' ? 'Pair' : 'Impair';
+  if (kind.type === 'range') return kind.value === 'low' ? '1-18' : '19-36';
+  if (kind.type === 'dozen') return `Douzaine ${kind.value}`;
+  if (kind.type === 'column') return `Colonne ${kind.value}`;
+  return `#${kind.value}`;
+}
+
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session || !isAdmin(session.id)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
-  const bet = Math.max(1, Math.min(500, Math.floor(Number(body.bet ?? 25))));
-  const kind = parseBet(body.wager);
-  if (!kind) return NextResponse.json({ error: 'Invalid bet.' }, { status: 400 });
 
-  const spin = Math.floor(Math.random() * 37); // 0..36 inclusive
-  const won = isWin(spin, kind);
-  const payout = won ? bet * multiplier(kind) : 0;
+  // Accept either a legacy single-wager payload or the new multi-bet array.
+  const rawWagers = Array.isArray(body.wagers) ? body.wagers
+    : body.wager ? [{ kind: body.wager, amount: body.bet ?? 25 }]
+    : [];
 
-  const settled = await settleBet(session.id, 'roulette', bet, payout);
+  const wagers: WagerRow[] = [];
+  for (const w of rawWagers) {
+    const k = parseBet((w as Record<string, unknown>).kind);
+    const amt = Math.floor(Number((w as Record<string, unknown>).amount ?? 0));
+    if (!k || !Number.isFinite(amt) || amt <= 0) continue;
+    wagers.push({ kind: k, amount: amt });
+  }
+  if (!wagers.length) return NextResponse.json({ error: 'Place at least one bet.' }, { status: 400 });
+
+  const totalStake = wagers.reduce((s, w) => s + w.amount, 0);
+  if (totalStake > 500) return NextResponse.json({ error: 'Total stake capped at 500 PULSE.' }, { status: 400 });
+
+  const spin = Math.floor(Math.random() * 37);
+  const results = wagers.map(w => {
+    const hit = isWin(spin, w.kind);
+    const payout = hit ? w.amount * multiplier(w.kind) : 0;
+    return { kind: w.kind, amount: w.amount, hit, payout };
+  });
+  const totalPayout = results.reduce((s, r) => s + r.payout, 0);
+
+  const settled = await settleBet(session.id, 'roulette', totalStake, totalPayout);
   if (!settled.ok) return NextResponse.json({ error: settled.error, balance: settled.balance }, { status: 400 });
 
-  const net = payout - bet;
+  const net = totalPayout - totalStake;
   if (body.share && body.channel_id && net >= 500) {
+    const winners = results.filter(r => r.hit).map(r => `${label(r.kind)} (+${r.payout})`).join(', ');
     await supabase.from('dashboard_commands').insert({
       command: 'announce',
       payload_json: {
         channel_id: body.channel_id,
         title: '🎡 Roulette big win!',
-        message: `<@${session.id}> hit **${spin} ${color(spin)}** and won **+${net} PULSE** on ${kind.type}! 💸`,
+        message: `<@${session.id}> hit **${spin} ${color(spin)}** and won **+${net} PULSE** net · ${winners}`,
         embed: true,
         ping: null,
       },
@@ -92,10 +121,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     spin,
     color: color(spin),
-    won,
-    bet,
-    payout,
-    multiplier: multiplier(kind),
+    totalStake,
+    totalPayout,
+    net,
+    results,
     newBalance: settled.newBalance,
   });
 }
