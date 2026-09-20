@@ -38,7 +38,7 @@ interface Props {
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
   if (href === '/dashboard/hub') {
-    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/charts']
+    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/charts', '/dashboard/play']
       .some(p => pathname === p || pathname.startsWith(p + '/'));
   }
   return pathname === href || pathname.startsWith(href + '/');

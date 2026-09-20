@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getSession, isAdmin } from '@/lib/auth';
+import { pickWeighted, settleBet, getBalance } from '@/lib/play';
+import { supabase } from '@/lib/supabase';
+
+const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
+const WEIGHTS = [30, 25, 20, 15, 6, 3, 1];
+const PAYOUTS = {
+  three_seven: 50,
+  three_diamond: 20,
+  three_star: 10,
+  three_other: 5,
+  two_match: 1,
+};
+
+function computePayout(reels: string[], bet: number): number {
+  const [a, b, c] = reels;
+  if (a === b && b === c) {
+    if (a === '7️⃣') return bet * PAYOUTS.three_seven;
+    if (a === '💎') return bet * PAYOUTS.three_diamond;
+    if (a === '⭐') return bet * PAYOUTS.three_star;
+    return bet * PAYOUTS.three_other;
+  }
+  if (a === b || b === c || a === c) return bet * PAYOUTS.two_match;
+  return 0;
+}
+
+export async function POST(req: NextRequest) {
+  const session = getSession();
+  if (!session || !isAdmin(session.id)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  const body = await req.json().catch(() => ({}));
+  const bet = Math.max(1, Math.min(500, Math.floor(Number(body.bet ?? 10))));
+
+  const reels = [
+    pickWeighted(SYMBOLS, WEIGHTS),
+    pickWeighted(SYMBOLS, WEIGHTS),
+    pickWeighted(SYMBOLS, WEIGHTS),
+  ];
+  const payout = computePayout(reels, bet);
+  const settled = await settleBet(session.id, 'slots', bet, payout);
+  if (!settled.ok) return NextResponse.json({ error: settled.error, balance: settled.balance }, { status: 400 });
+
+  // Optional: share to Discord — client controls via body.share
+  if (body.share && body.channel_id && payout >= bet * 5) {
+    const multiplier = Math.floor(payout / bet);
+    await supabase.from('dashboard_commands').insert({
+      command: 'announce',
+      payload_json: {
+        channel_id: body.channel_id,
+        title: '🎰 SLOTS JACKPOT!',
+        message: `<@${session.id}> just spun **${reels.join(' ')}** and won **${payout} PULSE** (${multiplier}× bet)! 🔥`,
+        embed: true,
+        ping: null,
+      },
+      status: 'pending',
+      created_by: session.id,
+    });
+  }
+
+  return NextResponse.json({
+    reels,
+    bet,
+    payout,
+    net: payout - bet,
+    newBalance: settled.newBalance,
+  });
+}
+
+export async function GET() {
+  const session = getSession();
+  if (!session || !isAdmin(session.id)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  const balance = await getBalance(session.id);
+  return NextResponse.json({ balance });
+}

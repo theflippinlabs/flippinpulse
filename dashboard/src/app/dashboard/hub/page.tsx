@@ -39,7 +39,8 @@ interface Tile {
 export default async function HubPage() {
   const s = await loadQuickStats();
   const tiles: Tile[] = [
-    { href: '/dashboard/games',       emoji: '🎮', title: 'Games',       hint: `${s.gamesEnabled} / ${s.gamesTotal} ON` },
+    { href: '/dashboard/play',        emoji: '🎮', title: 'Play',        hint: 'Slots · Coin · H/L — live PULSE' },
+    { href: '/dashboard/games',       emoji: '⚙️', title: 'Games',       hint: `${s.gamesEnabled} / ${s.gamesTotal} ON` },
     { href: '/dashboard/tournaments', emoji: '🏟️', title: 'Tournaments', hint: `${s.tournois} held` },
     { href: '/dashboard/lottery',     emoji: '🎫', title: 'Lottery',     hint: `${s.lotteryPot.toLocaleString('en-US')} pot` },
     { href: '/dashboard/novus',       emoji: '🧠', title: 'Novus',       hint: s.novusOn ? 'ON — AI running' : 'OFF' },
