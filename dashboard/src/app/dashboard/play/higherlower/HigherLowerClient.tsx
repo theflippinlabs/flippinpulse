@@ -5,6 +5,53 @@ import type { DiscordChannel } from '@/lib/channels';
 
 interface Result { seed: number; roll: number; choice: 'higher' | 'lower'; won: boolean; multiplier: number; bet: number; payout: number; newBalance: number }
 
+// One playing-card face. Uses radial highlights for a subtle 3D pop and
+// puts the number in the four canonical corners plus a large center.
+function CardFace({ value, color, backface = false }: { value: number; color: string; backface?: boolean }) {
+  return (
+    <div
+      className="absolute inset-0 rounded-2xl flex items-center justify-center"
+      style={{
+        background: 'linear-gradient(180deg, #fdfcf5 0%, #f0eee0 100%)',
+        border: '3px solid #d4a12c',
+        boxShadow: 'inset 0 4px 12px rgba(255,255,255,0.5), inset 0 -6px 14px rgba(0,0,0,0.15), 0 15px 35px rgba(0,0,0,0.5)',
+        backfaceVisibility: 'hidden',
+        transform: backface ? 'rotateY(180deg)' : undefined,
+        color,
+      }}
+    >
+      <span className="absolute top-2 left-3 text-lg font-black">{value}</span>
+      <span className="absolute top-2 right-3 text-lg font-black">{value}</span>
+      <span className="absolute bottom-2 right-3 text-lg font-black rotate-180">{value}</span>
+      <span className="absolute bottom-2 left-3 text-lg font-black rotate-180">{value}</span>
+      <span className="text-6xl md:text-7xl font-black" style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.15))' }}>{value}</span>
+    </div>
+  );
+}
+
+// The card back — shown before the flip. Diagonal PULSE monogram pattern.
+function CardBack() {
+  return (
+    <div
+      className="absolute inset-0 rounded-2xl flex items-center justify-center"
+      style={{
+        background: 'linear-gradient(135deg, #1a0f04 0%, #3a2410 50%, #1a0f04 100%)',
+        border: '3px solid #F5B62E',
+        boxShadow: 'inset 0 4px 12px rgba(245,182,46,0.2), inset 0 -6px 14px rgba(0,0,0,0.5), 0 15px 35px rgba(0,0,0,0.5)',
+        backfaceVisibility: 'hidden',
+      }}
+    >
+      <div
+        className="absolute inset-2 rounded-xl opacity-40"
+        style={{
+          background: 'repeating-linear-gradient(45deg, transparent 0 8px, rgba(245,182,46,0.3) 8px 10px)',
+        }}
+      />
+      <div className="text-5xl font-black text-pulse-gold" style={{ filter: 'drop-shadow(0 0 15px rgba(245,182,46,0.6))' }}>?</div>
+    </div>
+  );
+}
+
 export default function HigherLowerClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
   const [balance, setBalance] = useState(initialBalance);
   const [bet, setBet] = useState(25);
@@ -14,6 +61,7 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
   const [error, setError] = useState<string | null>(null);
   const [share, setShare] = useState(true);
   const [channelId, setChannelId] = useState('');
+  const [flipping, setFlipping] = useState(false);
 
   useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
 
@@ -23,6 +71,7 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
     setBusy(true);
     setError(null);
     setResult(null);
+    setFlipping(false);
     try {
       const res = await fetch('/api/play/higherlower', {
         method: 'POST',
@@ -31,13 +80,20 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      await new Promise(r => setTimeout(r, 600));
+      // Tiny suspense beat, then let the seed card flip to reveal the roll.
+      await new Promise(r => setTimeout(r, 250));
+      setFlipping(true);
+      await new Promise(r => setTimeout(r, 950));
       setResult(data);
       setBalance(data.newBalance);
-      // Fresh seed for next round.
-      setSeed(Math.floor(Math.random() * 98) + 2);
+      // Fresh seed for next round after a moment of the result showing.
+      setTimeout(() => {
+        setSeed(Math.floor(Math.random() * 98) + 2);
+        setFlipping(false);
+      }, 1800);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed.');
+      setFlipping(false);
     } finally {
       setBusy(false);
     }
@@ -56,17 +112,40 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
         <div className="text-xs text-pulse-mute">Payout scales with the odds</div>
       </div>
 
-      <div className="bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 border border-pulse-gold/30 rounded-2xl p-6 mb-4 text-center">
-        <div className="text-xs uppercase text-pulse-mute mb-2">Number to beat</div>
-        <div className="text-7xl md:text-8xl font-bold text-pulse-gold">{seed}</div>
-        <div className="text-xs text-pulse-mute mt-1">out of 100</div>
-        {result && (
-          <div className="mt-4 border-t border-pulse-border/60 pt-3">
-            <div className="text-xs text-pulse-mute">The roll was</div>
-            <div className="text-5xl font-bold my-1">{result.roll}</div>
+      <div className="bg-gradient-to-br from-pulse-gold/15 to-pulse-gold/5 border border-pulse-gold/30 rounded-2xl p-6 mb-4">
+        <div className="text-xs uppercase text-pulse-mute mb-2 text-center">Beat this card</div>
+
+        {/* Two cards side by side: seed on the left, reveal on the right. */}
+        <div className="flex items-center justify-center gap-4 md:gap-6" style={{ perspective: '1400px' }}>
+          {/* Seed card — static, always face-up. */}
+          <div className="relative w-28 h-40 md:w-32 md:h-44">
+            <CardFace value={seed} color="#B8860B" />
+          </div>
+
+          <div className="text-3xl text-pulse-gold/80">vs</div>
+
+          {/* Roll card — starts as back, flips to reveal roll after play. */}
+          <div className="relative w-28 h-40 md:w-32 md:h-44">
+            <div
+              className={`absolute inset-0 ${flipping ? 'card-flipping' : ''}`}
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: !flipping && !result ? 'rotateY(0deg)' : undefined,
+              }}
+            >
+              <CardBack />
+              {result && (
+                <CardFace value={result.roll} color={result.won ? '#0f6f2c' : '#8B0F0F'} backface />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {result && !flipping && (
+          <div className="mt-5 border-t border-pulse-border/60 pt-3 text-center">
             {result.won ? (
               <>
-                <div className="text-lg font-bold text-pulse-gold">🎉 +{(result.payout - result.bet).toLocaleString('en-US')} PULSE net</div>
+                <div className="text-lg font-bold text-pulse-gold multi-pulse">🎉 +{(result.payout - result.bet).toLocaleString('en-US')} PULSE net</div>
                 <div className="text-xs text-pulse-mute">{result.multiplier}× ({result.payout.toLocaleString('en-US')} back)</div>
               </>
             ) : (
@@ -90,11 +169,11 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
 
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => play('lower')} disabled={busy || balance < bet}
-            className="py-4 rounded-xl bg-red-500/90 text-white font-bold disabled:opacity-50">
+            className="py-4 rounded-xl bg-gradient-to-b from-red-500 to-red-700 text-white font-bold disabled:opacity-50 shadow-lg border border-red-400/40">
             🔽 LOWER<br/><span className="text-xs opacity-90">{lowerMulti}×</span>
           </button>
           <button onClick={() => play('higher')} disabled={busy || balance < bet}
-            className="py-4 rounded-xl bg-emerald-500 text-black font-bold disabled:opacity-50">
+            className="py-4 rounded-xl bg-gradient-to-b from-emerald-400 to-emerald-600 text-black font-bold disabled:opacity-50 shadow-lg border border-emerald-300/40">
             🔼 HIGHER<br/><span className="text-xs opacity-90">{higherMulti}×</span>
           </button>
         </div>

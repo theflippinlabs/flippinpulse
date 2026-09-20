@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DiscordChannel } from '@/lib/channels';
 
+// Symbols shown in the machine, in visual order. Repeated in the reel strip
+// below to make the vertical scroll seamless when it wraps.
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
+const STRIP = [...SYMBOLS, ...SYMBOLS, ...SYMBOLS, ...SYMBOLS];
+const CELL_H = 96; // px — matches Tailwind h-24
 
 interface Result {
   reels: string[];
@@ -13,20 +17,86 @@ interface Result {
   newBalance: number;
 }
 
+// One reel: a tall vertical strip of symbols we scroll with CSS transforms.
+// While spinning, the strip translates up quickly and wraps; when stopped
+// we compute an offset that lands the final symbol dead center with a
+// spring-y ease that overshoots slightly then settles.
+function Reel({ spinning, symbol, delay, jackpot }: { spinning: boolean; symbol: string; delay: number; jackpot: boolean }) {
+  const [offset, setOffset] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef(0);
+
+  useEffect(() => {
+    if (spinning) {
+      startRef.current = performance.now();
+      const loop = (t: number) => {
+        const dt = t - startRef.current;
+        // Fast scroll: cycle full strip every 250ms.
+        setOffset(-((dt / 250) * SYMBOLS.length * CELL_H) % (SYMBOLS.length * CELL_H));
+        rafRef.current = requestAnimationFrame(loop);
+      };
+      rafRef.current = requestAnimationFrame(loop);
+      return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    }
+    // Stop: schedule the landing offset after `delay`.
+    const idx = SYMBOLS.indexOf(symbol);
+    if (idx < 0) return;
+    const timer = setTimeout(() => {
+      // Land on the second copy of the symbol so we always scroll a bit.
+      const targetOffset = -(idx + SYMBOLS.length) * CELL_H;
+      setOffset(targetOffset);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [spinning, symbol, delay]);
+
+  return (
+    <div
+      className={`relative w-20 h-24 md:w-24 md:h-24 bg-black rounded-2xl border-2 overflow-hidden shadow-brand ${jackpot ? 'jackpot border-pulse-gold' : 'border-pulse-gold/50'}`}
+      style={{ perspective: '600px' }}
+    >
+      {/* Reel glass gradient (top/bottom fade). */}
+      <div className="pointer-events-none absolute inset-0 z-10"
+           style={{
+             background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 100%)',
+           }}
+      />
+      {/* Center line highlight when locked. */}
+      {!spinning && (
+        <div className="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 h-1 rounded-full z-10"
+             style={{ boxShadow: '0 0 20px rgba(245,182,46,0.8)', background: 'rgba(245,182,46,0.6)' }}
+        />
+      )}
+      <div
+        className="absolute inset-x-0 flex flex-col items-center will-change-transform"
+        style={{
+          transform: `translateY(${offset}px)`,
+          transition: spinning ? 'none' : 'transform 0.9s cubic-bezier(0.16, 1.1, 0.3, 1)',
+        }}
+      >
+        {STRIP.map((s, i) => (
+          <div key={i} className="h-24 flex items-center justify-center text-5xl md:text-6xl select-none"
+               style={{ transform: 'rotateX(4deg)' }}>
+            {s}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SlotsClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
   const [balance, setBalance] = useState(initialBalance);
   const [bet, setBet] = useState(25);
   const [spinning, setSpinning] = useState(false);
-  const [reels, setReels] = useState<string[]>(['🎰', '🎰', '🎰']);
+  const [reels, setReels] = useState<string[]>(['7️⃣', '💎', '⭐']);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [share, setShare] = useState(true);
   const [channelId, setChannelId] = useState<string>('');
   const [stats, setStats] = useState({ plays: 0, wins: 0, biggest: 0 });
+  const [lever, setLever] = useState(false);
 
-  useEffect(() => {
-    setChannelId(channels[0]?.channel_id ?? '');
-  }, [channels]);
+  useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
 
   const spin = async () => {
     if (spinning) return;
@@ -34,15 +104,8 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
     setSpinning(true);
     setError(null);
     setResult(null);
-
-    // Fake spin animation before we know the result — cycle random symbols.
-    const spinInterval = setInterval(() => {
-      setReels([
-        SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
-        SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
-        SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
-      ]);
-    }, 80);
+    setLever(true);
+    setTimeout(() => setLever(false), 400);
 
     try {
       const res = await fetch('/api/play/slots', {
@@ -53,25 +116,21 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
 
-      // Stop reels one by one for drama.
-      await new Promise(r => setTimeout(r, 700));
-      clearInterval(spinInterval);
-      setReels([data.reels[0], SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)], SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]]);
-      await new Promise(r => setTimeout(r, 400));
-      setReels([data.reels[0], data.reels[1], SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]]);
-      await new Promise(r => setTimeout(r, 400));
+      // Let the reels spin at speed for a beat, then lock them.
+      await new Promise(r => setTimeout(r, 1400));
       setReels(data.reels);
+      // Wait for the third reel to fully settle before showing the verdict.
+      await new Promise(r => setTimeout(r, 1400));
 
       setResult(data);
       setBalance(data.newBalance);
       const netGain = data.payout - data.bet;
       setStats(s => ({
         plays: s.plays + 1,
-        wins: s.wins + (netGain > 0 ? 1 : 0), // real win = net > 0, ignore refunds
-        biggest: Math.max(s.biggest, netGain), // track biggest NET gain
+        wins: s.wins + (netGain > 0 ? 1 : 0),
+        biggest: Math.max(s.biggest, netGain),
       }));
     } catch (err) {
-      clearInterval(spinInterval);
       setError(err instanceof Error ? err.message : 'Failed.');
     } finally {
       setSpinning(false);
@@ -82,6 +141,7 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
   const won = net > 0;
   const push = result && result.payout > 0 && net === 0;
   const multi = result && result.bet > 0 ? (result.payout / result.bet) : 0;
+  const jackpot = !!(result && reels[0] === reels[1] && reels[1] === reels[2] && !spinning);
 
   return (
     <>
@@ -97,29 +157,43 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 border border-pulse-gold/30 rounded-2xl p-6 mb-4">
-        <div className="flex justify-center gap-2 md:gap-4 mb-2">
-          {reels.map((s, i) => (
-            <div
-              key={i}
-              className={`w-20 h-20 md:w-24 md:h-24 bg-black rounded-2xl border-2 border-pulse-gold/50 flex items-center justify-center text-5xl md:text-6xl shadow-brand ${spinning ? 'animate-pulse' : ''}`}
-            >
-              {s}
-            </div>
-          ))}
+      {/* Cabinet: gradient bezel + lever on the right. */}
+      <div className="relative bg-gradient-to-b from-[#3a2a10] via-[#1a1206] to-[#0a0805] border-2 border-pulse-gold/60 rounded-3xl p-4 md:p-6 mb-4 shadow-2xl">
+        {/* Top marquee */}
+        <div className="text-center mb-3">
+          <div className={`inline-block px-4 py-1 rounded-full bg-black/60 border border-pulse-gold/50 text-xs tracking-widest font-bold ${jackpot ? 'multi-pulse text-pulse-gold' : 'text-pulse-gold/80'}`}>
+            {jackpot ? '★ JACKPOT ★' : 'FLIPPIN SLOTS'}
+          </div>
         </div>
-        {result && (
-          <div className="text-center mt-3">
+
+        <div className="flex items-center justify-center gap-4 md:gap-6">
+          <div className="flex gap-2 md:gap-3">
+            {reels.map((s, i) => (
+              <Reel key={i} spinning={spinning} symbol={s} delay={i * 400} jackpot={jackpot} />
+            ))}
+          </div>
+
+          {/* Lever */}
+          <button
+            onClick={spin}
+            disabled={spinning || balance < bet}
+            aria-label="Pull lever"
+            className="hidden md:flex flex-col items-center gap-1 group disabled:opacity-40"
+          >
+            <div className="w-3 h-16 rounded-full bg-gradient-to-b from-neutral-500 to-neutral-700 shadow-inner" />
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-red-400 to-red-700 border-2 border-red-900 shadow-lg transition-transform ${lever ? 'translate-y-6' : 'group-hover:translate-y-1'}`} />
+          </button>
+        </div>
+
+        {result && !spinning && (
+          <div className="text-center mt-4">
             {won ? (
               <div>
-                <div className="text-2xl font-bold text-pulse-gold">🎉 +{net.toLocaleString('en-US')} PULSE net</div>
-                <div className="text-sm text-pulse-mute">{multi.toFixed(1)}× your bet ({result.payout.toLocaleString('en-US')} back)</div>
+                <div className={`text-3xl font-black ${jackpot ? 'text-pulse-gold multi-pulse' : 'text-pulse-gold'}`}>+{net.toLocaleString('en-US')} PULSE</div>
+                <div className="text-sm text-pulse-mute">{multi.toFixed(1)}× · {result.payout.toLocaleString('en-US')} back</div>
               </div>
             ) : push ? (
-              <div>
-                <div className="text-lg text-pulse-mute">↩️ Push — bet refunded</div>
-                <div className="text-xs text-pulse-mute">Any 2 match pays back your stake</div>
-              </div>
+              <div className="text-lg text-pulse-mute">↩️ Push — bet refunded</div>
             ) : (
               <div className="text-lg text-red-300">– {result.bet.toLocaleString('en-US')} PULSE</div>
             )}
@@ -171,7 +245,7 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
         <button
           onClick={spin}
           disabled={spinning || balance < bet}
-          className="w-full bg-pulse-gold text-black font-bold text-lg py-4 rounded-xl disabled:opacity-50"
+          className="w-full bg-pulse-gold text-black font-bold text-lg py-4 rounded-xl disabled:opacity-50 shadow-brand"
         >
           {spinning ? 'Spinning…' : `🎰 SPIN — ${bet} PULSE`}
         </button>
