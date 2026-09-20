@@ -48,15 +48,12 @@ export async function GET(req: NextRequest) {
   if (!userRes.ok) return NextResponse.redirect(new URL('/?error=userinfo', req.url));
 
   const user = (await userRes.json()) as DiscordUser;
-  if (!isAdmin(user.id)) {
-    return NextResponse.redirect(new URL('/?error=not_admin', req.url));
-  }
-
   await setSessionCookie({
     id: user.id,
     username: user.global_name ?? user.username,
     avatar: user.avatar,
     iat: Date.now(),
   });
-  return NextResponse.redirect(new URL('/dashboard', req.url));
+  // Lords land on the command deck; regular members land on their app.
+  return NextResponse.redirect(new URL(isAdmin(user.id) ? '/dashboard' : '/app', req.url));
 }

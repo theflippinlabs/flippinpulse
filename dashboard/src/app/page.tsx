@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/auth';
+import { getSession, isAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
 const ERRORS: Record<string, string> = {
@@ -11,7 +11,7 @@ const ERRORS: Record<string, string> = {
 
 export default function Landing({ searchParams }: { searchParams: { error?: string } }) {
   const session = getSession();
-  if (session) redirect('/dashboard');
+  if (session) redirect(isAdmin(session.id) ? '/dashboard' : '/app');
   const err = searchParams.error ? ERRORS[searchParams.error] ?? 'Login failed.' : null;
 
   return (
@@ -20,8 +20,8 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
         <div className="absolute inset-x-0 -top-40 h-64 bg-brand-glow pointer-events-none" />
         <div className="text-center mb-6 relative">
           <div className="text-5xl text-pulse-gold">⚡</div>
-          <h1 className="text-2xl font-bold mt-2 tracking-wider">NOVARYS <span className="text-pulse-gold">//</span> Command Deck</h1>
-          <p className="text-pulse-mute mt-2 text-sm">Live stats &amp; admin console for the community.</p>
+          <h1 className="text-2xl font-bold mt-2 tracking-wider">NOVARYS <span className="text-pulse-gold">//</span> Pulse</h1>
+          <p className="text-pulse-mute mt-2 text-sm">Games, boutique, tournois — signe-toi avec Discord.</p>
         </div>
         {err && (
           <div className="mb-4 p-3 rounded-lg bg-red-900/40 border border-red-800 text-red-200 text-sm">{err}</div>
@@ -33,7 +33,7 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
           Sign in with Discord
         </a>
         <p className="text-xs text-pulse-mute text-center mt-4">
-          Access is restricted to Lords. Your Discord ID must be in <code className="text-pulse-brand">DASHBOARD_ADMIN_IDS</code>.
+          Ouvert à tous les membres du Discord Novarys.
         </p>
       </div>
     </main>

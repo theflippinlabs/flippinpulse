@@ -69,3 +69,11 @@ export function isAdmin(userId: string): boolean {
   const ids = (process.env.DASHBOARD_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
   return ids.includes(userId);
 }
+
+// Any signed-in Discord user is a member. Used by the /app member area and
+// its supporting API routes so a regular Discord user can play, buy, join
+// tournaments and ask Novus. Separate from isAdmin, which gates the Lord
+// command deck.
+export function isMember(session: SessionPayload | null): session is SessionPayload {
+  return session !== null;
+}

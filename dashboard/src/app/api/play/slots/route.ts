@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, isAdmin } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { pickWeighted, settleBet, getBalance } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
 
@@ -27,7 +27,7 @@ function computePayout(reels: string[], bet: number): number {
 
 export async function POST(req: NextRequest) {
   const session = getSession();
-  if (!session || !isAdmin(session.id)) {
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const session = getSession();
-  if (!session || !isAdmin(session.id)) {
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const balance = await getBalance(session.id);

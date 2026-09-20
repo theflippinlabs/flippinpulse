@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, isAdmin } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { settleBet } from '@/lib/play';
 import { drawCard, handTotal, dealerShouldHit } from '@/lib/blackjack';
 import { signGameToken, verifyGameToken } from '@/lib/gameToken';
@@ -16,7 +16,7 @@ const MAX_HAND_AGE_MS = 10 * 60_000; // 10 minutes; enough for slow players
 
 export async function POST(req: NextRequest) {
   const session = getSession();
-  if (!session || !isAdmin(session.id)) {
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, isAdmin } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { settleBet } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
-  if (!session || !isAdmin(session.id)) {
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
