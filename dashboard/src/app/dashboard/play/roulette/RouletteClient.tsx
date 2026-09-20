@@ -150,12 +150,14 @@ export default function RouletteClient({
 
       const idx = WHEEL.indexOf(data.spin);
       const perPocket = 360 / WHEEL.length;
-      const targetWheel = 360 * 6 + (WHEEL.length - idx) * perPocket;
-      const targetBall = -(360 * 10) - Math.random() * 45;
+      // Long, dramatic spin — wheel does ~12 full turns, ball does ~24 in
+      // the opposite direction, both landing precisely on the winning pocket.
+      const targetWheel = 360 * 12 + (WHEEL.length - idx) * perPocket;
+      const targetBall = -(360 * 24) - Math.random() * 60;
       setWheelRotation(targetWheel);
       setBallRotation(targetBall);
 
-      await new Promise(r => setTimeout(r, 3500));
+      await new Promise(r => setTimeout(r, 7200));
 
       setResult(data);
       setBalance(data.newBalance);
@@ -193,55 +195,99 @@ export default function RouletteClient({
         </div>
       </div>
 
-      {/* Wheel */}
+      {/* Wheel — larger, richer bezel, long deceleration */}
       <div className="bg-gradient-to-br from-[#3a1f10] via-[#1a0f06] to-[#0a0605] border-2 border-pulse-gold/60 rounded-3xl p-4 mb-4 shadow-2xl">
-        <div className="relative mx-auto" style={{ width: 220, height: 220 }}>
-          <div className="absolute left-1/2 -top-1 -translate-x-1/2 z-20"
-               style={{ width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '14px solid #F5B62E' }} />
+        <div className="relative mx-auto" style={{ width: 280, height: 280 }}>
+          {/* Outer gold bezel with subtle inner shadow */}
           <div
-            className="absolute inset-0 rounded-full will-change-transform"
+            className="absolute inset-0 rounded-full"
             style={{
-              transform: `rotate(${wheelRotation}deg)`,
-              transition: spinning ? 'transform 3.4s cubic-bezier(0.22, 0.61, 0.36, 1)' : 'none',
-              background:
-                'conic-gradient(from -4.86deg, ' +
-                WHEEL.map((n, i) => {
-                  const c = color(n);
-                  const bg = c === 'green' ? '#0f7d3d' : c === 'red' ? '#c62828' : '#111';
-                  return `${bg} ${i * 360 / WHEEL.length}deg ${(i + 1) * 360 / WHEEL.length}deg`;
-                }).join(', ') + ')',
-              boxShadow: 'inset 0 0 30px rgba(0,0,0,0.7), 0 0 20px rgba(245,182,46,0.3)',
+              background: 'radial-gradient(circle at 30% 25%, #F5B62E 0%, #B8860B 40%, #5a4008 100%)',
+              boxShadow: 'inset 0 6px 14px rgba(255,255,255,0.25), inset 0 -8px 20px rgba(0,0,0,0.6), 0 12px 30px rgba(0,0,0,0.6)',
             }}
+          />
+          {/* Pointer at the top of the bezel */}
+          <div className="absolute left-1/2 -top-2 -translate-x-1/2 z-20"
+               style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}>
+            <div style={{ width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderTop: '18px solid #F5B62E' }} />
+          </div>
+
+          {/* Inner disk — the wheel itself, inset from the bezel */}
+          <div className="absolute rounded-full overflow-hidden will-change-transform"
+               style={{
+                 top: 14, left: 14, right: 14, bottom: 14,
+                 transform: `rotate(${wheelRotation}deg)`,
+                 // Long cubic-bezier: fast start, gentle taper, tiny settle at the end.
+                 transition: spinning ? 'transform 7s cubic-bezier(0.17, 0.72, 0.22, 1)' : 'none',
+                 background:
+                   'conic-gradient(from -4.86deg, ' +
+                   WHEEL.map((n, i) => {
+                     const c = color(n);
+                     const bg = c === 'green' ? '#0f7d3d' : c === 'red' ? '#c62828' : '#111';
+                     return `${bg} ${i * 360 / WHEEL.length}deg ${(i + 1) * 360 / WHEEL.length}deg`;
+                   }).join(', ') + ')',
+                 boxShadow: 'inset 0 0 30px rgba(0,0,0,0.9)',
+               }}
           >
             {WHEEL.map((n, i) => {
               const angle = i * 360 / WHEEL.length;
               return (
                 <div key={n}
-                     className="absolute left-1/2 top-1/2 text-white text-[9px] font-bold pointer-events-none"
+                     className="absolute left-1/2 top-1/2 text-white text-[10px] font-bold pointer-events-none"
                      style={{
-                       transform: `rotate(${angle}deg) translateY(-90px) rotate(${-angle}deg)`,
+                       transform: `rotate(${angle}deg) translateY(-116px) rotate(${-angle}deg)`,
                        transformOrigin: '0 0',
                        textShadow: '0 1px 2px rgba(0,0,0,0.8)',
                      }}>{n}</div>
               );
             })}
+            {/* Radial dividers between pockets for that authentic look */}
+            {WHEEL.map((_, i) => {
+              const angle = i * 360 / WHEEL.length;
+              return (
+                <div key={`div-${i}`}
+                     className="absolute left-1/2 top-1/2 bg-black/50 pointer-events-none"
+                     style={{
+                       width: 1, height: 120,
+                       transform: `rotate(${angle}deg) translateY(-100%)`,
+                       transformOrigin: '0 100%',
+                     }} />
+              );
+            })}
           </div>
+
+          {/* Ball track — rotates in the opposite direction, longer transition */}
           <div className="absolute inset-0 will-change-transform"
                style={{
                  transform: `rotate(${ballRotation}deg)`,
-                 transition: spinning ? 'transform 3.4s cubic-bezier(0.15, 0.65, 0.35, 1)' : 'none',
+                 // Ball starts fast, decelerates hard as it drops into a pocket.
+                 transition: spinning ? 'transform 7s cubic-bezier(0.12, 0.75, 0.25, 1)' : 'none',
                }}>
-            <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white"
-                 style={{ top: 8, boxShadow: '0 0 8px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.5)' }} />
+            <div className="absolute left-1/2 -translate-x-1/2 rounded-full"
+                 style={{
+                   top: 22,
+                   width: 14, height: 14,
+                   background: 'radial-gradient(circle at 30% 25%, #fff 0%, #e5e7eb 50%, #9ca3af 100%)',
+                   boxShadow: '0 0 10px rgba(255,255,255,0.9), 0 3px 6px rgba(0,0,0,0.6), inset 0 -1px 2px rgba(0,0,0,0.3)',
+                 }} />
           </div>
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-gradient-to-br from-pulse-gold via-[#B8860B] to-[#5a4008] border-4 border-[#3a2a10] flex items-center justify-center shadow-inner">
+
+          {/* Center hub */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center"
+               style={{
+                 width: 88, height: 88,
+                 background: 'radial-gradient(circle at 30% 25%, #F5B62E 0%, #B8860B 40%, #5a4008 100%)',
+                 border: '4px solid #3a2a10',
+                 boxShadow: 'inset 0 -4px 10px rgba(0,0,0,0.5), inset 0 4px 8px rgba(255,255,255,0.4), 0 4px 12px rgba(0,0,0,0.6)',
+               }}
+          >
             {result && !spinning ? (
               <div className="text-center">
-                <div className={`text-2xl font-black ${result.color === 'red' ? 'text-red-200' : result.color === 'green' ? 'text-emerald-200' : 'text-white'}`}>{result.spin}</div>
-                <div className="text-[8px] uppercase text-black/70">{result.color}</div>
+                <div className={`text-3xl font-black ${result.color === 'red' ? 'text-red-200' : result.color === 'green' ? 'text-emerald-200' : 'text-white'}`}>{result.spin}</div>
+                <div className="text-[9px] uppercase text-black/70 font-bold">{result.color}</div>
               </div>
             ) : (
-              <div className="text-3xl">⚡</div>
+              <div className="text-4xl" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}>⚡</div>
             )}
           </div>
         </div>
