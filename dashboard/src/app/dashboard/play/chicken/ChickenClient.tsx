@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DiscordChannel } from '@/lib/channels';
 
 function multiplierAt(elapsedMs: number): number {
@@ -25,7 +25,33 @@ interface Outcome {
   newBalance?: number;
 }
 
-type Phase = 'idle' | 'running' | 'ended';
+type Phase = 'idle' | 'running' | 'crashing' | 'ended';
+
+// Small helper — build the SVG points for the live curve.
+function multiplierPoints(startMs: number, nowMs: number, width: number, height: number, maxMult: number): string {
+  const samples = 60;
+  const durationMs = nowMs - startMs;
+  const points: string[] = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = (i / samples) * durationMs;
+    const m = multiplierAt(t);
+    const x = (i / samples) * width;
+    const y = height - Math.min(height, ((m - 1) / (maxMult - 1)) * height);
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  return points.join(' ');
+}
+
+// Danger tint — green → yellow → orange → red as multiplier grows.
+function dangerTint(mult: number): string {
+  if (mult < 1.5) return 'from-emerald-500/30 to-emerald-500/5 border-emerald-500/30';
+  if (mult < 2.5) return 'from-lime-500/30 to-lime-500/5 border-lime-500/40';
+  if (mult < 4)   return 'from-yellow-500/30 to-yellow-500/5 border-yellow-500/40';
+  if (mult < 8)   return 'from-orange-500/30 to-orange-500/5 border-orange-500/50';
+  return 'from-red-500/40 to-red-500/10 border-red-500/60';
+}
+
+interface Coin { id: number; dx: number; delay: number }
 
 export default function ChickenClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
   const [balance, setBalance] = useState(initialBalance);
@@ -33,35 +59,52 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
   const [phase, setPhase] = useState<Phase>('idle');
   const [session, setSession] = useState<Session | null>(null);
   const [multiplier, setMultiplier] = useState(1);
+  const [nowMs, setNowMs] = useState(Date.now());
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [share, setShare] = useState(true);
   const [channelId, setChannelId] = useState('');
   const [stats, setStats] = useState({ plays: 0, wins: 0, biggest: 0 });
+  const [coins, setCoins] = useState<Coin[]>([]);
   const cashingRef = useRef(false);
+  const coinIdRef = useRef(0);
 
   useEffect(() => setChannelId(channels[0]?.channel_id ?? ''), [channels]);
 
-  // Live tick multiplier and trigger auto-crash locally when crash_at_ms elapses.
   useEffect(() => {
     if (phase !== 'running' || !session) return;
     const start = session.started_at_ms;
     const handle = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const m = multiplierAt(elapsed);
-      setMultiplier(m);
-      // Auto-crash locally: freeze UI, then send a cashout (which the server
-      // will report as too late), so the outcome card shows.
+      const now = Date.now();
+      const elapsed = now - start;
+      setNowMs(now);
+      setMultiplier(multiplierAt(elapsed));
       if (elapsed >= session.crash_at_ms && !cashingRef.current) {
         cashingRef.current = true;
-        void doCashout();
+        setPhase('crashing');
+        // Wait for the flee animation to play, then resolve on the server.
+        setTimeout(() => { void doCashout(); }, 1500);
       }
-    }, 100);
+    }, 60);
     return () => clearInterval(handle);
   }, [phase, session]);
 
+  const spawnCoins = (count: number) => {
+    const batch: Coin[] = [];
+    for (let i = 0; i < count; i++) {
+      coinIdRef.current += 1;
+      batch.push({
+        id: coinIdRef.current,
+        dx: (Math.random() - 0.5) * 300,
+        delay: Math.random() * 0.4,
+      });
+    }
+    setCoins(c => [...c, ...batch]);
+    setTimeout(() => setCoins(c => c.filter(x => !batch.find(b => b.id === x.id))), 2200);
+  };
+
   const start = async () => {
-    if (phase === 'running') return;
+    if (phase === 'running' || phase === 'crashing') return;
     if (balance < bet) { setError('Not enough PULSE.'); return; }
     setError(null);
     setOutcome(null);
@@ -82,6 +125,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
       });
       setBalance(data.newBalance);
       setMultiplier(1);
+      setNowMs(Date.now());
       setPhase('running');
       cashingRef.current = false;
     } catch (err) {
@@ -91,7 +135,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
 
   const doCashout = async () => {
     if (!session) return;
-    if (cashingRef.current === false) cashingRef.current = true;
+    if (!cashingRef.current) cashingRef.current = true;
     try {
       const res = await fetch('/api/play/chicken/cashout', {
         method: 'POST',
@@ -104,13 +148,15 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
       });
       const data = (await res.json()) as Outcome;
       if (!res.ok) throw new Error((data as unknown as { error?: string }).error ?? `HTTP ${res.status}`);
+      if (!data.crashed) spawnCoins(18);
       setOutcome(data);
       setPhase('ended');
       if (typeof data.newBalance === 'number') setBalance(data.newBalance);
+      const net = data.crashed ? -data.bet : (data.payout - data.bet);
       setStats(s => ({
         plays: s.plays + 1,
-        wins: s.wins + (data.crashed ? 0 : 1),
-        biggest: Math.max(s.biggest, data.crashed ? 0 : data.payout),
+        wins: s.wins + (net > 0 ? 1 : 0),
+        biggest: Math.max(s.biggest, net > 0 ? net : 0),
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed.');
@@ -123,6 +169,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
     if (phase !== 'running') return;
     if (cashingRef.current) return;
     cashingRef.current = true;
+    spawnCoins(12);
     await doCashout();
   };
 
@@ -134,7 +181,24 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
     cashingRef.current = false;
   };
 
-  const displayMult = phase === 'running' ? multiplier : phase === 'ended' ? (outcome?.crashed ? outcome.crash_mult : outcome?.cashed_mult ?? 1) : 1;
+  const displayMult = phase === 'running' ? multiplier : phase === 'crashing' ? session?.crash_mult ?? multiplier : phase === 'ended' ? (outcome?.crashed ? outcome.crash_mult : outcome?.cashed_mult ?? 1) : 1;
+
+  // Live curve — visible while running or crashing.
+  const svgPoints = useMemo(() => {
+    if (!session) return '';
+    const now = phase === 'running' ? nowMs : session.started_at_ms + Math.min(nowMs - session.started_at_ms, session.crash_at_ms);
+    const maxMult = Math.max(2, (session.crash_mult) * 1.05, displayMult * 1.05);
+    return multiplierPoints(session.started_at_ms, now, 300, 100, maxMult);
+  }, [session, nowMs, phase, displayMult]);
+
+  const tint = phase === 'crashing' || (phase === 'ended' && outcome?.crashed)
+    ? 'from-red-500/40 to-red-500/10 border-red-500/60'
+    : phase === 'ended' && !outcome?.crashed
+      ? 'from-emerald-500/30 to-emerald-500/5 border-emerald-500/40'
+      : dangerTint(displayMult);
+
+  const highTension = phase === 'running' && multiplier >= 4;
+  const arenaShaking = phase === 'crashing';
 
   return (
     <>
@@ -150,41 +214,112 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
         </div>
       </div>
 
-      {/* Big multiplier display */}
+      {/* Arena */}
       <div
-        className={`rounded-2xl p-6 mb-4 text-center border transition-colors ${
-          phase === 'ended' && outcome?.crashed
-            ? 'bg-red-500/10 border-red-500/40'
-            : phase === 'ended'
-              ? 'bg-emerald-500/10 border-emerald-500/40'
-              : 'bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 border-pulse-gold/30'
-        }`}
+        className={`relative bg-gradient-to-br ${tint} border rounded-2xl overflow-hidden mb-4 transition-colors duration-300 ${arenaShaking ? 'crash-shake' : ''}`}
+        style={{ height: '58vh', minHeight: '380px' }}
       >
-        <div className="text-xs uppercase tracking-widest text-pulse-mute mb-1">
-          {phase === 'running' ? 'LIVE' : phase === 'ended' && outcome?.crashed ? 'The chicken flew!' : phase === 'ended' ? 'Cashed out' : 'Ready'}
-        </div>
-        <div className={`text-7xl md:text-8xl font-bold ${phase === 'ended' && outcome?.crashed ? 'text-red-400' : 'text-pulse-gold'}`}>
-          {displayMult.toFixed(2)}<span className="text-3xl">x</span>
-        </div>
-        <div className="text-4xl mt-2">
-          {phase === 'ended' && outcome?.crashed ? '🐔💨' : phase === 'ended' ? '💸' : '🐔'}
+        {/* Top: multiplier */}
+        <div className="absolute inset-x-0 top-4 text-center z-10">
+          <div className="text-[10px] tracking-widest uppercase text-pulse-mute">
+            {phase === 'idle' && 'Ready'}
+            {phase === 'running' && 'LIVE'}
+            {phase === 'crashing' && '💨 The chicken flew!'}
+            {phase === 'ended' && (outcome?.crashed ? 'Wiped' : '💸 Cashed out')}
+          </div>
+          <div
+            className={`text-6xl md:text-7xl font-black text-pulse-gold ${highTension ? 'multi-pulse' : ''} ${phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? 'text-red-400' : ''}`}
+          >
+            {displayMult.toFixed(2)}<span className="text-3xl">x</span>
+          </div>
         </div>
 
-        {outcome && (
-          <div className="mt-4">
+        {/* Live curve chart */}
+        {session && phase !== 'idle' && (
+          <svg
+            className="absolute inset-x-0 top-32 mx-auto opacity-70"
+            width="90%"
+            height="100"
+            viewBox="0 0 300 100"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#F5B62E" stopOpacity="0.7"/>
+                <stop offset="100%" stopColor="#F5B62E" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            {svgPoints && (
+              <>
+                <polyline
+                  points={`${svgPoints} 300,100 0,100`}
+                  fill="url(#lineGrad)"
+                  stroke="none"
+                />
+                <polyline
+                  points={svgPoints}
+                  fill="none"
+                  stroke={phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? '#EF4444' : '#F5B62E'}
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </>
+            )}
+          </svg>
+        )}
+
+        {/* Chicken sprite — walks in idle, runs while live, flies away on crash */}
+        <div className="absolute bottom-16 left-4 md:left-8 pointer-events-none">
+          <div
+            className={
+              phase === 'idle' ? 'chicken-walking text-5xl' :
+              phase === 'running' ? 'chicken-running text-5xl' :
+              phase === 'crashing' || (phase === 'ended' && outcome?.crashed) ? 'chicken-fleeing text-5xl' :
+              'text-5xl'
+            }
+          >
+            🐔
+          </div>
+        </div>
+
+        {/* Ground / dust — animated when running */}
+        <div className="absolute inset-x-0 bottom-8 h-2 opacity-40">
+          <div
+            className={`h-full ${phase === 'running' ? 'ground-scrolling' : ''}`}
+            style={{
+              background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 20px, #F5B62E44 20px, #F5B62E44 24px)',
+              backgroundSize: '200px 100%',
+            }}
+          />
+        </div>
+
+        {/* Coin rain on cash out */}
+        {coins.map(c => (
+          <div
+            key={c.id}
+            className="absolute top-40 left-1/2 -translate-x-1/2 text-2xl pointer-events-none coin-drop"
+            style={{ ['--dx' as string]: `${c.dx}px`, animationDelay: `${c.delay}s` }}
+          >
+            🪙
+          </div>
+        ))}
+
+        {/* Outcome banner */}
+        {phase === 'ended' && outcome && (
+          <div className="absolute inset-x-0 bottom-4 text-center px-4">
             {outcome.crashed ? (
-              <>
+              <div className="bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
                 <div className="text-lg font-bold text-red-300">💀 You stayed too long</div>
-                <div className="text-sm text-pulse-mute">Lost {outcome.bet.toLocaleString('en-US')} PULSE</div>
-              </>
+                <div className="text-xs text-pulse-mute">Lost {outcome.bet.toLocaleString('en-US')} PULSE</div>
+              </div>
             ) : (
-              <>
-                <div className="text-2xl font-bold text-pulse-gold">🎉 +{(outcome.payout - outcome.bet).toLocaleString('en-US')} PULSE net</div>
-                <div className="text-xs text-pulse-mute mt-1">
-                  {outcome.payout.toLocaleString('en-US')} back on {outcome.bet.toLocaleString('en-US')} bet
-                  <br />The chicken flew at <span className="text-red-400 font-semibold">{outcome.crash_mult.toFixed(2)}x</span>
+              <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-xl px-4 py-3">
+                <div className="text-xl font-bold text-pulse-gold">🎉 +{(outcome.payout - outcome.bet).toLocaleString('en-US')} PULSE net</div>
+                <div className="text-xs text-pulse-mute">
+                  {outcome.payout.toLocaleString('en-US')} back · chicken flew at <span className="text-red-400 font-semibold">{outcome.crash_mult.toFixed(2)}x</span>
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -225,7 +360,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
             )}
 
             <button onClick={start} disabled={balance < bet}
-              className="w-full bg-pulse-gold text-black font-bold text-lg py-4 rounded-xl disabled:opacity-50">
+              className="w-full bg-pulse-gold text-black font-bold text-lg py-4 rounded-xl disabled:opacity-50 shadow-brand">
               🐔 JUMP ON — {bet} PULSE
             </button>
           </>
@@ -233,9 +368,15 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
 
         {phase === 'running' && (
           <button onClick={cashOut}
-            className="w-full bg-emerald-500 text-black font-bold text-2xl py-6 rounded-xl">
+            className="w-full bg-emerald-500 text-black font-bold text-2xl py-6 rounded-xl shadow-brand active:scale-95 transition-transform">
             💸 CASH OUT {multiplier.toFixed(2)}x
           </button>
+        )}
+
+        {phase === 'crashing' && (
+          <div className="w-full bg-red-500/20 border border-red-500/40 text-red-200 font-bold text-lg py-6 rounded-xl text-center">
+            🐔💨 Chicken's gone…
+          </div>
         )}
 
         {phase === 'ended' && (
@@ -249,8 +390,8 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
       </div>
 
       <div className="mt-4 bg-pulse-card border border-pulse-border rounded-xl p-3 text-xs text-pulse-mute">
-        <div className="font-semibold text-pulse-text mb-1">Payouts</div>
-        <div>Your win = bet × current multiplier. Chicken can fly at any moment — 2% chance instant, median around 4-6×, long tail up to 50×.</div>
+        <div className="font-semibold text-pulse-text mb-1">How it works</div>
+        <div>Bet, jump on the chicken. Multiplier climbs 🐔🏃. Cash out any time. If the chicken flies before you cash out → wiped. Median crash ~4-6×, tail up to 50×.</div>
       </div>
     </>
   );
