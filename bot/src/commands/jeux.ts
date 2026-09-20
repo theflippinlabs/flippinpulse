@@ -42,6 +42,7 @@ const PVP: GameEntry[] = [
 ];
 
 const MULTI: GameEntry[] = [
+  { name: 'chicken',      emoji: '🐔', desc: 'Chicken Race — cash out avant que la poule s\'envole !' },
   { name: 'battleroyale', emoji: '🏆', desc: 'Battle Royale — le dernier survivant rafle la cagnotte' },
   { name: 'diceroyale',   emoji: '🎲', desc: 'Dé Royale — le plus haut score gagne' },
 ];
