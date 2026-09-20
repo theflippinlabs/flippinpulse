@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
+import { useLocale } from '@/lib/i18n-client';
 
 interface Result { seed: number; roll: number; choice: 'higher' | 'lower'; won: boolean; multiplier: number; bet: number; payout: number; newBalance: number }
 
@@ -53,6 +54,7 @@ function CardBack() {
 }
 
 export default function HigherLowerClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
+  const locale = useLocale();
   const [balance, setBalance] = useState(initialBalance);
   const [bet, setBet] = useState(25);
   const [seed, setSeed] = useState<number>(Math.floor(Math.random() * 98) + 2);
@@ -76,7 +78,7 @@ export default function HigherLowerClient({ initialBalance, channels }: { initia
       const res = await fetch('/api/play/higherlower', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bet, seed, choice, share, channel_id: share ? channelId : undefined }),
+        body: JSON.stringify({ bet, seed, choice, share, channel_id: share ? channelId : undefined, locale }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);

@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LocaleContext, type Locale } from '@/lib/i18n-client';
+import LocaleToggle from '../app/LocaleToggle';
 
 const NAV_LEFT = [
   { href: '/dashboard', label: 'Home', emoji: '🏠' },
@@ -32,6 +34,7 @@ const DESKTOP_NAV = [
 interface Props {
   username: string;
   avatarUrl: string | null;
+  locale: Locale;
   children: React.ReactNode;
 }
 
@@ -44,7 +47,15 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-export default function DashboardShell({ username, avatarUrl, children }: Props) {
+export default function DashboardShell({ username, avatarUrl, locale, children }: Props) {
+  return (
+    <LocaleContext.Provider value={locale}>
+      <ShellInner username={username} avatarUrl={avatarUrl}>{children}</ShellInner>
+    </LocaleContext.Provider>
+  );
+}
+
+function ShellInner({ username, avatarUrl, children }: { username: string; avatarUrl: string | null; children: React.ReactNode }) {
   const pathname = usePathname();
 
   const NavItem = ({ href, label, emoji }: { href: string; label: string; emoji: string }) => {
@@ -73,6 +84,10 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
             <span className="text-xs text-pulse-mute truncate">Command Deck</span>
           </div>
           <div className="flex items-center gap-2">
+            <LocaleToggle />
+            <a href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">
+              🎮
+            </a>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-pulse-gold/40" />
@@ -108,6 +123,12 @@ export default function DashboardShell({ username, avatarUrl, children }: Props)
           ))}
         </nav>
         <div className="px-4 py-4 border-t border-pulse-border">
+          <div className="flex items-center gap-2 mb-3">
+            <LocaleToggle />
+            <a href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">
+              🎮 App
+            </a>
+          </div>
           <div className="flex items-center gap-3">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

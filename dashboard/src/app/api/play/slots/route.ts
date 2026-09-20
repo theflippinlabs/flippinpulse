@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { pickWeighted, settleBet, getBalance } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
+import { slotsAnnounce, pickLocale } from '@/lib/gameAnnounce';
 
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
 const WEIGHTS = [30, 25, 20, 15, 6, 3, 1];
@@ -47,15 +48,12 @@ export async function POST(req: NextRequest) {
   const net = payout - bet;
   if (body.share && body.channel_id && net >= bet * 5) {
     const multiplier = payout / bet;
+    const { title, message } = slotsAnnounce(pickLocale(body), {
+      userId: session.id, multi: multiplier, net, reels,
+    });
     await supabase.from('dashboard_commands').insert({
       command: 'announce',
-      payload_json: {
-        channel_id: body.channel_id,
-        title: '🎰 SLOTS JACKPOT!',
-        message: `<@${session.id}> just spun **${reels.join(' ')}** and won **+${net.toLocaleString('en-US')} PULSE** net (${multiplier.toFixed(1)}× bet)! 🔥`,
-        embed: true,
-        ping: null,
-      },
+      payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
       status: 'pending',
       created_by: session.id,
     });

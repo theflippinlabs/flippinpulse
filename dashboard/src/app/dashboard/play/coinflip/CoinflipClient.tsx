@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
+import { useLocale } from '@/lib/i18n-client';
 
 interface Result { outcome: 'heads' | 'tails'; choice: 'heads' | 'tails'; won: boolean; bet: number; payout: number; newBalance: number }
 
 export default function CoinflipClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
+  const locale = useLocale();
   const [balance, setBalance] = useState(initialBalance);
   const [bet, setBet] = useState(50);
   const [choice, setChoice] = useState<'heads' | 'tails'>('heads');
@@ -30,7 +32,7 @@ export default function CoinflipClient({ initialBalance, channels }: { initialBa
       const res = await fetch('/api/play/coinflip', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bet, choice, share, channel_id: share ? channelId : undefined }),
+        body: JSON.stringify({ bet, choice, share, channel_id: share ? channelId : undefined, locale }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);

@@ -125,16 +125,17 @@ function Avatar({ url, name, rank }: { url: string | null; name: string; rank: n
 
 export default async function Overview() {
   const [stats, recent] = await Promise.all([loadStats(), loadRecent()]);
+  const { t } = await import('@/lib/i18n');
   return (
     <>
-      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 tracking-wide">Overview</h1>
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 tracking-wide">{t('dashboard.overview')}</h1>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-        <Card label="Members tracked" value={fmt(stats.members)} />
-        <Card label="PULSE in wallets" value={fmt(stats.totalPulseInWallets)} hint="Sum of every balance" />
-        <Card label="Active tournois" value={fmt(stats.activeTournois)} hint="open + running" />
-        <Card label="Members jailed" value={fmt(stats.activeJails)} />
-        <Card label="Lottery pot" value={fmt(stats.lotteryPot)} hint="Current round" />
-        <Card label="Badges unlocked" value={fmt(stats.achievementsUnlocked)} hint="Across the community" />
+        <Card label={t('dashboard.stats.members_tracked')} value={fmt(stats.members)} />
+        <Card label={t('dashboard.stats.pulse_in_wallets')} value={fmt(stats.totalPulseInWallets)} hint={t('dashboard.stats.sum_every_balance')} />
+        <Card label={t('dashboard.stats.active_tournois')} value={fmt(stats.activeTournois)} hint={t('dashboard.stats.open_running')} />
+        <Card label={t('dashboard.stats.members_jailed')} value={fmt(stats.activeJails)} />
+        <Card label={t('dashboard.stats.lottery_pot')} value={fmt(stats.lotteryPot)} hint={t('dashboard.stats.current_round')} />
+        <Card label={t('dashboard.stats.badges_unlocked')} value={fmt(stats.achievementsUnlocked)} hint={t('dashboard.stats.across_community')} />
       </div>
 
       {/* Top members — podium for top 3, then a clean list */}
@@ -142,14 +143,14 @@ export default async function Overview() {
         <div className="bg-gradient-to-b from-pulse-card to-pulse-bg border border-pulse-border rounded-2xl p-4 md:p-5 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="font-bold text-lg">🏆 Leaderboard</h2>
-              <div className="text-xs text-pulse-mute">Top members by points</div>
+              <h2 className="font-bold text-lg">{t('dashboard.leaderboard_kanji')}</h2>
+              <div className="text-xs text-pulse-mute">{t('dashboard.top_by_points')}</div>
             </div>
-            <Link href="/dashboard/members" className="text-xs text-pulse-mute hover:text-pulse-gold underline-offset-2 hover:underline">View all ›</Link>
+            <Link href="/dashboard/members" className="text-xs text-pulse-mute hover:text-pulse-gold underline-offset-2 hover:underline">{t('dashboard.view_all')} ›</Link>
           </div>
 
           {recent.topMembers.length === 0 ? (
-            <div className="text-pulse-mute py-4 text-sm text-center">No members yet.</div>
+            <div className="text-pulse-mute py-4 text-sm text-center">{t('dashboard.no_members')}</div>
           ) : (
             <>
               {/* Podium: #2 · #1 (raised, centered) · #3 */}
@@ -185,8 +186,8 @@ export default async function Overview() {
               {recent.topMembers.length > 3 && (
                 <details className="group">
                   <summary className="list-none cursor-pointer flex items-center justify-center gap-2 py-2 rounded-lg bg-pulse-bg/60 border border-pulse-border/60 text-sm text-pulse-mute hover:text-pulse-gold hover:border-pulse-gold/40 transition-colors">
-                    <span className="group-open:hidden">Show ranks 4–{recent.topMembers.length}</span>
-                    <span className="hidden group-open:inline">Hide the rest</span>
+                    <span className="group-open:hidden">{t('dashboard.show_ranks').replace('{n}', String(recent.topMembers.length))}</span>
+                    <span className="hidden group-open:inline">{t('dashboard.hide_rest')}</span>
                     <span className="text-lg group-open:rotate-180 transition-transform">›</span>
                   </summary>
                   <ul className="space-y-2 mt-3">

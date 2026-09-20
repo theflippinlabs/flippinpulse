@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
+import { useLocale } from '@/lib/i18n-client';
 import ChickenSprite from './ChickenSprite';
 
 function multiplierAt(elapsedMs: number): number {
@@ -55,6 +56,7 @@ function dangerTint(mult: number): string {
 interface Coin { id: number; dx: number; delay: number }
 
 export default function ChickenClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
+  const locale = useLocale();
   const [balance, setBalance] = useState(initialBalance);
   const [bet, setBet] = useState(50);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -145,6 +147,7 @@ export default function ChickenClient({ initialBalance, channels }: { initialBal
           token: session.token,
           share,
           channel_id: share ? channelId : undefined,
+          locale,
         }),
       });
       const data = (await res.json()) as Outcome;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { settleBet } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
+import { rouletteAnnounce, pickLocale } from '@/lib/gameAnnounce';
 
 const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
@@ -103,16 +104,13 @@ export async function POST(req: NextRequest) {
 
   const net = totalPayout - totalStake;
   if (body.share && body.channel_id && net >= 500) {
-    const winners = results.filter(r => r.hit).map(r => `${label(r.kind)} (+${r.payout})`).join(', ');
+    const winnersInline = results.filter(r => r.hit).map(r => `${label(r.kind)} (+${r.payout})`).join(', ');
+    const { title, message } = rouletteAnnounce(pickLocale(body), {
+      userId: session.id, spin, color: color(spin), net, winnersInline,
+    });
     await supabase.from('dashboard_commands').insert({
       command: 'announce',
-      payload_json: {
-        channel_id: body.channel_id,
-        title: '🎡 Roulette big win!',
-        message: `<@${session.id}> hit **${spin} ${color(spin)}** and won **+${net} PULSE** net · ${winners}`,
-        embed: true,
-        ping: null,
-      },
+      payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
       status: 'pending',
       created_by: session.id,
     });

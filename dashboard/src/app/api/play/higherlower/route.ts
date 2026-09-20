@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { settleBet } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
+import { higherLowerAnnounce, pickLocale } from '@/lib/gameAnnounce';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -28,15 +29,12 @@ export async function POST(req: NextRequest) {
   if (!settled.ok) return NextResponse.json({ error: settled.error, balance: settled.balance }, { status: 400 });
 
   if (body.share && body.channel_id && won && multi >= 3) {
+    const { title, message } = higherLowerAnnounce(pickLocale(body), {
+      userId: session.id, seed, roll, choice, multi, net: payout - bet,
+    });
     await supabase.from('dashboard_commands').insert({
       command: 'announce',
-      payload_json: {
-        channel_id: body.channel_id,
-        title: '🔼 Higher/Lower — big call!',
-        message: `<@${session.id}> called **${choice}** on **${seed}**, drew **${roll}** and won **${payout} PULSE** (${multi}×)! 🎯`,
-        embed: true,
-        ping: null,
-      },
+      payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
       status: 'pending',
       created_by: session.id,
     });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
+import { useLocale } from '@/lib/i18n-client';
 
 // European wheel order — visual only; must match the server for the ball to
 // land on the right pocket.
@@ -86,6 +87,7 @@ export default function RouletteClient({
   initialBalance: number;
   channels: DiscordChannel[];
 }) {
+  const locale = useLocale();
   const [balance, setBalance] = useState(initialBalance);
   const [chip, setChip] = useState(25);
   const [wagers, setWagers] = useState<Wager[]>([]);
@@ -143,7 +145,7 @@ export default function RouletteClient({
       const res = await fetch('/api/play/roulette', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ wagers, share, channel_id: share ? channelId : undefined }),
+        body: JSON.stringify({ wagers, share, channel_id: share ? channelId : undefined, locale }),
       });
       const data: Result & { error?: string } = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { pickDefaultShareChannel, type DiscordChannel } from '@/lib/channelTypes';
+import { useLocale } from '@/lib/i18n-client';
 
 // Symbols shown in the machine, in visual order. Repeated in the reel strip
 // below to make the vertical scroll seamless when it wraps.
@@ -85,6 +86,7 @@ function Reel({ spinning, symbol, delay, jackpot }: { spinning: boolean; symbol:
 }
 
 export default function SlotsClient({ initialBalance, channels }: { initialBalance: number; channels: DiscordChannel[] }) {
+  const locale = useLocale();
   const [balance, setBalance] = useState(initialBalance);
   const [bet, setBet] = useState(25);
   const [spinning, setSpinning] = useState(false);
@@ -111,7 +113,7 @@ export default function SlotsClient({ initialBalance, channels }: { initialBalan
       const res = await fetch('/api/play/slots', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bet, share, channel_id: share ? channelId : undefined }),
+        body: JSON.stringify({ bet, share, channel_id: share ? channelId : undefined, locale }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
