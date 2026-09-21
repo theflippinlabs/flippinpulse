@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { grantPulse } from '../services/economy.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('givepulse')
@@ -17,13 +18,15 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
 
   const target = interaction.options.getUser('user', true);
   const amount = interaction.options.getInteger('amount', true);
-  const reason = interaction.options.getString('reason') ?? 'Admin grant';
+  const reason = interaction.options.getString('reason') ?? (en ? 'Admin grant' : 'Don admin');
 
   if (target.bot) {
-    await interaction.editReply({ embeds: [errorEmbed('You cannot give PULSE to a bot.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'You cannot give PULSE to a bot.' : 'Tu ne peux pas donner de PULSE à un bot.')] });
     return;
   }
 
@@ -37,15 +40,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   );
 
   if (!res.success) {
-    await interaction.editReply({ embeds: [errorEmbed(res.error ?? 'Failed to give PULSE.')] });
+    await interaction.editReply({ embeds: [errorEmbed(res.error ?? (en ? 'Failed to give PULSE.' : 'Échec du don de PULSE.'))] });
     return;
   }
 
   await interaction.editReply({
-    embeds: [successEmbed(
-      `Gave **${amount}** PULSE to <@${target.id}>.\n` +
-      `New balance: **${res.newBalance}** PULSE.\n` +
-      `Reason: ${reason}`
+    embeds: [successEmbed(en
+      ? `Gave **${amount}** PULSE to <@${target.id}>.\nNew balance: **${res.newBalance}** PULSE.\nReason: ${reason}`
+      : `**${amount}** PULSE donnés à <@${target.id}>.\nNouveau solde : **${res.newBalance}** PULSE.\nRaison : ${reason}`
     )],
   });
 }

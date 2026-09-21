@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { revokePulse } from '../services/economy.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('removepulse')
@@ -17,23 +18,24 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
 
   const target = interaction.options.getUser('user', true);
   const amount = interaction.options.getInteger('amount', true);
-  const reason = interaction.options.getString('reason') ?? 'Admin revoke';
+  const reason = interaction.options.getString('reason') ?? (en ? 'Admin revoke' : 'Retrait admin');
 
   const res = await revokePulse(target.id, amount, reason, interaction.user.id);
 
   if (!res.success) {
-    await interaction.editReply({ embeds: [errorEmbed(res.error ?? 'Failed to remove PULSE.')] });
+    await interaction.editReply({ embeds: [errorEmbed(res.error ?? (en ? 'Failed to remove PULSE.' : 'Échec du retrait de PULSE.'))] });
     return;
   }
 
   await interaction.editReply({
-    embeds: [successEmbed(
-      `Removed PULSE from <@${target.id}>.\n` +
-      `New balance: **${res.newBalance}** PULSE.\n` +
-      `Reason: ${reason}`
+    embeds: [successEmbed(en
+      ? `Removed PULSE from <@${target.id}>.\nNew balance: **${res.newBalance}** PULSE.\nReason: ${reason}`
+      : `PULSE retirés à <@${target.id}>.\nNouveau solde : **${res.newBalance}** PULSE.\nRaison : ${reason}`
     )],
   });
 }

@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { logAndAnnounce } from '../services/moderation.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('unban')
@@ -15,18 +16,21 @@ export const data = new SlashCommandBuilder()
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!interaction.guild) {
-    await interaction.reply({ embeds: [errorEmbed('Server only.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Server only.' : 'Uniquement en serveur.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.options.getString('user_id', true).trim();
-  const reason = interaction.options.getString('reason') ?? 'Manual unban';
+  const reason = interaction.options.getString('reason') ?? (en ? 'Manual unban' : 'Déban manuel');
 
   if (!/^\d{17,20}$/.test(userId)) {
-    await interaction.editReply({ embeds: [errorEmbed('Invalid user ID.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Invalid user ID.' : 'ID utilisateur invalide.')] });
     return;
   }
 
@@ -34,7 +38,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.guild.bans.remove(userId, reason);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'unknown';
-    await interaction.editReply({ embeds: [errorEmbed(`Failed to unban: ${msg}`)] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? `Failed to unban: ${msg}` : `Échec du déban : ${msg}`)] });
     return;
   }
 
@@ -46,5 +50,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     reason,
   });
 
-  await interaction.editReply({ embeds: [successEmbed(`Unbanned <@${userId}>.`)] });
+  await interaction.editReply({ embeds: [successEmbed(en ? `Unbanned <@${userId}>.` : `<@${userId}> déban.`)] });
 }

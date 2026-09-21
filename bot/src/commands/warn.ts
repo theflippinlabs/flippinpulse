@@ -7,6 +7,7 @@ import {
 import { countWarnings, logAndAnnounce } from '../services/moderation.js';
 import { getModConfig } from '../services/settings.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('warn')
@@ -16,8 +17,11 @@ export const data = new SlashCommandBuilder()
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!interaction.guild) {
-    await interaction.reply({ embeds: [errorEmbed('Server only.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Server only.' : 'Uniquement en serveur.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -27,11 +31,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const reason = interaction.options.getString('reason', true);
 
   if (target.bot) {
-    await interaction.editReply({ embeds: [errorEmbed('Cannot warn a bot.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Cannot warn a bot.' : 'Impossible d\'avertir un bot.')] });
     return;
   }
   if (target.id === interaction.user.id) {
-    await interaction.editReply({ embeds: [errorEmbed('You cannot warn yourself.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'You cannot warn yourself.' : 'Tu ne peux pas t\'avertir toi-même.')] });
     return;
   }
 
@@ -48,17 +52,25 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const member = await interaction.guild.members.fetch(target.id).catch(() => null);
   if (member) {
+    const targetLocale = await getUserLocale(target.id);
+    const ten = targetLocale === 'en';
     await member.send({
-      embeds: [errorEmbed(`You were warned in **${interaction.guild.name}**.\nReason: ${reason}\nTotal warnings: ${count}`)],
+      embeds: [errorEmbed(ten
+        ? `You were warned in **${interaction.guild.name}**.\nReason: ${reason}\nTotal warnings: ${count}`
+        : `Tu as reçu un avertissement dans **${interaction.guild.name}**.\nRaison : ${reason}\nAvertissements totaux : ${count}`)],
     }).catch(() => null);
   }
 
   let note = '';
   if (threshold > 0 && count >= threshold) {
-    note = `\n⚠️ User has reached **${count}** warnings (threshold: ${threshold}). Consider escalating.`;
+    note = en
+      ? `\n⚠️ User has reached **${count}** warnings (threshold: ${threshold}). Consider escalating.`
+      : `\n⚠️ L'utilisateur a atteint **${count}** avertissements (seuil : ${threshold}). Envisage une escalade.`;
   }
 
   await interaction.editReply({
-    embeds: [successEmbed(`Warned <@${target.id}>. Total warnings: **${count}**.${note}`)],
+    embeds: [successEmbed(en
+      ? `Warned <@${target.id}>. Total warnings: **${count}**.${note}`
+      : `<@${target.id}> averti. Avertissements totaux : **${count}**.${note}`)],
   });
 }

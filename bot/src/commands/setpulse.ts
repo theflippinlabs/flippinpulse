@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { setPulse } from '../services/economy.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('setpulse')
@@ -17,13 +18,15 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
 
   const target = interaction.options.getUser('user', true);
   const amount = interaction.options.getInteger('amount', true);
-  const reason = interaction.options.getString('reason') ?? 'Admin set balance';
+  const reason = interaction.options.getString('reason') ?? (en ? 'Admin set balance' : 'Solde défini par admin');
 
   if (target.bot) {
-    await interaction.editReply({ embeds: [errorEmbed('You cannot set PULSE for a bot.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'You cannot set PULSE for a bot.' : 'Tu ne peux pas définir le PULSE d\'un bot.')] });
     return;
   }
 
@@ -37,11 +40,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   );
 
   if (!res.success) {
-    await interaction.editReply({ embeds: [errorEmbed(res.error ?? 'Failed to set PULSE.')] });
+    await interaction.editReply({ embeds: [errorEmbed(res.error ?? (en ? 'Failed to set PULSE.' : 'Échec de la définition du PULSE.'))] });
     return;
   }
 
   await interaction.editReply({
-    embeds: [successEmbed(`Set <@${target.id}>'s balance to **${res.newBalance}** PULSE.\nReason: ${reason}`)],
+    embeds: [successEmbed(en
+      ? `Set <@${target.id}>'s balance to **${res.newBalance}** PULSE.\nReason: ${reason}`
+      : `Solde de <@${target.id}> défini à **${res.newBalance}** PULSE.\nRaison : ${reason}`)],
   });
 }

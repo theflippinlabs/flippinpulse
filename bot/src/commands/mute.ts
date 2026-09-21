@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { logAndAnnounce, parseDurationSeconds } from '../services/moderation.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60_000;
 
@@ -18,8 +19,11 @@ export const data = new SlashCommandBuilder()
   .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!interaction.guild) {
-    await interaction.reply({ embeds: [errorEmbed('Server only.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Server only.' : 'Uniquement en serveur.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -27,31 +31,35 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const target = interaction.options.getUser('user', true);
   const durationStr = interaction.options.getString('duration', true);
-  const reason = interaction.options.getString('reason') ?? 'No reason provided';
+  const reason = interaction.options.getString('reason') ?? (en ? 'No reason provided' : 'Aucune raison donnée');
 
   const seconds = parseDurationSeconds(durationStr);
   if (!seconds || seconds <= 0) {
-    await interaction.editReply({ embeds: [errorEmbed('Invalid duration. Use formats like `30s`, `10m`, `2h`, `1d`.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? 'Invalid duration. Use formats like `30s`, `10m`, `2h`, `1d`.'
+      : 'Durée invalide. Utilise `30s`, `10m`, `2h`, `1d`.')] });
     return;
   }
   const ms = seconds * 1000;
   if (ms > MAX_TIMEOUT_MS) {
-    await interaction.editReply({ embeds: [errorEmbed('Discord caps timeouts at 28 days.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Discord caps timeouts at 28 days.' : 'Discord plafonne les mute à 28 jours.')] });
     return;
   }
 
   const member = await interaction.guild.members.fetch(target.id).catch(() => null);
   if (!member) {
-    await interaction.editReply({ embeds: [errorEmbed('Member not found.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Member not found.' : 'Membre introuvable.')] });
     return;
   }
   if (!member.moderatable) {
-    await interaction.editReply({ embeds: [errorEmbed('I cannot moderate this member (missing permission or role hierarchy).')] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? 'I cannot moderate this member (missing permission or role hierarchy).'
+      : 'Je ne peux pas modérer ce membre (permission ou hiérarchie de rôles).')] });
     return;
   }
 
   await member.timeout(ms, reason).catch(err => {
-    return interaction.editReply({ embeds: [errorEmbed(`Failed to mute: ${err.message}`)] });
+    return interaction.editReply({ embeds: [errorEmbed(en ? `Failed to mute: ${err.message}` : `Échec du mute : ${err.message}`)] });
   });
 
   await logAndAnnounce(interaction.guild, {
@@ -64,6 +72,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   });
 
   await interaction.editReply({
-    embeds: [successEmbed(`Muted <@${target.id}> for ${durationStr}. Reason: ${reason}`)],
+    embeds: [successEmbed(en
+      ? `Muted <@${target.id}> for ${durationStr}. Reason: ${reason}`
+      : `<@${target.id}> mute pendant ${durationStr}. Raison : ${reason}`)],
   });
 }
