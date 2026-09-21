@@ -58,6 +58,7 @@ import * as cosmetics from './cosmetics.js';
 import * as language from './language.js';
 import * as catchup from './catchup.js';
 import * as compagnon from './compagnon.js';
+import * as poker from './poker.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -74,7 +75,7 @@ const commandList: Command[] = [
   higherlower, lottery, battleroyale, diceroyale,
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
   jeux, hub, setupaccueil, jail, achievements, tournoi, cosmetics, chicken, automod, charts, music,
-  language, catchup, compagnon,
+  language, catchup, compagnon, poker,
 ];
 
 export const commands = new Map<string, Command>();

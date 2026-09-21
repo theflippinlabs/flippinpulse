@@ -341,6 +341,7 @@ const GAME_LABELS: Record<string, string> = {
   typing_race: '⌨️ Typing race',
   battle_royale: '🏆 Battle Royale',
   dice_royale: '🎲 Dice Royale',
+  poker: '♠️ Poker Texas Hold\'em',
 };
 
 function labelFor(key: string): string {
