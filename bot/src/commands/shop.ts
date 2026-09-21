@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale, t } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('shop')
@@ -19,6 +20,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
   const category = interaction.options.getString('category');
 
   let query = supabase
@@ -32,18 +34,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: items } = await query.limit(15);
 
   if (!items?.length) {
-    await interaction.reply({ content: 'No items available right now!', ephemeral: true });
+    await interaction.reply({ content: t('shop', 'empty', locale), ephemeral: true });
     return;
   }
 
   const lines = items.map(item => {
-    const stock = item.stock_remaining !== null ? ` (${item.stock_remaining} left)` : '';
+    const stock = item.stock_remaining !== null ? ` ${t('shop', 'stock_left', locale, { n: item.stock_remaining })}` : '';
     return `**${item.name}** — ${item.price_pulse} PULSE${stock}\n${item.description ?? ''}`;
   });
 
-  const embed = pulseEmbed('PULSE Shop')
+  const embed = pulseEmbed(t('shop', 'title', locale))
     .setDescription(lines.join('\n\n'))
-    .setFooter({ text: 'Use /buy <item name> to purchase' });
+    .setFooter({ text: t('shop', 'footer', locale) });
 
   await interaction.reply({ embeds: [embed] });
 }

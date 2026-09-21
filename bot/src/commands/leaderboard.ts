@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('leaderboard')
@@ -17,9 +18,13 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const period = interaction.options.getString('period') ?? 'total';
   const column = period === 'week' ? 'points_week' : period === 'month' ? 'points_month' : 'points_total';
-  const periodLabel = period === 'week' ? 'Weekly' : period === 'month' ? 'Monthly' : 'All Time';
+  const periodLabel = period === 'week'  ? (en ? 'Weekly'   : 'Semaine')
+                   : period === 'month'  ? (en ? 'Monthly'  : 'Mois')
+                   :                       (en ? 'All Time' : 'Total');
 
   const { data: users } = await supabase
     .from('discord_users')
@@ -28,7 +33,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .limit(10);
 
   if (!users?.length) {
-    await interaction.reply({ content: 'No users found yet!', ephemeral: true });
+    await interaction.reply({ content: en ? 'No users found yet!' : 'Aucun membre pour l\'instant !', ephemeral: true });
     return;
   }
 
@@ -40,7 +45,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return `${medal} **${username}** — ${pts} pts ${rankName ? `(${rankName})` : ''}`;
   });
 
-  const embed = pulseEmbed(`Leaderboard — ${periodLabel}`)
+  const embed = pulseEmbed(`${en ? 'Leaderboard' : 'Classement'} — ${periodLabel}`)
     .setDescription(lines.join('\n'));
 
   await interaction.reply({ embeds: [embed] });

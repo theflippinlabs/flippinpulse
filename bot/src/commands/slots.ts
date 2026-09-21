@@ -18,6 +18,7 @@ import {
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { buildPostGameRow } from '../utils/postgame.js';
+import { getUserLocale } from '../i18n.js';
 
 interface SlotsConfig {
   min_bet: number;
@@ -77,8 +78,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 export async function runSlots(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('slots')) {
-    await interaction.reply({ embeds: [errorEmbed('Slots is currently disabled.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Slots is currently disabled.' : 'Les slots sont désactivés pour l\'instant.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -86,19 +90,23 @@ export async function runSlots(interaction: ChatInputCommandInteraction | ModalS
   const cfg: SlotsConfig = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
 
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`
+      : `La mise doit être entre ${cfg.min_bet} et ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const bal = await getBalance(interaction.user.id);
   if (!bal || bal.balance < bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Insufficient PULSE. You have ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Not enough PULSE. You have ${bal?.balance ?? 0}.`
+      : `Pas assez de PULSE. Tu as ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const spend = await spendPulse(interaction.user.id, bet, 'slots_bet');
   if (!spend.success) {
-    await interaction.reply({ embeds: [errorEmbed(spend.error ?? 'Failed to place bet.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(spend.error ?? (en ? 'Failed to place bet.' : 'Échec de la mise.'))], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -106,9 +114,11 @@ export async function runSlots(interaction: ChatInputCommandInteraction | ModalS
   if (sessionId) await addGamePlayer(sessionId, interaction.user.id, bet);
 
   const reels = ['🎰', '🎰', '🎰'];
+  const betLabel = en ? 'Bet' : 'Mise';
+  const spinningText = en ? 'Spinning…' : 'Ça tourne…';
 
   await interaction.reply({
-    embeds: [pulseEmbed('🎰 Slots').setDescription(`**Bet:** ${bet} PULSE\n\n[ ${reels.join(' | ')} ]\n\nSpinning…`)],
+    embeds: [pulseEmbed('🎰 Slots').setDescription(`**${betLabel}:** ${bet} PULSE\n\n[ ${reels.join(' | ')} ]\n\n${spinningText}`)],
   });
 
   const final = [
@@ -121,7 +131,7 @@ export async function runSlots(interaction: ChatInputCommandInteraction | ModalS
     await new Promise(r => setTimeout(r, 700));
     reels[step] = final[step];
     await interaction.editReply({
-      embeds: [pulseEmbed('🎰 Slots').setDescription(`**Bet:** ${bet} PULSE\n\n[ ${reels.join(' | ')} ]`)],
+      embeds: [pulseEmbed('🎰 Slots').setDescription(`**${betLabel}:** ${bet} PULSE\n\n[ ${reels.join(' | ')} ]`)],
     });
   }
 
@@ -138,8 +148,12 @@ export async function runSlots(interaction: ChatInputCommandInteraction | ModalS
   }
 
   const result = payout > 0
-    ? successEmbed(`[ ${final.join(' | ')} ]\n\n🎉 **${multiplier}x** payout! You win **${payout}** PULSE.`).setTitle('🎰 Slots')
-    : errorEmbed(`[ ${final.join(' | ')} ]\n\nNo match. You lose **${bet}** PULSE.`).setTitle('🎰 Slots');
+    ? successEmbed(en
+        ? `[ ${final.join(' | ')} ]\n\n🎉 **${multiplier}x** payout! You win **${payout}** PULSE.`
+        : `[ ${final.join(' | ')} ]\n\n🎉 Paiement **${multiplier}x** ! Tu gagnes **${payout}** PULSE.`).setTitle('🎰 Slots')
+    : errorEmbed(en
+        ? `[ ${final.join(' | ')} ]\n\nNo match. You lose **${bet}** PULSE.`
+        : `[ ${final.join(' | ')} ]\n\nAucune combinaison. Tu perds **${bet}** PULSE.`).setTitle('🎰 Slots');
 
   await interaction.editReply({ embeds: [result], components: [buildPostGameRow('slots', bet)] });
 }

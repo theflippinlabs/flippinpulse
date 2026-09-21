@@ -4,6 +4,7 @@ import { getRankForPoints } from '../services/ranks.js';
 import { listAllAchievements, listUnlocked } from '../services/achievements.js';
 import { getCosmetics, parseHex } from '../services/cosmetics.js';
 import { pulseEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
@@ -11,6 +12,8 @@ export const data = new SlashCommandBuilder()
   .addUserOption(opt => opt.setName('user').setDescription('User to view').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const targetUser = interaction.options.getUser('user') ?? interaction.user;
   const { data: user } = await supabase
     .from('discord_users')
@@ -19,7 +22,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .single();
 
   if (!user) {
-    await interaction.reply({ embeds: [errorEmbed('User not found. They need to be active first!')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'User not found. They need to be active first!' : 'Utilisateur introuvable. Il doit être actif d\'abord !')], ephemeral: true });
     return;
   }
 
@@ -45,20 +48,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const badges = all.filter(a => unlockedSet.has(a.achievement_key));
   const badgeLine = badges.length
     ? badges.slice(-8).map(a => `${a.emoji} ${a.name}`).join(' \u00b7 ')
-    : '_None yet \u2014 play games, chat, claim daily\u2026_';
+    : (en ? '_None yet \u2014 play games, chat, claim daily\u2026_' : '_Aucun encore \u2014 joue, discute, r\u00e9clame le daily\u2026_');
 
   const titlePrefix = cosmetics?.title ? `_${cosmetics.title}_\n` : '';
-  const embed = pulseEmbed(`${targetUser.username}'s Profile`)
+  const rankLabel = en ? 'Rank' : 'Rang';
+  const unrankedLabel = en ? 'Unranked' : 'Non class\u00e9';
+  const embed = pulseEmbed(en ? `${targetUser.username}'s Profile` : `Profil de ${targetUser.username}`)
     .setThumbnail(targetUser.displayAvatarURL({ size: 128 }))
-    .setDescription(`${titlePrefix}\ud83c\udfc6 **Rank:** ${user.rank_name ?? 'Unranked'}${progressLine}`)
+    .setDescription(`${titlePrefix}\ud83c\udfc6 **${rankLabel}:** ${user.rank_name ?? unrankedLabel}${progressLine}`)
     .addFields(
-      { name: '\ud83d\udd25 Streak', value: `${user.streak ?? 0} days`, inline: true },
-      { name: 'Weekly', value: `${user.points_week ?? 0}`, inline: true },
-      { name: 'Monthly', value: `${user.points_month ?? 0}`, inline: true },
-      { name: 'PULSE Balance', value: `${user.balance_pulse ?? 0} PULSE`, inline: true },
-      { name: 'Lifetime Earned', value: `${user.lifetime_earned_pulse ?? 0}`, inline: true },
-      { name: 'Lifetime Spent', value: `${user.lifetime_spent_pulse ?? 0}`, inline: true },
-      { name: `\ud83c\udfc5 Badges (${badges.length}/${all.length})`, value: badgeLine.slice(0, 1024), inline: false },
+      { name: `\ud83d\udd25 ${en ? 'Streak' : 'Streak'}`, value: en ? `${user.streak ?? 0} days` : `${user.streak ?? 0} jours`, inline: true },
+      { name: en ? 'Weekly'  : 'Semaine', value: `${user.points_week ?? 0}`, inline: true },
+      { name: en ? 'Monthly' : 'Mois',    value: `${user.points_month ?? 0}`, inline: true },
+      { name: en ? 'PULSE Balance'   : 'Solde PULSE',       value: `${user.balance_pulse ?? 0} PULSE`, inline: true },
+      { name: en ? 'Lifetime Earned' : 'Gagn\u00e9 en tout',     value: `${user.lifetime_earned_pulse ?? 0}`, inline: true },
+      { name: en ? 'Lifetime Spent'  : 'D\u00e9pens\u00e9 en tout',   value: `${user.lifetime_spent_pulse ?? 0}`, inline: true },
+      { name: `\ud83c\udfc5 ${en ? 'Badges' : 'Badges'} (${badges.length}/${all.length})`, value: badgeLine.slice(0, 1024), inline: false },
     );
 
   // Custom profile color overrides the brand color.
