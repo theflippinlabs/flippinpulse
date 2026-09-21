@@ -29,8 +29,12 @@ interface ModConfig {
   anti_invites: { enabled: boolean; action: 'delete' | 'warn' };
   anti_links: { enabled: boolean; whitelist_domains: string[] };
   anti_raid: { enabled: boolean; max_joins: number; window_seconds: number; lockdown_minutes: number };
+  ai_moderation: { enabled: boolean; sensitivity: 'low' | 'medium' | 'high'; action: 'flag' | 'delete' | 'mute'; mute_seconds: number; min_chars: number };
   auto_warn_threshold: number;
 }
+
+const NEXT_SENSITIVITY: Record<'low' | 'medium' | 'high', 'low' | 'medium' | 'high'> = { low: 'medium', medium: 'high', high: 'low' };
+const NEXT_ACTION: Record<'flag' | 'delete' | 'mute', 'flag' | 'delete' | 'mute'> = { flag: 'delete', delete: 'mute', mute: 'flag' };
 
 function render(cfg: ModConfig, locale: Locale) {
   const en = locale === 'en';
@@ -67,6 +71,9 @@ function render(cfg: ModConfig, locale: Locale) {
         line(cfg.anti_invites.enabled, invitesName, `${actionLbl}: ${cfg.anti_invites.action}`),
         line(cfg.anti_links.enabled, linksName,   `${whitelistLbl}: ${cfg.anti_links.whitelist_domains.length ? cfg.anti_links.whitelist_domains.join(', ') : noneLbl}`),
         line(cfg.anti_raid.enabled, raidName,    `${cfg.anti_raid.max_joins} ${joinsLbl} / ${cfg.anti_raid.window_seconds}s → ${lockLbl} ${cfg.anti_raid.lockdown_minutes}min`),
+        line(cfg.ai_moderation.enabled, en ? '🤖 AI moderation' : '🤖 Modération IA', en
+          ? `sensitivity **${cfg.ai_moderation.sensitivity}** · action **${cfg.ai_moderation.action}**`
+          : `sensibilité **${cfg.ai_moderation.sensitivity}** · action **${cfg.ai_moderation.action}**`),
       ].join('\n') +
       `\n\n${thresholdLine}\n\n${footerLine}`,
     )
@@ -87,8 +94,13 @@ function render(cfg: ModConfig, locale: Locale) {
     new ButtonBuilder().setCustomId('automod:links').setLabel(`${en ? 'Links' : 'Liens'} ${cfg.anti_links.enabled ? onLbl : offLbl}`).setEmoji('🌐').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('automod:raid').setLabel(`Raid ${cfg.anti_raid.enabled ? onLbl : offLbl}`).setEmoji('🛡️').setStyle(ButtonStyle.Secondary),
   );
+  const row3 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId('automod:ai').setLabel(`${en ? 'AI' : 'IA'} ${cfg.ai_moderation.enabled ? onLbl : offLbl}`).setEmoji('🤖').setStyle(cfg.ai_moderation.enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('automod:aisens').setLabel(`${en ? 'Sensitivity' : 'Sensibilité'}: ${cfg.ai_moderation.sensitivity}`).setEmoji('🎚️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('automod:aiaction').setLabel(`${en ? 'Action' : 'Action'}: ${cfg.ai_moderation.action}`).setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
+  );
 
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row1, row2, row3] };
 }
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -111,6 +123,7 @@ async function saveModConfig(patch: Partial<ModConfig>): Promise<ModConfig> {
   if (patch.anti_invites)       merged.anti_invites       = { ...current.anti_invites,       ...patch.anti_invites };
   if (patch.anti_links)         merged.anti_links         = { ...current.anti_links,         ...patch.anti_links };
   if (patch.anti_raid)          merged.anti_raid          = { ...current.anti_raid,          ...patch.anti_raid };
+  if (patch.ai_moderation)      merged.ai_moderation      = { ...current.ai_moderation,      ...patch.ai_moderation };
   await setSetting('mod_config', { ...raw, ...merged });
   return merged;
 }
@@ -133,6 +146,9 @@ export async function handleAutomodButton(interaction: ButtonInteraction): Promi
     else if (action === 'invites')  next = await saveModConfig({ anti_invites: { ...cur.anti_invites, enabled: !cur.anti_invites.enabled } });
     else if (action === 'links')    next = await saveModConfig({ anti_links: { ...cur.anti_links, enabled: !cur.anti_links.enabled } });
     else if (action === 'raid')     next = await saveModConfig({ anti_raid: { ...cur.anti_raid, enabled: !cur.anti_raid.enabled } });
+    else if (action === 'ai')       next = await saveModConfig({ ai_moderation: { ...cur.ai_moderation, enabled: !cur.ai_moderation.enabled } });
+    else if (action === 'aisens')   next = await saveModConfig({ ai_moderation: { ...cur.ai_moderation, sensitivity: NEXT_SENSITIVITY[cur.ai_moderation.sensitivity] } });
+    else if (action === 'aiaction') next = await saveModConfig({ ai_moderation: { ...cur.ai_moderation, action: NEXT_ACTION[cur.ai_moderation.action] } });
     else { await interaction.reply({ content: en ? 'Unknown action.' : 'Action inconnue.', flags: MessageFlags.Ephemeral }); return; }
     await interaction.update(render(next, locale));
   } catch (err) {

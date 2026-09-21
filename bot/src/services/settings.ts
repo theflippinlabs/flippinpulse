@@ -69,6 +69,13 @@ export interface ModConfig {
   anti_invites: { enabled: boolean; action: 'delete' | 'warn' };
   anti_links: { enabled: boolean; whitelist_domains: string[] };
   anti_raid: { enabled: boolean; max_joins: number; window_seconds: number; lockdown_minutes: number };
+  ai_moderation: {
+    enabled: boolean;
+    sensitivity: 'low' | 'medium' | 'high';
+    action: 'flag' | 'delete' | 'mute';
+    mute_seconds: number;
+    min_chars: number;
+  };
   auto_warn_threshold: number;
 }
 
@@ -98,6 +105,7 @@ const defaults = {
     anti_invites: { enabled: false, action: 'delete' },
     anti_links: { enabled: false, whitelist_domains: [] },
     anti_raid: { enabled: false, max_joins: 10, window_seconds: 30, lockdown_minutes: 10 },
+    ai_moderation: { enabled: false, sensitivity: 'medium', action: 'flag', mute_seconds: 600, min_chars: 40 },
     auto_warn_threshold: 3,
   } as ModConfig,
 };
@@ -162,6 +170,7 @@ export function getModConfig(): ModConfig {
     anti_invites: { ...defaults.mod_config.anti_invites, ...(raw.anti_invites ?? {}) },
     anti_links: { ...defaults.mod_config.anti_links, ...(raw.anti_links ?? {}) },
     anti_raid: { ...defaults.mod_config.anti_raid, ...(raw.anti_raid ?? {}) },
+    ai_moderation: { ...defaults.mod_config.ai_moderation, ...(raw.ai_moderation ?? {}) },
   };
 }
 
