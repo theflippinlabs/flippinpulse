@@ -15,6 +15,7 @@ import {
   setGiveawayMessage,
 } from '../services/giveaways.js';
 import { errorEmbed, successEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const MAX_DURATION_MS = 30 * 24 * 60 * 60_000;
 
@@ -36,8 +37,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!interaction.guild || !interaction.channel || interaction.channel.type !== ChannelType.GuildText) {
-    await interaction.reply({ embeds: [errorEmbed('This command must be used in a text channel.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'This command must be used in a text channel.' : 'Cette commande doit être utilisée dans un salon texte.')], ephemeral: true });
     return;
   }
 
@@ -52,11 +56,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     const durationMs = parseDurationMs(durationStr);
     if (!durationMs || durationMs <= 0) {
-      await interaction.editReply({ embeds: [errorEmbed('Invalid duration. Use formats like `30s`, `15m`, `2h`, `1d`.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en
+        ? 'Invalid duration. Use formats like `30s`, `15m`, `2h`, `1d`.'
+        : 'Durée invalide. Utilise `30s`, `15m`, `2h`, `1d`.')] });
       return;
     }
     if (durationMs > MAX_DURATION_MS) {
-      await interaction.editReply({ embeds: [errorEmbed('Duration cannot exceed 30 days.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Duration cannot exceed 30 days.' : 'La durée ne peut pas dépasser 30 jours.')] });
       return;
     }
 
@@ -70,13 +76,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
 
     if (!giveawayId) {
-      await interaction.editReply({ embeds: [errorEmbed('Failed to create giveaway.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Failed to create giveaway.' : 'Impossible de créer le giveaway.')] });
       return;
     }
 
     const g = await getGiveaway(giveawayId);
     if (!g) {
-      await interaction.editReply({ embeds: [errorEmbed('Giveaway lookup failed after creation.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Giveaway lookup failed after creation.' : 'Recherche du giveaway échouée après création.')] });
       return;
     }
 
@@ -85,7 +91,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await setGiveawayMessage(giveawayId, message.id);
 
     await interaction.editReply({
-      embeds: [successEmbed(`Giveaway started! ID: \`${giveawayId}\``)],
+      embeds: [successEmbed(en ? `Giveaway started! ID: \`${giveawayId}\`` : `Giveaway démarré ! ID : \`${giveawayId}\``)],
     });
     return;
   }
@@ -96,18 +102,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const id = interaction.options.getString('id', true);
     const g = await getGiveaway(id);
     if (!g) {
-      await interaction.editReply({ embeds: [errorEmbed('Giveaway not found.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Giveaway not found.' : 'Giveaway introuvable.')] });
       return;
     }
     if (g.status !== 'active') {
-      await interaction.editReply({ embeds: [errorEmbed('Giveaway is not active.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Giveaway is not active.' : 'Giveaway pas actif.')] });
       return;
     }
 
     await endGiveaway(interaction.client, id);
     const finalCount = await countEntries(id);
     await interaction.editReply({
-      embeds: [successEmbed(`Giveaway \`${id}\` ended with ${finalCount} entries.`)],
+      embeds: [successEmbed(en
+        ? `Giveaway \`${id}\` ended with ${finalCount} entries.`
+        : `Giveaway \`${id}\` terminé avec ${finalCount} entrée${finalCount === 1 ? '' : 's'}.`)],
     });
   }
 }

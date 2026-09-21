@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const CATEGORIES = [
   { name: 'Role', value: 'role' },
@@ -46,6 +47,8 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'add') {
@@ -57,21 +60,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const maxPerUser = interaction.options.getInteger('max_per_user') ?? 1;
 
     const { error } = await supabase.from('shop_items').insert({
-      name,
-      description,
-      category,
-      price_pulse: price,
-      stock_total: stock,
-      stock_remaining: stock,
-      max_per_user: maxPerUser,
-      is_active: true,
+      name, description, category, price_pulse: price,
+      stock_total: stock, stock_remaining: stock,
+      max_per_user: maxPerUser, is_active: true,
     });
 
     if (error) {
-      await interaction.editReply({ embeds: [errorEmbed(`Could not add item: ${error.message}`)] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? `Could not add item: ${error.message}` : `Impossible d'ajouter l'article : ${error.message}`)] });
       return;
     }
-    await interaction.editReply({ embeds: [successEmbed(`Added **${name}** — ${price} PULSE (${category})${stock ? `, stock ${stock}` : ''}.`)] });
+    const stockStr = stock ? (en ? `, stock ${stock}` : `, stock ${stock}`) : '';
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Added **${name}** — ${price} PULSE (${category})${stockStr}.`
+      : `**${name}** ajouté — ${price} PULSE (${category})${stockStr}.`)] });
     return;
   }
 
@@ -82,42 +83,50 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       .order('price_pulse', { ascending: true })
       .limit(40);
 
+    const title = en ? 'Shop items' : 'Articles boutique';
     if (!items?.length) {
-      await interaction.editReply({ embeds: [pulseEmbed('Shop items').setDescription('No items yet. Use `/shopadmin add`.')] });
+      await interaction.editReply({ embeds: [pulseEmbed(title).setDescription(en ? 'No items yet. Use `/shopadmin add`.' : 'Aucun article. Utilise `/shopadmin add`.')] });
       return;
     }
+    const leftLbl = en ? 'left' : 'restants';
     const lines = items.map(i => {
-      const stock = i.stock_remaining !== null ? ` · ${i.stock_remaining} left` : '';
+      const stock = i.stock_remaining !== null ? ` · ${i.stock_remaining} ${leftLbl}` : '';
       return `${i.is_active ? '🟢' : '⚫'} **${i.name}** — ${i.price_pulse} PULSE · ${i.category}${stock}`;
     });
-    await interaction.editReply({ embeds: [pulseEmbed('Shop items').setDescription(lines.join('\n'))] });
+    await interaction.editReply({ embeds: [pulseEmbed(title).setDescription(lines.join('\n'))] });
     return;
   }
 
-  // remove / setprice / toggle all target an item by name
   const name = interaction.options.getString('name', true);
   const { data: item } = await supabase
-    .from('shop_items')
-    .select('id, name')
-    .ilike('name', name)
-    .limit(1)
-    .single();
+    .from('shop_items').select('id, name').ilike('name', name).limit(1).single();
 
   if (!item) {
-    await interaction.editReply({ embeds: [errorEmbed(`No item named "${name}" found. Check spelling with \`/shopadmin list\`.`)] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? `No item named "${name}" found. Check spelling with \`/shopadmin list\`.`
+      : `Aucun article nommé "${name}" trouvé. Vérifie l'orthographe avec \`/shopadmin list\`.`)] });
     return;
   }
 
   if (sub === 'remove') {
     await supabase.from('shop_items').update({ is_active: false }).eq('id', item.id);
-    await interaction.editReply({ embeds: [successEmbed(`**${item.name}** is now hidden from the shop.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `**${item.name}** is now hidden from the shop.`
+      : `**${item.name}** est maintenant caché de la boutique.`)] });
   } else if (sub === 'setprice') {
     const price = interaction.options.getInteger('price', true);
     await supabase.from('shop_items').update({ price_pulse: price }).eq('id', item.id);
-    await interaction.editReply({ embeds: [successEmbed(`**${item.name}** price set to **${price}** PULSE.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `**${item.name}** price set to **${price}** PULSE.`
+      : `Prix de **${item.name}** défini à **${price}** PULSE.`)] });
   } else if (sub === 'toggle') {
     const active = interaction.options.getBoolean('active', true);
     await supabase.from('shop_items').update({ is_active: active }).eq('id', item.id);
-    await interaction.editReply({ embeds: [successEmbed(`**${item.name}** is now ${active ? 'active 🟢' : 'inactive ⚫'}.`)] });
+    const stateLbl = en
+      ? (active ? 'active 🟢' : 'inactive ⚫')
+      : (active ? 'actif 🟢' : 'inactif ⚫');
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `**${item.name}** is now ${stateLbl}.`
+      : `**${item.name}** est maintenant ${stateLbl}.`)] });
   }
 }

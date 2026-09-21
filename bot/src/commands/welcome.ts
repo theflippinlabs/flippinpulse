@@ -8,6 +8,7 @@ import {
 import { getWelcomeConfig, setSetting, type WelcomeConfig } from '../services/settings.js';
 import { buildWelcomePayload } from '../events/guildMemberAdd.js';
 import { successEmbed, errorEmbed, pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 async function patchWelcome(patch: Partial<WelcomeConfig>): Promise<void> {
   await setSetting('welcome_config', { ...getWelcomeConfig(), ...patch });
@@ -41,36 +42,40 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const sub = interaction.options.getSubcommand();
   const cfg = getWelcomeConfig();
 
   if (sub === 'channel') {
     const channel = interaction.options.getChannel('channel', true);
     await patchWelcome({ channel_id: channel.id });
-    await interaction.editReply({ embeds: [successEmbed(`Welcome messages will be posted in <#${channel.id}>.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Welcome messages will be posted in <#${channel.id}>.`
+      : `Les messages de bienvenue seront postés dans <#${channel.id}>.`)] });
     return;
   }
 
   if (sub === 'title') {
     await patchWelcome({ title: interaction.options.getString('text', true) });
-    await interaction.editReply({ embeds: [successEmbed('Welcome title updated.')] });
+    await interaction.editReply({ embeds: [successEmbed(en ? 'Welcome title updated.' : 'Titre de bienvenue mis à jour.')] });
     return;
   }
 
   if (sub === 'message') {
     await patchWelcome({ description: interaction.options.getString('text', true) });
-    await interaction.editReply({ embeds: [successEmbed('Welcome message updated.')] });
+    await interaction.editReply({ embeds: [successEmbed(en ? 'Welcome message updated.' : 'Message de bienvenue mis à jour.')] });
     return;
   }
 
   if (sub === 'color') {
     const hex = interaction.options.getString('hex', true).trim();
     if (!/^#?[0-9a-fA-F]{6}$/.test(hex)) {
-      await interaction.editReply({ embeds: [errorEmbed('Invalid color. Use a hex value like `#38BDF8`.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Invalid color. Use a hex value like `#38BDF8`.' : 'Couleur invalide. Utilise une valeur hex comme `#38BDF8`.')] });
       return;
     }
     await patchWelcome({ embed_color: hex.startsWith('#') ? hex : `#${hex}` });
-    await interaction.editReply({ embeds: [successEmbed(`Welcome color set to \`${hex}\`.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en ? `Welcome color set to \`${hex}\`.` : `Couleur de bienvenue définie à \`${hex}\`.`)] });
     return;
   }
 
@@ -81,52 +86,68 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (ping !== null) patch.ping_user = ping;
     if (count !== null) patch.show_member_count = count;
     if (Object.keys(patch).length === 0) {
-      await interaction.editReply({ embeds: [errorEmbed('Provide at least one option to change.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Provide at least one option to change.' : 'Fournis au moins une option à modifier.')] });
       return;
     }
     await patchWelcome(patch);
-    await interaction.editReply({ embeds: [successEmbed('Welcome options updated.')] });
+    await interaction.editReply({ embeds: [successEmbed(en ? 'Welcome options updated.' : 'Options de bienvenue mises à jour.')] });
     return;
   }
 
   if (sub === 'toggle') {
     const enabled = interaction.options.getBoolean('enabled', true);
     await patchWelcome({ enabled });
-    const warn = enabled && !cfg.channel_id ? '\n⚠️ Set a channel first with `/welcome channel`.' : '';
-    await interaction.editReply({ embeds: [successEmbed(`Welcome messages are now **${enabled ? 'ON ✅' : 'OFF ⛔'}**.${warn}`)] });
+    const warn = enabled && !cfg.channel_id
+      ? (en ? '\n⚠️ Set a channel first with `/welcome channel`.' : '\n⚠️ Définis un salon d\'abord avec `/welcome channel`.')
+      : '';
+    const stateOn = en ? 'ON ✅' : 'ACTIF ✅';
+    const stateOff = en ? 'OFF ⛔' : 'INACTIF ⛔';
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Welcome messages are now **${enabled ? stateOn : stateOff}**.${warn}`
+      : `Les messages de bienvenue sont maintenant **${enabled ? stateOn : stateOff}**.${warn}`)] });
     return;
   }
 
   if (sub === 'status') {
+    const stateOn = en ? 'ON ✅' : 'ACTIF ✅';
+    const stateOff = en ? 'OFF ⛔' : 'INACTIF ⛔';
+    const notSet = en ? '*(not set)*' : '*(non défini)*';
+    const yes = en ? 'yes' : 'oui';
+    const no = en ? 'no' : 'non';
     await interaction.editReply({
-      embeds: [pulseEmbed('👋 Welcome configuration').setDescription(
-        `**Status:** ${cfg.enabled ? 'ON ✅' : 'OFF ⛔'}\n` +
-        `**Channel:** ${cfg.channel_id ? `<#${cfg.channel_id}>` : '*(not set)*'}\n` +
-        `**Color:** ${cfg.embed_color}\n` +
-        `**Ping member:** ${cfg.ping_user ? 'yes' : 'no'}\n` +
-        `**Show member count:** ${cfg.show_member_count ? 'yes' : 'no'}\n\n` +
-        `**Title:** ${cfg.title}\n**Message:** ${cfg.description}\n\n` +
-        `Placeholders: \`{username}\` \`{mention}\` \`{server}\` \`{member_count}\``
+      embeds: [pulseEmbed(en ? '👋 Welcome configuration' : '👋 Configuration bienvenue').setDescription(
+        `**${en ? 'Status' : 'État'}:** ${cfg.enabled ? stateOn : stateOff}\n` +
+        `**${en ? 'Channel' : 'Salon'}:** ${cfg.channel_id ? `<#${cfg.channel_id}>` : notSet}\n` +
+        `**${en ? 'Color' : 'Couleur'}:** ${cfg.embed_color}\n` +
+        `**${en ? 'Ping member' : 'Ping du membre'}:** ${cfg.ping_user ? yes : no}\n` +
+        `**${en ? 'Show member count' : 'Afficher le compteur'}:** ${cfg.show_member_count ? yes : no}\n\n` +
+        `**${en ? 'Title' : 'Titre'}:** ${cfg.title}\n**Message:** ${cfg.description}\n\n` +
+        `${en ? 'Placeholders' : 'Variables'}: \`{username}\` \`{mention}\` \`{server}\` \`{member_count}\``
       )],
     });
     return;
   }
 
-  // test
   if (!interaction.guild) {
-    await interaction.editReply({ embeds: [errorEmbed('Use this in a server.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Use this in a server.' : 'Utilise cette commande en serveur.')] });
     return;
   }
   if (!cfg.channel_id) {
-    await interaction.editReply({ embeds: [errorEmbed('Set a welcome channel first with `/welcome channel`.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? 'Set a welcome channel first with `/welcome channel`.'
+      : 'Définis un salon de bienvenue d\'abord avec `/welcome channel`.')] });
     return;
   }
   const channel = await interaction.guild.channels.fetch(cfg.channel_id).catch(() => null);
   if (!channel || channel.type !== ChannelType.GuildText) {
-    await interaction.editReply({ embeds: [errorEmbed('The configured welcome channel is missing or not a text channel.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? 'The configured welcome channel is missing or not a text channel.'
+      : 'Le salon de bienvenue configuré est introuvable ou n\'est pas un salon texte.')] });
     return;
   }
   const member = await interaction.guild.members.fetch(interaction.user.id);
   await channel.send(buildWelcomePayload(member, cfg));
-  await interaction.editReply({ embeds: [successEmbed(`Sent a test welcome to <#${cfg.channel_id}>.`)] });
+  await interaction.editReply({ embeds: [successEmbed(en
+    ? `Sent a test welcome to <#${cfg.channel_id}>.`
+    : `Message de test envoyé dans <#${cfg.channel_id}>.`)] });
 }

@@ -5,6 +5,19 @@ import {
 } from 'discord.js';
 import { listAllAchievements, listUnlocked } from '../services/achievements.js';
 import { pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
+
+const CATEGORY_LABEL_FR: Record<string, string> = {
+  economy: '💰 Économie',
+  games: '🎲 Jeux',
+  streak: '🔥 Séries',
+  social: '💬 Social',
+  quiz: '🧠 Quiz',
+  missions: '🎯 Missions',
+  lottery: '🎫 Loterie',
+  rank: '🌟 Rang',
+  special: '⚜️ Spécial',
+};
 
 export const data = new SlashCommandBuilder()
   .setName('achievements')
@@ -25,6 +38,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const target = interaction.options.getUser('user') ?? interaction.user;
 
   const [all, unlockedKeys] = await Promise.all([
@@ -41,9 +56,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     grouped.get(a.category)!.push(a);
   }
 
+  const catLabels = en ? CATEGORY_LABEL : CATEGORY_LABEL_FR;
   const lines: string[] = [];
   for (const [cat, items] of grouped) {
-    lines.push(`\n**${CATEGORY_LABEL[cat] ?? cat}**`);
+    lines.push(`\n**${catLabels[cat] ?? cat}**`);
     for (const a of items) {
       const got = unlockedSet.has(a.achievement_key);
       const mark = got ? '✅' : '🔒';
@@ -53,13 +69,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }
   }
 
+  const unlockedLbl = en ? 'unlocked' : 'débloqués';
   const header = target.id === interaction.user.id
-    ? `**${done} / ${total.length}** unlocked.`
-    : `<@${target.id}> — **${done} / ${total.length}** unlocked.`;
+    ? `**${done} / ${total.length}** ${unlockedLbl}.`
+    : `<@${target.id}> — **${done} / ${total.length}** ${unlockedLbl}.`;
 
-  // Discord embed description caps at 4096 chars.
   const body = (header + '\n' + lines.join('\n')).slice(0, 4090);
   await interaction.editReply({
-    embeds: [pulseEmbed('🏆 Achievements').setDescription(body)],
+    embeds: [pulseEmbed(en ? '🏆 Achievements' : '🏆 Succès').setDescription(body)],
   });
 }

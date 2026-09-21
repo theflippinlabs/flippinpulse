@@ -7,6 +7,7 @@ import {
 } from 'discord.js';
 import { getRankUpConfig, setSetting, type RankUpConfig } from '../services/settings.js';
 import { successEmbed, pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 async function patch(p: Partial<RankUpConfig>): Promise<void> {
   await setSetting('rank_up_config', { ...getRankUpConfig(), ...p });
@@ -29,34 +30,48 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const sub = interaction.options.getSubcommand();
   const cfg = getRankUpConfig();
 
   if (sub === 'channel') {
     const channel = interaction.options.getChannel('channel', true);
     await patch({ channel_id: channel.id });
-    await interaction.editReply({ embeds: [successEmbed(`Rank-up announcements will be posted in <#${channel.id}>.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Rank-up announcements will be posted in <#${channel.id}>.`
+      : `Les annonces de niveau seront postées dans <#${channel.id}>.`)] });
     return;
   }
   if (sub === 'toggle') {
     const enabled = interaction.options.getBoolean('enabled', true);
     await patch({ enabled });
-    const warn = enabled && !cfg.channel_id ? '\n⚠️ Set a channel first with `/rankup channel`.' : '';
-    await interaction.editReply({ embeds: [successEmbed(`Rank-up announcements are now **${enabled ? 'ON ✅' : 'OFF ⛔'}**.${warn}`)] });
+    const warn = enabled && !cfg.channel_id
+      ? (en ? '\n⚠️ Set a channel first with `/rankup channel`.' : '\n⚠️ Définis un salon d\'abord avec `/rankup channel`.')
+      : '';
+    const stateOn = en ? 'ON ✅' : 'ACTIF ✅';
+    const stateOff = en ? 'OFF ⛔' : 'INACTIF ⛔';
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Rank-up announcements are now **${enabled ? stateOn : stateOff}**.${warn}`
+      : `Les annonces de niveau sont maintenant **${enabled ? stateOn : stateOff}**.${warn}`)] });
     return;
   }
   if (sub === 'pinguser') {
     const enabled = interaction.options.getBoolean('enabled', true);
     await patch({ ping_user: enabled });
-    await interaction.editReply({ embeds: [successEmbed(`Members will ${enabled ? 'now' : 'no longer'} be pinged on rank up.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Members will ${enabled ? 'now' : 'no longer'} be pinged on rank up.`
+      : `Les membres ${enabled ? 'seront désormais' : 'ne seront plus'} pingués lors d'un passage de rang.`)] });
     return;
   }
-  // status
+  const notSet = en ? '*(not set)*' : '*(non défini)*';
+  const stateOn = en ? 'ON ✅' : 'ACTIF ✅';
+  const stateOff = en ? 'OFF ⛔' : 'INACTIF ⛔';
   await interaction.editReply({
-    embeds: [pulseEmbed('🚀 Rank-up configuration').setDescription(
-      `**Status:** ${cfg.enabled ? 'ON ✅' : 'OFF ⛔'}\n` +
-      `**Channel:** ${cfg.channel_id ? `<#${cfg.channel_id}>` : '*(not set)*'}\n` +
-      `**Ping member:** ${cfg.ping_user ? 'yes' : 'no'}`
+    embeds: [pulseEmbed(en ? '🚀 Rank-up configuration' : '🚀 Configuration passage de rang').setDescription(
+      `**${en ? 'Status' : 'État'}:** ${cfg.enabled ? stateOn : stateOff}\n` +
+      `**${en ? 'Channel' : 'Salon'}:** ${cfg.channel_id ? `<#${cfg.channel_id}>` : notSet}\n` +
+      `**${en ? 'Ping member' : 'Ping du membre'}:** ${cfg.ping_user ? (en ? 'yes' : 'oui') : (en ? 'no' : 'non')}`
     )],
   });
 }
