@@ -26,16 +26,13 @@ import { runWheel } from './wheel.js';
 import { runHigherLower } from './higherlower.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
+import { getUserLocale } from '../i18n.js';
 
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
 
 // ---- FR/EN ----
-function isFR(interaction: { locale?: string }): boolean {
-  return (interaction.locale ?? 'fr').startsWith('fr');
-}
-
-function t(interaction: { locale?: string }, fr: string, en: string): string {
-  return isFR(interaction) ? fr : en;
+async function localeIsFR(userId: string): Promise<boolean> {
+  return (await getUserLocale(userId)) === 'fr';
 }
 
 // ---- Nav ----
@@ -98,7 +95,7 @@ function mention(name: string, ids: Map<string, string>): string {
 
 // ---- Views ----
 async function renderHome(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(discordId);
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse, points_total, rank_name, streak, last_daily_at')
@@ -149,7 +146,7 @@ async function renderHome(interaction: Interaction, discordId: string): Promise<
 }
 
 async function renderProfil(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(discordId);
   const { data: user } = await supabase.from('discord_users').select('*').eq('discord_id', discordId).maybeSingle();
   if (!user) {
     return {
@@ -179,7 +176,7 @@ async function renderProfil(interaction: Interaction, discordId: string): Promis
 }
 
 async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(interaction.user.id);
   const ids = await loadCmdIds(interaction);
   const line = (name: string, emoji: string, desc: string) => `${emoji} ${mention(name, ids)} — ${desc}`;
   const description = [
@@ -222,7 +219,7 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
 }
 
 async function renderMissions(interaction: Interaction): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(interaction.user.id);
   const { data: active } = await supabase
     .from('pulse_challenges').select('title, description, kind, reward, goal, metric')
     .eq('status', 'active').order('created_at', { ascending: false }).limit(10);
@@ -239,7 +236,7 @@ async function renderMissions(interaction: Interaction): Promise<{ embeds: Retur
 }
 
 async function renderShop(interaction: Interaction): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(interaction.user.id);
   const ids = await loadCmdIds(interaction);
   const { data: items } = await supabase
     .from('shop_items').select('name, description, price_pulse, category, stock_remaining')
@@ -261,7 +258,7 @@ async function renderShop(interaction: Interaction): Promise<{ embeds: ReturnTyp
 }
 
 async function renderLottery(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(discordId);
   const st = await getLotteryStatus(discordId);
   if (!st) {
     return {
@@ -286,7 +283,7 @@ async function renderLottery(interaction: Interaction, discordId: string): Promi
 }
 
 async function renderLeaderboard(interaction: Interaction, sortBy: 'total' | 'week' | 'month' = 'total'): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(interaction.user.id);
   const col = sortBy === 'week' ? 'points_week' : sortBy === 'month' ? 'points_month' : 'points_total';
   const { data: top } = await supabase
     .from('discord_users').select(`username, ${col}, balance_pulse, rank_name`)
@@ -309,7 +306,7 @@ async function renderLeaderboard(interaction: Interaction, sortBy: 'total' | 'we
 }
 
 async function claimDaily(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
-  const fr = isFR(interaction);
+  const fr = await localeIsFR(discordId);
   const dailies = await getActiveMissions('daily');
   if (!dailies.length) {
     return { embeds: [errorEmbed(fr ? 'Aucune mission daily active.' : 'No daily mission active.')], components: navRows() };
@@ -410,7 +407,8 @@ export async function handleHubInteraction(interaction: Interaction): Promise<vo
     const raw = interaction.fields.getTextInputValue('bet');
     const bet = Math.floor(Number(raw));
     if (!Number.isFinite(bet) || bet <= 0) {
-      await interaction.reply({ embeds: [errorEmbed(isFR(interaction) ? 'Mise invalide.' : 'Invalid bet.')], flags: MessageFlags.Ephemeral });
+      const fr = await localeIsFR(interaction.user.id);
+      await interaction.reply({ embeds: [errorEmbed(fr ? 'Mise invalide.' : 'Invalid bet.')], flags: MessageFlags.Ephemeral });
       return;
     }
     try {
@@ -431,7 +429,8 @@ export async function handleHubInteraction(interaction: Interaction): Promise<vo
       const gameKey = id.split(':')[2];
       const g = GAMES[gameKey];
       if (!g) return;
-      await interaction.showModal(betModal(gameKey, g.defaultBet, isFR(interaction)));
+      const fr = await localeIsFR(interaction.user.id);
+      await interaction.showModal(betModal(gameKey, g.defaultBet, fr));
       return;
     }
 
@@ -473,7 +472,7 @@ export async function handleHubInteraction(interaction: Interaction): Promise<vo
     if (id.startsWith('hub:lotto:')) {
       const count = Number(id.split(':')[2]);
       const res = await buyTickets(uid, count);
-      const fr = isFR(interaction);
+      const fr = await localeIsFR(uid);
       if (!res.success) {
         return respond(interaction, {
           embeds: [errorEmbed(fr ? `Achat impossible : ${res.error ?? 'erreur'}` : `Purchase failed: ${res.error ?? 'error'}`)],
