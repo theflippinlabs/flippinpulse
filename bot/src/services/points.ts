@@ -5,6 +5,7 @@ import { checkRankUp } from './ranks.js';
 import { getPulseHourMultiplier } from './pulseHour.js';
 import { applyDailyCap } from './dailyCap.js';
 import { tickAchievements } from './achievements.js';
+import { grantXP as grantBattlePassXP } from './battlePass.js';
 import { log } from '../utils/logger.js';
 
 interface AwardOptions {
@@ -89,6 +90,9 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
       guildId: guild.id,
       lifetimeEarned: currentLifetimeEarned + pulseEarned,
     });
+
+    // Battle-pass XP: every activity point is 1 XP. Fail-soft (never throws).
+    void grantBattlePassXP(discordId, points);
   } catch (err) {
     log('ERROR', `Failed to award points to ${discordId}`, err);
   }

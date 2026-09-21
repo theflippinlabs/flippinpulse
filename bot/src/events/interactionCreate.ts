@@ -16,6 +16,7 @@ import { handleChickenButton } from '../services/chickenRace.js';
 import { handleAutomodButton } from '../commands/automod.js';
 import { handleChallengeInteraction } from '../services/challenges.js';
 import { handlePokerInteraction } from '../commands/poker.js';
+import { handleBattlePassInteraction } from '../commands/battlepass.js';
 import { log } from '../utils/logger.js';
 
 async function handleGiveawayButton(interaction: ButtonInteraction): Promise<void> {
@@ -77,6 +78,15 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handlePokerInteraction(interaction);
     } catch (err) {
       log('ERROR', 'Poker interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('bp:')) {
+    try {
+      await handleBattlePassInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Battle Pass interaction handler crashed', err);
     }
     return;
   }

@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { recordChallengeMetric } from './challenges.js';
 import { tickAchievements } from './achievements.js';
+import { grantXP as grantBattlePassXP } from './battlePass.js';
 import { log } from '../utils/logger.js';
 
 export interface GameConfig {
@@ -175,6 +176,9 @@ export async function earnPulse(
     lifetimeEarned: currentEarned + amount,
     lotteryWon: /lottery_win/i.test(reason) || undefined,
   });
+
+  // Battle-pass XP: 1 XP per PULSE earned via game/mission/reward (positive amounts only).
+  if (amount > 0) void grantBattlePassXP(discordId, amount);
 
   return newBalance;
 }
