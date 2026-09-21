@@ -10,6 +10,7 @@ import {
 } from 'discord.js';
 import { formatDuration, searchTrack } from '../services/music.js';
 import { errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
@@ -23,28 +24,33 @@ export const data = new SlashCommandBuilder()
 const NOVARYS_COLOR = 0xF5B62E;
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const query = interaction.options.getString('query', true);
   await interaction.deferReply();
 
   const track = await searchTrack(query);
   if (!track) {
-    await interaction.editReply({ embeds: [errorEmbed('No match found on any platform.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'No match found on any platform.' : 'Aucun résultat trouvé sur les plateformes.')] });
     return;
   }
 
   const duration = formatDuration(track.duration_ms);
+  const noLink = en ? '_No streaming link available._' : '_Aucun lien de streaming disponible._';
   const description =
     `**${track.artist}**` +
     (track.album ? `\n_${track.album}_` : '') +
     (duration ? `\n\n🕒 ${duration}` : '') +
-    (Object.values(track.links).some(Boolean) ? '' : '\n\n_No streaming link available._');
+    (Object.values(track.links).some(Boolean) ? '' : `\n\n${noLink}`);
 
   const embed = new EmbedBuilder()
     .setColor(NOVARYS_COLOR)
     .setTitle(`🎵 ${track.title}`)
     .setDescription(description)
     .setFooter({
-      text: `Shared by ${interaction.user.username} · via Novarys jukebox`,
+      text: en
+        ? `Shared by ${interaction.user.username} · via Novarys jukebox`
+        : `Partagé par ${interaction.user.username} · via le jukebox Novarys`,
       iconURL: interaction.user.displayAvatarURL({ size: 64 }),
     })
     .setTimestamp();

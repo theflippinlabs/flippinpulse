@@ -7,6 +7,7 @@ import {
 } from 'discord.js';
 import { getModConfig, setSetting } from '../services/settings.js';
 import { successEmbed, pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('modlog')
@@ -20,25 +21,33 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const sub = interaction.options.getSubcommand();
   const cfg = getModConfig();
 
   if (sub === 'channel') {
     const channel = interaction.options.getChannel('channel', true);
     await setSetting('mod_config', { ...cfg, mod_log_channel_id: channel.id });
-    await interaction.editReply({ embeds: [successEmbed(`Moderation actions will be logged in <#${channel.id}>.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Moderation actions will be logged in <#${channel.id}>.`
+      : `Les actions de modération seront journalisées dans <#${channel.id}>.`)] });
     return;
   }
   if (sub === 'clear') {
     await setSetting('mod_config', { ...cfg, mod_log_channel_id: null });
-    await interaction.editReply({ embeds: [successEmbed('Moderation logging disabled (no channel set).')] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? 'Moderation logging disabled (no channel set).'
+      : 'Journal de modération désactivé (aucun salon défini).')] });
     return;
   }
-  // status
+  const notSet = en ? '*(not set)*' : '*(non défini)*';
+  const on = en ? 'ON ✅' : 'ACTIF ✅';
+  const off = en ? 'OFF ⛔' : 'INACTIF ⛔';
   await interaction.editReply({
-    embeds: [pulseEmbed('🛡️ Moderation log configuration').setDescription(
-      `**Log channel:** ${cfg.mod_log_channel_id ? `<#${cfg.mod_log_channel_id}>` : '*(not set)*'}\n` +
-      `**Auto-moderation:** ${cfg.automod_enabled ? 'ON ✅' : 'OFF ⛔'} *(toggle with /module automod)*`
+    embeds: [pulseEmbed(en ? '🛡️ Moderation log configuration' : '🛡️ Configuration du journal de modération').setDescription(
+      `**${en ? 'Log channel' : 'Salon de log'}:** ${cfg.mod_log_channel_id ? `<#${cfg.mod_log_channel_id}>` : notSet}\n` +
+      `**${en ? 'Auto-moderation' : 'Auto-modération'}:** ${cfg.automod_enabled ? on : off} *(${en ? 'toggle with /module automod' : 'bascule avec /module automod'})*`
     )],
   });
 }

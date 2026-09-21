@@ -6,6 +6,17 @@ import {
 } from 'discord.js';
 import { getRawSetting, setSetting } from '../services/settings.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
+
+const LABELS_FR: Record<string, string> = {
+  welcome: 'Messages de bienvenue',
+  rankup: 'Annonces de niveau',
+  automod: 'Auto-modération',
+  pulsehour: 'Pulse Hour (multiplicateur de points)',
+  dailycap: 'Plafond PULSE journalier',
+  streak: 'Bonus de série d\'activité',
+  decay: 'Décroissance des points d\'inactivité',
+};
 
 // module name -> { settings key, boolean field inside the JSON }
 const MODULES: Record<string, { key: string; field: string; label: string }> = {
@@ -37,13 +48,15 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
 
   const feature = interaction.options.getString('feature', true);
   const enabled = interaction.options.getBoolean('enabled', true);
   const mod = MODULES[feature];
 
   if (!mod) {
-    await interaction.editReply({ embeds: [errorEmbed('Unknown feature.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Unknown feature.' : 'Fonctionnalité inconnue.')] });
     return;
   }
 
@@ -53,11 +66,16 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   try {
     await setSetting(mod.key, current);
   } catch {
-    await interaction.editReply({ embeds: [errorEmbed('Failed to save. Try again.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Failed to save. Try again.' : 'Échec de la sauvegarde. Réessaie.')] });
     return;
   }
 
+  const label = en ? mod.label : (LABELS_FR[feature] ?? mod.label);
+  const stateOn = en ? 'ON ✅' : 'ACTIF ✅';
+  const stateOff = en ? 'OFF ⛔' : 'INACTIF ⛔';
   await interaction.editReply({
-    embeds: [successEmbed(`**${mod.label}** is now **${enabled ? 'ON ✅' : 'OFF ⛔'}**.\n*(Takes effect within a minute.)*`)],
+    embeds: [successEmbed(en
+      ? `**${label}** is now **${enabled ? stateOn : stateOff}**.\n*(Takes effect within a minute.)*`
+      : `**${label}** est maintenant **${enabled ? stateOn : stateOff}**.\n*(Effet dans la minute.)*`)],
   });
 }

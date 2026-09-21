@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { getRawSetting, setSetting } from '../services/settings.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 // knob -> { settings key, numeric field }
 const KNOBS: Record<string, { key: string; field: string; label: string }> = {
@@ -33,15 +34,26 @@ export const data = new SlashCommandBuilder()
   )
   .addNumberOption(o => o.setName('value').setDescription('New value').setMinValue(0).setRequired(true));
 
+const LABELS_FR: Record<string, string> = {
+  pulse_per_point: 'PULSE gagné par point d\'activité',
+  points_message: 'Points par message',
+  points_reaction: 'Points par réaction',
+  points_voice: 'Points par minute vocale',
+  points_invite: 'Points par invitation',
+  points_event: 'Points par événement',
+};
+
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
 
   const setting = interaction.options.getString('setting', true);
   const value = interaction.options.getNumber('value', true);
   const knob = KNOBS[setting];
 
   if (!knob) {
-    await interaction.editReply({ embeds: [errorEmbed('Unknown setting.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Unknown setting.' : 'Réglage inconnu.')] });
     return;
   }
 
@@ -51,11 +63,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   try {
     await setSetting(knob.key, current);
   } catch {
-    await interaction.editReply({ embeds: [errorEmbed('Failed to save. Try again.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Failed to save. Try again.' : 'Échec de la sauvegarde. Réessaie.')] });
     return;
   }
 
+  const label = en ? knob.label : (LABELS_FR[setting] ?? knob.label);
   await interaction.editReply({
-    embeds: [successEmbed(`**${knob.label}** is now **${value}**.\n*(Takes effect within a minute.)*`)],
+    embeds: [successEmbed(en
+      ? `**${label}** is now **${value}**.\n*(Takes effect within a minute.)*`
+      : `**${label}** est maintenant **${value}**.\n*(Effet dans la minute.)*`)],
   });
 }
