@@ -19,6 +19,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('duel')
@@ -45,8 +46,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('duel')) {
-    await interaction.reply({ embeds: [errorEmbed('Duel is currently disabled.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Duel is currently disabled.' : 'Le duel est désactivé pour l\'instant.')], ephemeral: true });
     return;
   }
 
@@ -64,22 +68,25 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const mode = interaction.options.getString('mode') ?? 'coinflip';
 
   if (opponent.id === interaction.user.id) {
-    await interaction.reply({ embeds: [errorEmbed('You cannot duel yourself.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'You cannot duel yourself.' : 'Tu ne peux pas te duel toi-même.')], ephemeral: true });
     return;
   }
   if (opponent.bot) {
-    await interaction.reply({ embeds: [errorEmbed('You cannot duel a bot.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'You cannot duel a bot.' : 'Tu ne peux pas duel un bot.')], ephemeral: true });
     return;
   }
   if (bet < minBet || bet > maxBet) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${minBet} and ${maxBet} PULSE.`)], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be between ${minBet} and ${maxBet} PULSE.`
+      : `La mise doit être entre ${minBet} et ${maxBet} PULSE.`)], ephemeral: true });
     return;
   }
 
-  // Check both balances
   const challengerBal = await getBalance(interaction.user.id);
   if (!challengerBal || challengerBal.balance < bet) {
-    await interaction.reply({ embeds: [errorEmbed(`You don't have enough PULSE. Balance: ${challengerBal?.balance ?? 0}`)], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `You don't have enough PULSE. Balance: ${challengerBal?.balance ?? 0}`
+      : `Tu n'as pas assez de PULSE. Solde : ${challengerBal?.balance ?? 0}`)], ephemeral: true });
     return;
   }
 
@@ -91,29 +98,29 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   });
 
   if (!sessionId) {
-    await interaction.reply({ embeds: [errorEmbed('Failed to create duel.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Failed to create duel.' : 'Impossible de créer le duel.')], ephemeral: true });
     return;
   }
 
   const acceptBtn = new ButtonBuilder()
     .setCustomId(`duel_accept_${sessionId}`)
-    .setLabel('⚔️ Accept Duel')
+    .setLabel(en ? '⚔️ Accept Duel' : '⚔️ Accepter')
     .setStyle(ButtonStyle.Success);
 
   const declineBtn = new ButtonBuilder()
     .setCustomId(`duel_decline_${sessionId}`)
-    .setLabel('❌ Decline')
+    .setLabel(en ? '❌ Decline' : '❌ Refuser')
     .setStyle(ButtonStyle.Danger);
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(acceptBtn, declineBtn);
 
-  const modeLabel = mode === 'dice' ? '🎲 Dice Roll' : '🪙 Coin Flip';
-  const embed = pulseEmbed('⚔️ Duel Challenge!')
-    .setDescription(
-      `**${interaction.user}** challenges **${opponent}** to a duel!\n\n` +
-      `💰 Wager: **${bet}** PULSE\n🎮 Mode: **${modeLabel}**\n\n` +
-      `${opponent}, do you accept?`
-    );
+  const modeLabel = mode === 'dice'
+    ? (en ? '🎲 Dice Roll' : '🎲 Lancer de dé')
+    : (en ? '🪙 Coin Flip' : '🪙 Pile ou Face');
+  const embed = pulseEmbed(en ? '⚔️ Duel Challenge!' : '⚔️ Défi en duel !')
+    .setDescription(en
+      ? `**${interaction.user}** challenges **${opponent}** to a duel!\n\n💰 Wager: **${bet}** PULSE\n🎮 Mode: **${modeLabel}**\n\n${opponent}, do you accept?`
+      : `**${interaction.user}** défie **${opponent}** en duel !\n\n💰 Mise : **${bet}** PULSE\n🎮 Mode : **${modeLabel}**\n\n${opponent}, tu acceptes ?`);
 
   const reply = await interaction.reply({ content: `${opponent}`, embeds: [embed], components: [row], fetchReply: true }) as Message;
 
@@ -127,7 +134,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (btnInteraction.customId === `duel_decline_${sessionId}`) {
       collector.stop('declined');
       await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
-      const declineEmbed = errorEmbed(`${opponent.username} declined the duel.`).setTitle('⚔️ Duel');
+      const declineEmbed = errorEmbed(en
+        ? `${opponent.username} declined the duel.`
+        : `${opponent.username} a refusé le duel.`).setTitle('⚔️ Duel');
       await btnInteraction.update({ embeds: [declineEmbed], components: [] });
       return;
     }
@@ -135,31 +144,29 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (btnInteraction.customId === `duel_accept_${sessionId}`) {
       collector.stop('accepted');
 
-      // Check opponent balance
       const oppBal = await getBalance(opponent.id);
       if (!oppBal || oppBal.balance < bet) {
         await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
-        const noFunds = errorEmbed(`${opponent.username} doesn't have enough PULSE.`).setTitle('⚔️ Duel');
+        const noFunds = errorEmbed(en
+          ? `${opponent.username} doesn't have enough PULSE.`
+          : `${opponent.username} n'a pas assez de PULSE.`).setTitle('⚔️ Duel');
         await btnInteraction.update({ embeds: [noFunds], components: [] });
         return;
       }
 
-      // Deduct from both
       const s1 = await spendPulse(interaction.user.id, bet, 'duel_bet', sessionId);
       const s2 = await spendPulse(opponent.id, bet, 'duel_bet', sessionId);
       if (!s1.success || !s2.success) {
-        // Refund on failure
         if (s1.success) await earnPulse(interaction.user.id, bet, 'duel_refund', sessionId);
         if (s2.success) await earnPulse(opponent.id, bet, 'duel_refund', sessionId);
         await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
-        await btnInteraction.update({ embeds: [errorEmbed('Failed to deduct bets. Duel cancelled.')], components: [] });
+        await btnInteraction.update({ embeds: [errorEmbed(en ? 'Failed to deduct bets. Duel cancelled.' : 'Impossible de débiter les mises. Duel annulé.')], components: [] });
         return;
       }
 
       await addGamePlayer(sessionId, interaction.user.id, bet);
       await addGamePlayer(sessionId, opponent.id, bet);
 
-      // Determine winner
       let winnerId: string;
       let resultText: string;
 
@@ -171,9 +178,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         if (roll1 === roll2) winnerId = Math.random() > 0.5 ? interaction.user.id : opponent.id;
       } else {
         const flip = Math.random() > 0.5;
-        const side = flip ? 'Heads' : 'Tails';
+        const side = en ? (flip ? 'Heads' : 'Tails') : (flip ? 'Face' : 'Pile');
         winnerId = flip ? interaction.user.id : opponent.id;
-        resultText = `🪙 The coin landed on **${side}**!`;
+        resultText = en ? `🪙 The coin landed on **${side}**!` : `🪙 La pièce est tombée sur **${side}** !`;
       }
 
       const totalPot = bet * 2;
@@ -186,9 +193,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       await saveGameResult(sessionId, { winnerId, mode, payout });
 
       const winnerName = winnerId === interaction.user.id ? interaction.user.username : opponent.username;
-      const resultEmbed = successEmbed(
-        `${resultText}\n\n🏆 **${winnerName}** wins **${payout}** PULSE! (${feePercent}% fee)`
-      ).setTitle('⚔️ Duel Result');
+      const resultEmbed = successEmbed(en
+        ? `${resultText}\n\n🏆 **${winnerName}** wins **${payout}** PULSE! (${feePercent}% fee)`
+        : `${resultText}\n\n🏆 **${winnerName}** gagne **${payout}** PULSE ! (frais ${feePercent}%)`
+      ).setTitle(en ? '⚔️ Duel Result' : '⚔️ Résultat du duel');
 
       await btnInteraction.update({ embeds: [resultEmbed], components: [] });
     }
@@ -197,7 +205,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   collector.on('end', (_collected, reason) => {
     if (reason === 'time') {
       updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
-      const timeoutEmbed = errorEmbed(`${opponent.username} didn't respond in time. Duel cancelled.`).setTitle('⚔️ Duel');
+      const timeoutEmbed = errorEmbed(en
+        ? `${opponent.username} didn't respond in time. Duel cancelled.`
+        : `${opponent.username} n'a pas répondu à temps. Duel annulé.`).setTitle('⚔️ Duel');
       interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
     }
   });

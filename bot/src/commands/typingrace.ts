@@ -53,8 +53,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await (await import('../i18n.js')).getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('typing_race')) {
-    await interaction.reply({ embeds: [errorEmbed('Typing Race is currently disabled.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Typing Race is currently disabled.' : 'Typing Race est désactivé pour l\'instant.')], ephemeral: true });
     return;
   }
 
@@ -72,7 +75,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   if (bet > 0) {
     const bal = await getBalance(interaction.user.id);
     if (!bal || bal.balance < bet) {
-      await interaction.reply({ embeds: [errorEmbed(`Insufficient PULSE. Balance: ${bal?.balance ?? 0}`)], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed(en
+        ? `Not enough PULSE. Balance: ${bal?.balance ?? 0}`
+        : `Pas assez de PULSE. Solde : ${bal?.balance ?? 0}`)], ephemeral: true });
       return;
     }
   }
@@ -86,7 +91,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   });
 
   if (!sessionId) {
-    await interaction.reply({ embeds: [errorEmbed('Failed to create race.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Failed to create race.' : 'Impossible de créer la course.')], ephemeral: true });
     return;
   }
 
@@ -131,20 +136,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   joinCollector.on('collect', async (btnI) => {
     if (btnI.customId === `race_join_${sessionId}` && !raceStarted) {
+      // Ephemeral replies use the JOINER's locale.
+      const jLocale = await (await import('../i18n.js')).getUserLocale(btnI.user.id);
+      const jen = jLocale === 'en';
       if (players.has(btnI.user.id)) {
-        await btnI.reply({ content: 'You already joined!', ephemeral: true });
+        await btnI.reply({ content: jen ? 'You already joined!' : 'Tu as déjà rejoint !', ephemeral: true });
         return;
       }
       if (players.size >= maxPlayers) {
-        await btnI.reply({ content: 'Race is full!', ephemeral: true });
+        await btnI.reply({ content: jen ? 'Race is full!' : 'La course est complète !', ephemeral: true });
         return;
       }
 
-      // Check and deduct bet
       if (bet > 0) {
         const bal = await getBalance(btnI.user.id);
         if (!bal || bal.balance < bet) {
-          await btnI.reply({ embeds: [errorEmbed(`You need ${bet} PULSE to join.`)], ephemeral: true });
+          await btnI.reply({ embeds: [errorEmbed(jen ? `You need ${bet} PULSE to join.` : `Il te faut ${bet} PULSE pour rejoindre.`)], ephemeral: true });
           return;
         }
         await spendPulse(btnI.user.id, bet, 'typingrace_bet', sessionId);
@@ -183,7 +190,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       }
       await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
       await interaction.editReply({
-        embeds: [errorEmbed('Race timed out. All bets refunded.').setTitle('🏁 Typing Race')],
+        embeds: [errorEmbed(en ? 'Race timed out. All bets refunded.' : 'La course a expiré. Toutes les mises sont remboursées.').setTitle('🏁 Typing Race')],
         components: [],
       }).catch(() => {});
       return;
@@ -287,7 +294,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         }
         await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
         await interaction.editReply({
-          embeds: [errorEmbed('Nobody typed anything. Bets refunded.').setTitle('🏁 Typing Race')],
+          embeds: [errorEmbed(en ? 'Nobody typed anything. Bets refunded.' : 'Personne n\'a rien tapé. Mises remboursées.').setTitle('🏁 Typing Race')],
           components: [],
         }).catch(() => {});
         return;
