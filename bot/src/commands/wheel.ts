@@ -19,6 +19,7 @@ import {
 } from '../services/games.js';
 import { errorEmbed } from '../utils/embeds.js';
 import { buildPostGameRow } from '../utils/postgame.js';
+import { getUserLocale } from '../i18n.js';
 
 interface WheelOutcome {
   label: string;
@@ -74,8 +75,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 export async function runWheel(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('wheel')) {
-    await interaction.reply({ embeds: [errorEmbed('Wheel is currently disabled.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Wheel is currently disabled.' : 'La roue est désactivée pour l\'instant.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -84,19 +88,23 @@ export async function runWheel(interaction: ChatInputCommandInteraction | ModalS
   if (!cfg.outcomes?.length) cfg.outcomes = DEFAULT_CONFIG.outcomes;
 
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`
+      : `La mise doit être entre ${cfg.min_bet} et ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const bal = await getBalance(interaction.user.id);
   if (!bal || bal.balance < bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Insufficient PULSE. You have ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Not enough PULSE. You have ${bal?.balance ?? 0}.`
+      : `Pas assez de PULSE. Tu as ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const spend = await spendPulse(interaction.user.id, bet, 'wheel_bet');
   if (!spend.success) {
-    await interaction.reply({ embeds: [errorEmbed(spend.error ?? 'Failed to place bet.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(spend.error ?? (en ? 'Failed to place bet.' : 'Échec de la mise.'))], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -106,8 +114,13 @@ export async function runWheel(interaction: ChatInputCommandInteraction | ModalS
   const outcome = pickOutcome(cfg.outcomes);
   const payout = bet * outcome.multiplier;
 
+  const title = en ? '🎡 Wheel of PULSE' : '🎡 Roue PULSE';
+  const betLbl = en ? 'Bet' : 'Mise';
+  const resultLbl = en ? 'Result' : 'Résultat';
+  const spinningLine = en ? '*Spinning…*' : '*La roue tourne…*';
+
   await interaction.reply({
-    embeds: [new EmbedBuilder().setColor(0x6366F1).setTitle('🎡 Wheel of PULSE').setDescription(`**Bet:** ${bet} PULSE\n\n*Spinning…*`)],
+    embeds: [new EmbedBuilder().setColor(0x6366F1).setTitle(title).setDescription(`**${betLbl}:** ${bet} PULSE\n\n${spinningLine}`)],
   });
 
   await new Promise(r => setTimeout(r, 1500));
@@ -123,13 +136,13 @@ export async function runWheel(interaction: ChatInputCommandInteraction | ModalS
 
   const result = new EmbedBuilder()
     .setColor(parseHex(outcome.color))
-    .setTitle('🎡 Wheel of PULSE')
+    .setTitle(title)
     .setDescription([
-      `**Bet:** ${bet} PULSE`,
-      `**Result:** ${outcome.label} (${outcome.multiplier}x)`,
+      `**${betLbl}:** ${bet} PULSE`,
+      `**${resultLbl}:** ${outcome.label} (${outcome.multiplier}x)`,
       payout > 0
-        ? `🎉 You win **${payout}** PULSE!`
-        : `💸 You lose **${bet}** PULSE.`,
+        ? (en ? `🎉 You win **${payout}** PULSE!` : `🎉 Tu gagnes **${payout}** PULSE !`)
+        : (en ? `💸 You lose **${bet}** PULSE.` : `💸 Tu perds **${bet}** PULSE.`),
     ].join('\n'))
     .setTimestamp();
 

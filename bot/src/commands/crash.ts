@@ -24,6 +24,7 @@ import {
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { buildPostGameRow } from '../utils/postgame.js';
 import { log } from '../utils/logger.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('crash')
@@ -41,8 +42,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 export async function runCrash(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('crash')) {
-    await interaction.reply({ embeds: [errorEmbed('Crash is currently disabled.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Crash is currently disabled.' : 'Crash est désactivé pour l\'instant.')], ephemeral: true });
     return;
   }
 
@@ -58,30 +62,32 @@ export async function runCrash(interaction: ChatInputCommandInteraction | ModalS
   const feePercent = conf.fee_percent ?? 5;
 
   if (bet < minBet || bet > maxBet) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${minBet} and ${maxBet} PULSE.`)], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be between ${minBet} and ${maxBet} PULSE.`
+      : `La mise doit être entre ${minBet} et ${maxBet} PULSE.`)], ephemeral: true });
     return;
   }
 
   const bal = await getBalance(interaction.user.id);
   if (!bal || bal.balance < bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Insufficient PULSE. You have ${bal?.balance ?? 0}.`)], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Not enough PULSE. You have ${bal?.balance ?? 0}.`
+      : `Pas assez de PULSE. Tu as ${bal?.balance ?? 0}.`)], ephemeral: true });
     return;
   }
 
-  // Deduct bet
   const spend = await spendPulse(interaction.user.id, bet, 'crash_bet');
   if (!spend.success) {
-    await interaction.reply({ embeds: [errorEmbed(spend.error ?? 'Failed to place bet.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(spend.error ?? (en ? 'Failed to place bet.' : 'Échec de la mise.'))], ephemeral: true });
     return;
   }
 
-  // Generate crash point (weighted towards lower values)
   const crashPoint = Math.round((crashMin + Math.random() * Math.random() * (crashMax - crashMin)) * 100) / 100;
 
   const sessionId = await createGameSession('crash', interaction.channelId ?? '', { crashPoint, bet });
   if (!sessionId) {
     await earnPulse(interaction.user.id, bet, 'crash_refund');
-    await interaction.reply({ embeds: [errorEmbed('Failed to start game. Bet refunded.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Failed to start game. Bet refunded.' : 'Impossible de démarrer. Mise remboursée.')], ephemeral: true });
     return;
   }
   await addGamePlayer(sessionId, interaction.user.id, bet);
@@ -91,16 +97,22 @@ export async function runCrash(interaction: ChatInputCommandInteraction | ModalS
   let crashed = false;
   let cashedOut = false;
 
+  const cashLbl = en ? 'Cash Out' : 'Encaisser';
+  const betLbl = en ? 'Bet' : 'Mise';
+  const multiLbl = en ? 'Multiplier' : 'Multiplicateur';
+  const potWinLbl = en ? 'Potential win' : 'Gain potentiel';
+  const footerText = en ? 'Click Cash Out before it crashes!' : 'Encaisse avant que ça crash !';
+
   const cashoutBtn = new ButtonBuilder()
     .setCustomId(`crash_cashout_${sessionId}`)
-    .setLabel(`💰 Cash Out (${multiplier.toFixed(2)}x)`)
+    .setLabel(`💰 ${cashLbl} (${multiplier.toFixed(2)}x)`)
     .setStyle(ButtonStyle.Success);
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(cashoutBtn);
 
   const embed = pulseEmbed('🚀 Crash')
-    .setDescription(`**Bet:** ${bet} PULSE\n\n📈 Multiplier: **${multiplier.toFixed(2)}x**\n💰 Potential win: **${Math.floor(bet * multiplier)}** PULSE`)
-    .setFooter({ text: 'Click Cash Out before it crashes!' });
+    .setDescription(`**${betLbl}:** ${bet} PULSE\n\n📈 ${multiLbl}: **${multiplier.toFixed(2)}x**\n💰 ${potWinLbl}: **${Math.floor(bet * multiplier)}** PULSE`)
+    .setFooter({ text: footerText });
 
   const reply = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }) as Message;
 
@@ -125,7 +137,9 @@ export async function runCrash(interaction: ChatInputCommandInteraction | ModalS
       await updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
       await saveGameResult(sessionId, { crashPoint, cashedOutAt: multiplier, payout });
 
-      const winEmbed = successEmbed(`🎉 You cashed out at **${multiplier.toFixed(2)}x**!\n\n💰 Payout: **${payout}** PULSE (${feePercent}% fee)\n📈 Crash point was: **${crashPoint.toFixed(2)}x**`);
+      const winEmbed = successEmbed(en
+        ? `🎉 You cashed out at **${multiplier.toFixed(2)}x**!\n\n💰 Payout: **${payout}** PULSE (${feePercent}% fee)\n📈 Crash point was: **${crashPoint.toFixed(2)}x**`
+        : `🎉 Encaissé à **${multiplier.toFixed(2)}x** !\n\n💰 Gain : **${payout}** PULSE (frais ${feePercent}%)\n📈 Le crash était à : **${crashPoint.toFixed(2)}x**`);
       await btnInteraction.update({ embeds: [winEmbed], components: [buildPostGameRow('crash', bet)] });
     }
   });
@@ -147,17 +161,19 @@ export async function runCrash(interaction: ChatInputCommandInteraction | ModalS
       await updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
       await saveGameResult(sessionId, { crashPoint, cashedOutAt: null, payout: 0 });
 
-      const loseEmbed = errorEmbed(`💥 CRASHED at **${crashPoint.toFixed(2)}x**!\n\nYou lost **${bet}** PULSE.`)
+      const loseEmbed = errorEmbed(en
+        ? `💥 CRASHED at **${crashPoint.toFixed(2)}x**!\n\nYou lost **${bet}** PULSE.`
+        : `💥 CRASH à **${crashPoint.toFixed(2)}x** !\n\nTu perds **${bet}** PULSE.`)
         .setTitle('🚀 Crash');
       await interaction.editReply({ embeds: [loseEmbed], components: [buildPostGameRow('crash', bet)] }).catch(() => {});
       return;
     }
 
-    cashoutBtn.setLabel(`💰 Cash Out (${multiplier.toFixed(2)}x)`);
+    cashoutBtn.setLabel(`💰 ${cashLbl} (${multiplier.toFixed(2)}x)`);
     const newRow = new ActionRowBuilder<ButtonBuilder>().addComponents(cashoutBtn);
     const updatedEmbed = pulseEmbed('🚀 Crash')
-      .setDescription(`**Bet:** ${bet} PULSE\n\n📈 Multiplier: **${multiplier.toFixed(2)}x**\n💰 Potential win: **${Math.floor(bet * multiplier)}** PULSE`)
-      .setFooter({ text: 'Click Cash Out before it crashes!' });
+      .setDescription(`**${betLbl}:** ${bet} PULSE\n\n📈 ${multiLbl}: **${multiplier.toFixed(2)}x**\n💰 ${potWinLbl}: **${Math.floor(bet * multiplier)}** PULSE`)
+      .setFooter({ text: footerText });
 
     await interaction.editReply({ embeds: [updatedEmbed], components: [newRow] }).catch(() => {});
   }, 1500);
@@ -168,7 +184,9 @@ export async function runCrash(interaction: ChatInputCommandInteraction | ModalS
       // Timed out without cashing out
       updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
       saveGameResult(sessionId, { crashPoint, cashedOutAt: null, payout: 0, reason: 'timeout' });
-      const timeoutEmbed = errorEmbed(`⏰ Time's up! You didn't cash out.\n\nYou lost **${bet}** PULSE.`).setTitle('🚀 Crash');
+      const timeoutEmbed = errorEmbed(en
+        ? `⏰ Time's up! You didn't cash out.\n\nYou lost **${bet}** PULSE.`
+        : `⏰ Temps écoulé ! Tu n'as pas encaissé.\n\nTu perds **${bet}** PULSE.`).setTitle('🚀 Crash');
       interaction.editReply({ embeds: [timeoutEmbed], components: [buildPostGameRow('crash', bet)] }).catch(() => {});
     }
   });

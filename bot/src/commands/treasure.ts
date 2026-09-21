@@ -21,6 +21,7 @@ import {
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { log } from '../utils/logger.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('treasure')
@@ -36,6 +37,8 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const action = interaction.options.getString('action', true);
 
   if (action === 'status') {
@@ -51,8 +54,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const maxClaims = (cfg?.config_json as Record<string, number>)?.max_claims_per_user_per_day ?? 3;
 
     await interaction.reply({
-      embeds: [pulseEmbed('🏴‍☠️ Treasure Status').setDescription(
-        `Claims today: **${claims}/${maxClaims}**`
+      embeds: [pulseEmbed(en ? '🏴‍☠️ Treasure Status' : '🏴‍☠️ Statut du trésor').setDescription(
+        en ? `Claims today: **${claims}/${maxClaims}**` : `Réclamations aujourd'hui : **${claims}/${maxClaims}**`
       )],
       ephemeral: true,
     });
@@ -60,7 +63,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   if (!isGameEnabled('treasure_drop')) {
-    await interaction.reply({ embeds: [errorEmbed('Treasure Drop is currently disabled.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Treasure Drop is currently disabled.' : 'Treasure Drop est désactivé pour l\'instant.')], ephemeral: true });
     return;
   }
 
@@ -77,23 +80,21 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const sessionId = await createGameSession('treasure_drop', interaction.channelId, { reward });
   if (!sessionId) {
-    await interaction.reply({ embeds: [errorEmbed('Failed to create treasure drop.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Failed to create treasure drop.' : 'Impossible de créer le trésor.')], ephemeral: true });
     return;
   }
 
   const claimBtn = new ButtonBuilder()
     .setCustomId(`treasure_claim_${sessionId}`)
-    .setLabel('🏴‍☠️ Claim Treasure!')
+    .setLabel(en ? '🏴‍☠️ Claim Treasure!' : '🏴‍☠️ Réclamer le trésor !')
     .setStyle(ButtonStyle.Success);
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(claimBtn);
 
-  const embed = pulseEmbed('🏴‍☠️ Treasure Drop!')
-    .setDescription(
-      `A treasure chest appeared!\n\n` +
-      `💰 Contains **???** PULSE\n\n` +
-      `First to claim it wins!`
-    )
+  const embed = pulseEmbed(en ? '🏴‍☠️ Treasure Drop!' : '🏴‍☠️ Un trésor !')
+    .setDescription(en
+      ? `A treasure chest appeared!\n\n💰 Contains **???** PULSE\n\nFirst to claim it wins!`
+      : `Un coffre au trésor est apparu !\n\n💰 Contient **???** PULSE\n\nLe premier qui le réclame gagne !`)
     .setThumbnail('https://em-content.zobj.net/thumbs/240/apple/354/pirate-flag_1f3f4-200d-2620-fe0f.png');
 
   const reply = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }) as Message;
@@ -105,11 +106,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   });
 
   collector.on('collect', async (btnI) => {
+    // Message goes to the claimer, so use THEIR locale.
+    const claimerLocale = await getUserLocale(btnI.user.id);
+    const cen = claimerLocale === 'en';
     const maxClaims = conf.max_claims_per_user_per_day ?? 3;
     const canClaim = await checkGameLimit(btnI.user.id, 'treasure_claim', maxClaims);
 
     if (!canClaim) {
-      await btnI.reply({ embeds: [errorEmbed('You reached your daily claim limit!')], ephemeral: true });
+      await btnI.reply({ embeds: [errorEmbed(cen ? 'You reached your daily claim limit!' : 'Tu as atteint ta limite journalière !')], ephemeral: true });
       return;
     }
 
@@ -118,9 +122,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await updateGameSession(sessionId, { status: 'completed', ended_at: new Date().toISOString() });
     await saveGameResult(sessionId, { claimedBy: btnI.user.id, reward });
 
-    const winEmbed = successEmbed(
-      `🏴‍☠️ **${btnI.user.username}** claimed the treasure!\n\n💰 Reward: **${reward}** PULSE`
-    );
+    // Use the DROPPER's locale for the public announcement so it matches
+    // the drop message language.
+    const winEmbed = successEmbed(en
+      ? `🏴‍☠️ **${btnI.user.username}** claimed the treasure!\n\n💰 Reward: **${reward}** PULSE`
+      : `🏴‍☠️ **${btnI.user.username}** a réclamé le trésor !\n\n💰 Récompense : **${reward}** PULSE`);
 
     await btnI.update({ embeds: [winEmbed], components: [] });
   });
@@ -128,7 +134,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   collector.on('end', async (collected) => {
     if (collected.size === 0) {
       await updateGameSession(sessionId, { status: 'cancelled', ended_at: new Date().toISOString() });
-      const expiredEmbed = errorEmbed('The treasure vanished... nobody claimed it!').setTitle('🏴‍☠️ Treasure Drop');
+      const expiredEmbed = errorEmbed(en ? 'The treasure vanished... nobody claimed it!' : 'Le trésor a disparu… personne ne l\'a réclamé !').setTitle(en ? '🏴‍☠️ Treasure Drop' : '🏴‍☠️ Trésor');
       await interaction.editReply({ embeds: [expiredEmbed], components: [] }).catch(() => {});
     }
   });

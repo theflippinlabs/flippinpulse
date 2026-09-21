@@ -9,6 +9,7 @@ import {
 } from '../services/games.js';
 import { createLobby, registerLobbyResolver, delay, type LobbyPlayer } from '../services/lobby.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const DICE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const d6 = () => Math.floor(Math.random() * 6) + 1;
@@ -73,8 +74,11 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption(o => o.setName('bet').setDescription('PULSE entry fee (optional)').setMinValue(0).setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('dice_royale')) {
-    await interaction.reply({ embeds: [errorEmbed('Dice Royale is currently disabled.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Dice Royale is currently disabled.' : 'Dice Royale est désactivé pour l\'instant.')], ephemeral: true });
     return;
   }
 
@@ -86,7 +90,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const bet = interaction.options.getInteger('bet') ?? 0;
   if (bet > maxBet || (bet > 0 && bet < minBet)) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be ${minBet}–${maxBet} PULSE (or 0 for free).`)], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be ${minBet}–${maxBet} PULSE (or 0 for free).`
+      : `La mise doit être entre ${minBet} et ${maxBet} PULSE (ou 0 pour gratuit).`)], ephemeral: true });
     return;
   }
 
