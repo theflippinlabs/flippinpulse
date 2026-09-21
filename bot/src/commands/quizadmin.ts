@@ -7,6 +7,7 @@ import {
 import { supabase } from '../supabase.js';
 import { generateQuizQuestions } from '../services/aiQuiz.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('quizadmin')
@@ -35,6 +36,8 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'add') {
@@ -64,12 +67,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
 
     if (error) {
-      await interaction.editReply({ embeds: [errorEmbed(`Could not add question: ${error.message}`)] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? `Could not add question: ${error.message}` : `Impossible d'ajouter la question : ${error.message}`)] });
       return;
     }
     await interaction.editReply({
-      embeds: [successEmbed(
-        `Added a question to **${category}**:\n\n**${question}**\n` +
+      embeds: [successEmbed((en
+        ? `Added a question to **${category}**:\n\n**${question}**\n`
+        : `Question ajoutée à **${category}** :\n\n**${question}**\n`) +
         choices.map((c, i) => `${i === correctIndex ? '✅' : '▫️'} ${c}`).join('\n')
       )],
     });
@@ -82,12 +86,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (category) query = query.eq('category', category.toLowerCase().trim());
     const { data: rows } = await query;
 
+    const title = en ? 'Quiz questions' : 'Questions de quiz';
     if (!rows?.length) {
-      await interaction.editReply({ embeds: [pulseEmbed('Quiz questions').setDescription('No questions yet. Add some with `/quizadmin add`.')] });
+      await interaction.editReply({ embeds: [pulseEmbed(title).setDescription(en ? 'No questions yet. Add some with `/quizadmin add`.' : 'Aucune question. Ajoute-en avec `/quizadmin add`.')] });
       return;
     }
     const lines = rows.map(r => `${r.is_active ? '🟢' : '⚫'} [${r.category}] ${r.question}`.slice(0, 100));
-    await interaction.editReply({ embeds: [pulseEmbed(`Quiz questions (${rows.length})`).setDescription(lines.join('\n').slice(0, 4000))] });
+    await interaction.editReply({ embeds: [pulseEmbed(`${title} (${rows.length})`).setDescription(lines.join('\n').slice(0, 4000))] });
     return;
   }
 
@@ -103,16 +108,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'unknown';
       const friendly = msg === 'NO_API_KEY'
-        ? 'AI generation is not configured. Set the `ANTHROPIC_API_KEY` environment variable in Railway, then try again.'
+        ? (en
+            ? 'AI generation is not configured. Set the `ANTHROPIC_API_KEY` environment variable in Railway, then try again.'
+            : 'La génération IA n\'est pas configurée. Définis la variable `ANTHROPIC_API_KEY` sur Railway, puis réessaie.')
         : msg === 'BAD_JSON'
-          ? 'The AI response could not be parsed. Try again.'
-          : `AI generation failed: ${msg}`;
+          ? (en ? 'The AI response could not be parsed. Try again.' : 'La réponse de l\'IA ne peut pas être analysée. Réessaie.')
+          : (en ? `AI generation failed: ${msg}` : `Génération IA échouée : ${msg}`);
       await interaction.editReply({ embeds: [errorEmbed(friendly)] });
       return;
     }
 
     if (!generated.length) {
-      await interaction.editReply({ embeds: [errorEmbed('The AI did not return any usable questions. Try a clearer topic.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en
+        ? 'The AI did not return any usable questions. Try a clearer topic.'
+        : 'L\'IA n\'a pas renvoyé de questions utilisables. Essaie un sujet plus clair.')] });
       return;
     }
 
@@ -137,8 +146,15 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const preview = toInsert.slice(0, 5).map(q => `• ${q.question}`).join('\n');
     await interaction.editReply({
       embeds: [successEmbed(
-        `🤖 Added **${toInsert.length}** new question${toInsert.length === 1 ? '' : 's'} to **${category}**` +
-        `${skipped ? ` (${skipped} duplicate${skipped === 1 ? '' : 's'} skipped)` : ''}.\n\n${preview}`
+        (en
+          ? `🤖 Added **${toInsert.length}** new question${toInsert.length === 1 ? '' : 's'} to **${category}**`
+          : `🤖 Ajout de **${toInsert.length}** nouvelle${toInsert.length === 1 ? '' : 's'} question${toInsert.length === 1 ? '' : 's'} à **${category}**`) +
+        (skipped
+          ? (en
+              ? ` (${skipped} duplicate${skipped === 1 ? '' : 's'} skipped)`
+              : ` (${skipped} doublon${skipped === 1 ? '' : 's'} ignoré${skipped === 1 ? '' : 's'})`)
+          : '') +
+        `.\n\n${preview}`
       )],
     });
     return;
@@ -153,18 +169,24 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .limit(5);
 
   if (!matches?.length) {
-    await interaction.editReply({ embeds: [errorEmbed(`No question matches "${contains}".`)] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? `No question matches "${contains}".`
+      : `Aucune question ne correspond à « ${contains} ».`)] });
     return;
   }
   if (matches.length > 1) {
     await interaction.editReply({
       embeds: [errorEmbed(
-        `That matches **${matches.length}** questions — be more specific:\n` +
+        (en
+          ? `That matches **${matches.length}** questions — be more specific:\n`
+          : `Cela correspond à **${matches.length}** questions — sois plus précis :\n`) +
         matches.map(m => `• ${m.question}`).join('\n')
       )],
     });
     return;
   }
   await supabase.from('quiz_questions').delete().eq('id', matches[0].id);
-  await interaction.editReply({ embeds: [successEmbed(`Removed: **${matches[0].question}**`)] });
+  await interaction.editReply({ embeds: [successEmbed(en
+    ? `Removed: **${matches[0].question}**`
+    : `Supprimée : **${matches[0].question}**`)] });
 }

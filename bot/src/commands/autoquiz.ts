@@ -9,6 +9,7 @@ import {
 import { setSetting } from '../services/settings.js';
 import { getAutoQuizConfig, launchQuiz, type AutoQuizConfig } from '../services/communityQuiz.js';
 import { successEmbed, errorEmbed, pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 async function saveConfig(patch: Partial<AutoQuizConfig>): Promise<void> {
   await setSetting('auto_quiz', { ...getAutoQuizConfig(), ...patch });
@@ -45,13 +46,17 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const sub = interaction.options.getSubcommand();
   const cfg = getAutoQuizConfig();
 
   if (sub === 'channel') {
     const channel = interaction.options.getChannel('channel', true);
     await saveConfig({ channel_id: channel.id });
-    await interaction.editReply({ embeds: [successEmbed(`Daily quizzes will be posted in <#${channel.id}>.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Daily quizzes will be posted in <#${channel.id}>.`
+      : `Les quiz quotidiens seront publiés dans <#${channel.id}>.`)] });
     return;
   }
 
@@ -60,23 +65,29 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       .split(',').map(t => t.trim()).filter(Boolean);
     const invalid = times.filter(t => !TIME_RE.test(t));
     if (invalid.length || !times.length) {
-      await interaction.editReply({ embeds: [errorEmbed(`Use 24h UTC times like \`18:00,00:00\`. Invalid: ${invalid.join(', ') || '(none)'}`)] });
+      await interaction.editReply({ embeds: [errorEmbed(en
+        ? `Use 24h UTC times like \`18:00,00:00\`. Invalid: ${invalid.join(', ') || '(none)'}`
+        : `Utilise des heures UTC au format 24h comme \`18:00,00:00\`. Invalides : ${invalid.join(', ') || '(aucune)'}`)] });
       return;
     }
     await saveConfig({ daily_times_utc: times });
     await setSetting('auto_quiz_state', { fired: {} });
-    await interaction.editReply({ embeds: [successEmbed(`Daily quiz times set to **${times.join(', ')} UTC**.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Daily quiz times set to **${times.join(', ')} UTC**.`
+      : `Heures quotidiennes du quiz définies à **${times.join(', ')} UTC**.`)] });
     return;
   }
 
   if (sub === 'topics') {
     const topics = interaction.options.getString('list', true).split(',').map(t => t.trim()).filter(Boolean);
     if (!topics.length) {
-      await interaction.editReply({ embeds: [errorEmbed('Give at least one topic.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Give at least one topic.' : 'Donne au moins un sujet.')] });
       return;
     }
     await saveConfig({ topics });
-    await interaction.editReply({ embeds: [successEmbed(`AI quiz topics: ${topics.join(', ')}.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `AI quiz topics: ${topics.join(', ')}.`
+      : `Sujets du quiz IA : ${topics.join(', ')}.`)] });
     return;
   }
 
@@ -95,11 +106,15 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (ai !== null) patch.auto_generate = ai;
     if (language !== null) patch.language = language.trim();
     if (Object.keys(patch).length === 0) {
-      await interaction.editReply({ embeds: [errorEmbed('Provide at least one setting to change.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en
+        ? 'Provide at least one setting to change.'
+        : 'Fournis au moins un paramètre à modifier.')] });
       return;
     }
     await saveConfig(patch);
-    await interaction.editReply({ embeds: [successEmbed('Auto-quiz settings updated. *(Takes effect within a minute.)*')] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? 'Auto-quiz settings updated. *(Takes effect within a minute.)*'
+      : 'Paramètres du quiz auto mis à jour. *(Effectif dans la minute.)*')] });
     return;
   }
 
@@ -107,24 +122,37 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const enabled = interaction.options.getBoolean('enabled', true);
     await saveConfig({ enabled });
     if (enabled && !cfg.channel_id) {
-      await interaction.editReply({ embeds: [errorEmbed('Enabled — but set a channel first with `/autoquiz channel`.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en
+        ? 'Enabled — but set a channel first with `/autoquiz channel`.'
+        : 'Activé — mais définis d\'abord un salon avec `/autoquiz channel`.')] });
       return;
     }
-    await interaction.editReply({ embeds: [successEmbed(`Automatic daily quiz is now **${enabled ? 'ON ✅' : 'OFF ⛔'}**.`)] });
+    await interaction.editReply({ embeds: [successEmbed(en
+      ? `Automatic daily quiz is now **${enabled ? 'ON ✅' : 'OFF ⛔'}**.`
+      : `Le quiz quotidien automatique est maintenant **${enabled ? 'ACTIVÉ ✅' : 'DÉSACTIVÉ ⛔'}**.`)] });
     return;
   }
 
   if (sub === 'status') {
     await interaction.editReply({
-      embeds: [pulseEmbed('🧠 Auto-Quiz configuration').setDescription(
-        `**Status:** ${cfg.enabled ? 'ON ✅' : 'OFF ⛔'}\n` +
-        `**Channel:** ${cfg.channel_id ? `<#${cfg.channel_id}>` : '*(not set)*'}\n` +
-        `**Daily times (UTC):** ${cfg.daily_times_utc.join(', ')}\n` +
-        `**Questions:** ${cfg.questions_per_round}${cfg.bonus_enabled ? ' + 1 bonus (×2)' : ''}\n` +
-        `**Time/question:** ${cfg.seconds_per_question}s\n` +
-        `**Reward/correct:** ${cfg.reward_per_correct} PULSE\n` +
-        `**AI generation:** ${cfg.auto_generate ? `ON (${cfg.language})` : 'OFF (uses question bank)'}\n` +
-        `**Topics:** ${cfg.topics.join(', ')}`
+      embeds: [pulseEmbed(en ? '🧠 Auto-Quiz configuration' : '🧠 Configuration du quiz auto').setDescription(
+        (en
+          ? `**Status:** ${cfg.enabled ? 'ON ✅' : 'OFF ⛔'}\n` +
+            `**Channel:** ${cfg.channel_id ? `<#${cfg.channel_id}>` : '*(not set)*'}\n` +
+            `**Daily times (UTC):** ${cfg.daily_times_utc.join(', ')}\n` +
+            `**Questions:** ${cfg.questions_per_round}${cfg.bonus_enabled ? ' + 1 bonus (×2)' : ''}\n` +
+            `**Time/question:** ${cfg.seconds_per_question}s\n` +
+            `**Reward/correct:** ${cfg.reward_per_correct} PULSE\n` +
+            `**AI generation:** ${cfg.auto_generate ? `ON (${cfg.language})` : 'OFF (uses question bank)'}\n` +
+            `**Topics:** ${cfg.topics.join(', ')}`
+          : `**État :** ${cfg.enabled ? 'ACTIVÉ ✅' : 'DÉSACTIVÉ ⛔'}\n` +
+            `**Salon :** ${cfg.channel_id ? `<#${cfg.channel_id}>` : '*(non défini)*'}\n` +
+            `**Heures quotidiennes (UTC) :** ${cfg.daily_times_utc.join(', ')}\n` +
+            `**Questions :** ${cfg.questions_per_round}${cfg.bonus_enabled ? ' + 1 bonus (×2)' : ''}\n` +
+            `**Temps/question :** ${cfg.seconds_per_question}s\n` +
+            `**Récompense/bonne réponse :** ${cfg.reward_per_correct} PULSE\n` +
+            `**Génération IA :** ${cfg.auto_generate ? `ACTIVÉE (${cfg.language})` : 'DÉSACTIVÉE (utilise la banque de questions)'}\n` +
+            `**Sujets :** ${cfg.topics.join(', ')}`)
       )],
     });
     return;
@@ -133,9 +161,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   // now
   const channel = interaction.channel;
   if (!channel || !channel.isTextBased() || channel.isDMBased()) {
-    await interaction.editReply({ embeds: [errorEmbed('Run this in a text channel.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Run this in a text channel.' : 'Exécute cette commande dans un salon texte.')] });
     return;
   }
-  await interaction.editReply({ embeds: [successEmbed('Launching a quiz here now! 🧠 (generating questions…)')] });
+  await interaction.editReply({ embeds: [successEmbed(en
+    ? 'Launching a quiz here now! 🧠 (generating questions…)'
+    : 'Lancement d\'un quiz ici maintenant ! 🧠 (génération des questions…)')] });
   void launchQuiz(channel as GuildTextBasedChannel, cfg);
 }

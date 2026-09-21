@@ -17,6 +17,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 interface QuizQuestion {
   id: string;
@@ -42,8 +43,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('quiz')) {
-    await interaction.reply({ embeds: [errorEmbed('Quiz Blitz is currently disabled.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Quiz Blitz is currently disabled.' : 'Quiz Blitz est désactivé pour l\'instant.')], ephemeral: true });
     return;
   }
 
@@ -71,7 +75,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const { data: allQuestions } = await query;
 
   if (!allQuestions || allQuestions.length === 0) {
-    await interaction.reply({ embeds: [errorEmbed('No quiz questions available.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'No quiz questions available.' : 'Aucune question de quiz disponible.')], ephemeral: true });
     return;
   }
 
@@ -85,13 +89,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   });
 
   if (!sessionId) {
-    await interaction.reply({ embeds: [errorEmbed('Failed to start quiz.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Failed to start quiz.' : 'Impossible de démarrer le quiz.')], ephemeral: true });
     return;
   }
 
   await interaction.reply({
-    embeds: [pulseEmbed('🧠 Quiz Blitz').setDescription(
-      `Starting **${questions.length}** questions!\n⏱️ ${conf.time_per_question_seconds ?? 15}s per question\n\nGet ready...`
+    embeds: [pulseEmbed('🧠 Quiz Blitz').setDescription(en
+      ? `Starting **${questions.length}** questions!\n⏱️ ${conf.time_per_question_seconds ?? 15}s per question\n\nGet ready...`
+      : `Démarrage : **${questions.length}** questions !\n⏱️ ${conf.time_per_question_seconds ?? 15}s par question\n\nPrépare-toi…`
     )],
   });
 
@@ -117,8 +122,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     const qEmbed = pulseEmbed(`Question ${i + 1}/${questions.length}`)
-      .setDescription(`**${q.question}**\n\n${q.difficulty ? `Difficulty: ${q.difficulty}` : ''}`)
-      .setFooter({ text: `⏱️ ${conf.time_per_question_seconds ?? 15}s to answer` });
+      .setDescription(`**${q.question}**\n\n${q.difficulty ? `${en ? 'Difficulty' : 'Difficulté'}: ${q.difficulty}` : ''}`)
+      .setFooter({ text: en ? `⏱️ ${conf.time_per_question_seconds ?? 15}s to answer` : `⏱️ ${conf.time_per_question_seconds ?? 15}s pour répondre` });
 
     const msg = await interaction.followUp({ embeds: [qEmbed], components: rows, fetchReply: true }) as Message;
 
@@ -156,7 +161,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           newRows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(newButtons.slice(r, r + 2)));
         }
 
-        const resultText = isCorrect ? '✅ Correct!' : `❌ Wrong! Answer: **${choices[q.correct_index]}**`;
+        const resultText = isCorrect
+          ? (en ? '✅ Correct!' : '✅ Correct !')
+          : (en ? `❌ Wrong! Answer: **${choices[q.correct_index]}**` : `❌ Faux ! Réponse : **${choices[q.correct_index]}**`);
         await btnI.update({
           embeds: [qEmbed.setFooter({ text: resultText })],
           components: newRows,
@@ -191,10 +198,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const percentage = Math.round((score / questions.length) * 100);
   const emoji = percentage >= 80 ? '🏆' : percentage >= 60 ? '👏' : percentage >= 40 ? '🤔' : '😅';
 
-  const finalEmbed = pulseEmbed(`${emoji} Quiz Complete!`)
+  const finalEmbed = pulseEmbed(`${emoji} ${en ? 'Quiz Complete!' : 'Quiz terminé !'}`)
     .setDescription(
-      `**Score: ${score}/${questions.length}** (${percentage}%)\n\n` +
-      `💰 Earned: **${rewardAmount}** PULSE\n\n` +
+      `**${en ? 'Score' : 'Score'}: ${score}/${questions.length}** (${percentage}%)\n\n` +
+      `💰 ${en ? 'Earned' : 'Gagné'} : **${rewardAmount}** PULSE\n\n` +
       results.map((r, idx) => `${r.correct ? '✅' : '❌'} Q${idx + 1}`).join(' ')
     );
 
