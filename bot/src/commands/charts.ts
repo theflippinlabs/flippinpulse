@@ -8,6 +8,7 @@ import {
 import { supabase } from '../supabase.js';
 import { requireLord } from '../services/lord.js';
 import { errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('charts')
@@ -57,8 +58,10 @@ function sparkline(values: number[]): string {
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   if (!interaction.guild) {
-    await interaction.reply({ embeds: [errorEmbed('Server only.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Server only.' : 'Uniquement en serveur.')], flags: MessageFlags.Ephemeral });
     return;
   }
   if (!(await requireLord(interaction))) return;
@@ -84,24 +87,30 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
   const peak = (arr: number[]) => Math.max(0, ...arr);
 
+  const noActivity = en ? '_No activity this week._' : '_Aucune activité cette semaine._';
   const topLines = ((top.data ?? []) as { username: string; points_week: number }[])
     .map((u, i) => `${['🥇', '🥈', '🥉'][i]} **${u.username ?? '???'}** — ${fmt(u.points_week ?? 0)} pts`)
-    .join('\n') || '_No activity this week._';
+    .join('\n') || noActivity;
+
+  const totalLbl = en ? 'total' : 'total';
+  const peakLbl = en ? 'peak' : 'pic';
 
   const embed = new EmbedBuilder()
     .setColor(0xF5B62E)
-    .setTitle(`📊 Novarys — last ${DAYS} days`)
+    .setTitle(en ? `📊 Community — last ${DAYS} days` : `📊 Communauté — ${DAYS} derniers jours`)
     .setDescription(
-      `**Members tracked:** ${fmt(members.count ?? 0)}\n\n` +
-      `💬 **Messages** — total ${fmt(sum(msgVals))} · peak ${fmt(peak(msgVals))}\n` +
+      `**${en ? 'Members tracked' : 'Membres suivis'}:** ${fmt(members.count ?? 0)}\n\n` +
+      `💬 **${en ? 'Messages' : 'Messages'}** — ${totalLbl} ${fmt(sum(msgVals))} · ${peakLbl} ${fmt(peak(msgVals))}\n` +
       `\`${sparkline(msgVals)}\`\n\n` +
-      `🎮 **Games played** — total ${fmt(sum(gameVals))} · peak ${fmt(peak(gameVals))}\n` +
+      `🎮 **${en ? 'Games played' : 'Parties jouées'}** — ${totalLbl} ${fmt(sum(gameVals))} · ${peakLbl} ${fmt(peak(gameVals))}\n` +
       `\`${sparkline(gameVals)}\`\n\n` +
-      `💰 **PULSE minted** — total ${fmt(sum(pulseVals))} · peak ${fmt(peak(pulseVals))}\n` +
+      `💰 **${en ? 'PULSE minted' : 'PULSE créés'}** — ${totalLbl} ${fmt(sum(pulseVals))} · ${peakLbl} ${fmt(peak(pulseVals))}\n` +
       `\`${sparkline(pulseVals)}\`\n\n` +
-      `**🏆 Top of the week**\n${topLines}`,
+      `**${en ? '🏆 Top of the week' : '🏆 Top de la semaine'}**\n${topLines}`,
     )
-    .setFooter({ text: 'Deeper drilldowns are on the dashboard → Hub → 📊 Charts.' })
+    .setFooter({ text: en
+      ? 'Deeper drilldowns are on the dashboard → Hub → 📊 Charts.'
+      : 'Analyses détaillées sur le dashboard → Hub → 📊 Charts.' })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

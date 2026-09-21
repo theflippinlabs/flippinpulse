@@ -21,39 +21,47 @@ import {
   PRICES,
 } from '../services/cosmetics.js';
 import { errorEmbed, successEmbed, pulseEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 export const data = new SlashCommandBuilder()
   .setName('cosmetics')
   .setDescription('Personalize your profile — title, colors, custom nameplate');
 
 async function panel(interaction: ChatInputCommandInteraction | ButtonInteraction, editReply = false): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const c = await getCosmetics(interaction.user.id);
   const nameColorRemaining = c?.name_color_expires_at
     ? Math.max(0, Math.ceil((new Date(c.name_color_expires_at).getTime() - Date.now()) / 86_400_000))
     : 0;
 
+  const noneSetTitle = en ? '*(none — press Set title)*' : '*(aucun — clique Définir le titre)*';
+  const defaultLbl = en ? '*(default)*' : '*(défaut)*';
+  const daysLbl = en ? (nameColorRemaining === 1 ? 'day' : 'days') : (nameColorRemaining === 1 ? 'jour' : 'jours');
+  const leftLbl = en ? 'left' : 'restants';
+
   const lines = [
-    `**Your current cosmetics:**`,
-    `🏷️ **Title:** ${c?.title ? `_${c.title}_` : '*(none — press Set title)*'}`,
-    `🎨 **Profile color:** ${c?.color_hex ? `\`${c.color_hex}\`` : '*(default)*'}`,
-    `🌈 **Name color:** ${c?.name_color_hex ? `\`${c.name_color_hex}\` — ${nameColorRemaining} day${nameColorRemaining === 1 ? '' : 's'} left` : '*(default)*'}`,
+    `**${en ? 'Your current cosmetics:' : 'Tes cosmétiques actuels :'}**`,
+    `🏷️ **${en ? 'Title' : 'Titre'}:** ${c?.title ? `_${c.title}_` : noneSetTitle}`,
+    `🎨 **${en ? 'Profile color' : 'Couleur de profil'}:** ${c?.color_hex ? `\`${c.color_hex}\`` : defaultLbl}`,
+    `🌈 **${en ? 'Name color' : 'Couleur de pseudo'}:** ${c?.name_color_hex ? `\`${c.name_color_hex}\` — ${nameColorRemaining} ${daysLbl} ${leftLbl}` : defaultLbl}`,
     '',
-    `**Prices:**`,
-    `• 🏷️ Custom title (permanent) — **${PRICES.title} PULSE**`,
-    `• 🎨 Profile embed color (permanent) — **${PRICES.color} PULSE**`,
-    `• 🌈 Discord name color (${NAME_COLOR_DAYS} days) — **${PRICES.nameColor30} PULSE**`,
+    `**${en ? 'Prices:' : 'Prix :'}**`,
+    `• 🏷️ ${en ? 'Custom title (permanent)' : 'Titre custom (permanent)'} — **${PRICES.title} PULSE**`,
+    `• 🎨 ${en ? 'Profile embed color (permanent)' : 'Couleur d\'embed (permanente)'} — **${PRICES.color} PULSE**`,
+    `• 🌈 ${en ? `Discord name color (${NAME_COLOR_DAYS} days)` : `Couleur de pseudo Discord (${NAME_COLOR_DAYS} jours)`} — **${PRICES.nameColor30} PULSE**`,
   ];
 
   const rows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-      new ButtonBuilder().setCustomId('cos:title').setLabel('Set title').setEmoji('🏷️').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('cos:color').setLabel('Set profile color').setEmoji('🎨').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('cos:namecolor').setLabel('Buy name color').setEmoji('🌈').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('cos:title').setLabel(en ? 'Set title' : 'Définir titre').setEmoji('🏷️').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('cos:color').setLabel(en ? 'Set profile color' : 'Couleur profil').setEmoji('🎨').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('cos:namecolor').setLabel(en ? 'Buy name color' : 'Acheter couleur pseudo').setEmoji('🌈').setStyle(ButtonStyle.Success),
     ),
   ];
 
   const payload = {
-    embeds: [pulseEmbed('✨ Cosmetics Boutique').setDescription(lines.join('\n'))],
+    embeds: [pulseEmbed(en ? '✨ Cosmetics Boutique' : '✨ Boutique cosmétique').setDescription(lines.join('\n'))],
     components: rows,
     flags: MessageFlags.Ephemeral as const,
   };
@@ -88,12 +96,14 @@ function colorModal(id: string, title: string): ModalBuilder {
 }
 
 export async function handleCosmeticsInteraction(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const id = interaction.customId;
 
   if (interaction.isButton()) {
     if (id === 'cos:title') { await interaction.showModal(titleModal()); return; }
-    if (id === 'cos:color') { await interaction.showModal(colorModal('cos:modal:color', 'Set your profile embed color')); return; }
-    if (id === 'cos:namecolor') { await interaction.showModal(colorModal('cos:modal:namecolor', `Buy Discord name color (${NAME_COLOR_DAYS} days)`)); return; }
+    if (id === 'cos:color') { await interaction.showModal(colorModal('cos:modal:color', en ? 'Set your profile embed color' : 'Choisis ta couleur d\'embed')); return; }
+    if (id === 'cos:namecolor') { await interaction.showModal(colorModal('cos:modal:namecolor', en ? `Buy Discord name color (${NAME_COLOR_DAYS} days)` : `Acheter couleur pseudo Discord (${NAME_COLOR_DAYS} jours)`)); return; }
     return;
   }
 
@@ -101,25 +111,31 @@ export async function handleCosmeticsInteraction(interaction: ButtonInteraction 
     const value = interaction.fields.getTextInputValue('v');
     if (id === 'cos:modal:title') {
       const res = await buyTitle(interaction.user.id, value);
-      if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? 'Failed.')], flags: MessageFlags.Ephemeral }); return; }
-      await interaction.reply({ embeds: [successEmbed(`Title set to _"${value.trim().slice(0, 40)}"_. Check it on \`/profile\`.`)], flags: MessageFlags.Ephemeral });
+      if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? (en ? 'Failed.' : 'Échec.'))], flags: MessageFlags.Ephemeral }); return; }
+      await interaction.reply({ embeds: [successEmbed(en
+        ? `Title set to _"${value.trim().slice(0, 40)}"_. Check it on \`/profile\`.`
+        : `Titre défini à _"${value.trim().slice(0, 40)}"_. Vérifie avec \`/profile\`.`)], flags: MessageFlags.Ephemeral });
       return;
     }
     if (id === 'cos:modal:color') {
       const res = await buyProfileColor(interaction.user.id, value);
-      if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? 'Failed.')], flags: MessageFlags.Ephemeral }); return; }
-      await interaction.reply({ embeds: [successEmbed(`Profile color set to \`${res.hex}\`. It'll show on \`/profile\`.`)], flags: MessageFlags.Ephemeral });
+      if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? (en ? 'Failed.' : 'Échec.'))], flags: MessageFlags.Ephemeral }); return; }
+      await interaction.reply({ embeds: [successEmbed(en
+        ? `Profile color set to \`${res.hex}\`. It'll show on \`/profile\`.`
+        : `Couleur de profil définie à \`${res.hex}\`. Visible sur \`/profile\`.`)], flags: MessageFlags.Ephemeral });
       return;
     }
     if (id === 'cos:modal:namecolor') {
-      if (!interaction.guild) { await interaction.reply({ embeds: [errorEmbed('Server only.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!interaction.guild) { await interaction.reply({ embeds: [errorEmbed(en ? 'Server only.' : 'Uniquement en serveur.')], flags: MessageFlags.Ephemeral }); return; }
       const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-      if (!member) { await interaction.reply({ embeds: [errorEmbed('Member not found.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!member) { await interaction.reply({ embeds: [errorEmbed(en ? 'Member not found.' : 'Membre introuvable.')], flags: MessageFlags.Ephemeral }); return; }
       const res = await buyNameColor(interaction.guild, member, value);
-      if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? 'Failed.')], flags: MessageFlags.Ephemeral }); return; }
+      if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? (en ? 'Failed.' : 'Échec.'))], flags: MessageFlags.Ephemeral }); return; }
       const expiresTs = Math.floor(new Date(res.expiresAt!).getTime() / 1000);
       await interaction.reply({
-        embeds: [successEmbed(`Name color set to \`${res.hex}\` — expires <t:${expiresTs}:R>.`)],
+        embeds: [successEmbed(en
+          ? `Name color set to \`${res.hex}\` — expires <t:${expiresTs}:R>.`
+          : `Couleur de pseudo définie à \`${res.hex}\` — expire <t:${expiresTs}:R>.`)],
         flags: MessageFlags.Ephemeral,
       });
       return;
