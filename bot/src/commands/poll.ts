@@ -10,6 +10,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const MAX_OPTIONS = 5;
 const DEFAULT_DURATION_MS = 5 * 60_000;
@@ -41,13 +42,17 @@ export const data = new SlashCommandBuilder()
   .addStringOption(o => o.setName('duration').setDescription('Duration e.g. 5m, 1h (default 5m, max 24h)').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
   const question = interaction.options.getString('question', true);
   const optionsRaw = interaction.options.getString('options', true);
   const durationStr = interaction.options.getString('duration');
 
   const options = optionsRaw.split(',').map(s => s.trim()).filter(Boolean);
   if (options.length < 2 || options.length > MAX_OPTIONS) {
-    await interaction.reply({ embeds: [errorEmbed(`Provide between 2 and ${MAX_OPTIONS} options.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Provide between 2 and ${MAX_OPTIONS} options.`
+      : `Fournis entre 2 et ${MAX_OPTIONS} options.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -55,7 +60,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   if (durationStr) {
     const parsed = parseDurationMs(durationStr);
     if (!parsed) {
-      await interaction.reply({ embeds: [errorEmbed('Invalid duration. Use formats like `30s`, `5m`, `1h`.')], flags: MessageFlags.Ephemeral });
+      await interaction.reply({ embeds: [errorEmbed(en ? 'Invalid duration. Use formats like `30s`, `5m`, `1h`.' : 'Durée invalide. Utilise `30s`, `5m`, `1h`.')], flags: MessageFlags.Ephemeral });
       return;
     }
     durationMs = Math.min(parsed, MAX_DURATION_MS);
@@ -72,17 +77,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const counts = options.map((_, i) => 0);
     for (const choice of votes.values()) counts[choice]++;
 
+    const voteLbl = en ? 'vote' : 'vote';
+    const votesLbl = en ? 'votes' : 'votes';
     const lines = options.map((label, i) => {
       const pct = total === 0 ? 0 : Math.round((counts[i] / total) * 100);
-      return `${OPTION_EMOJIS[i]} **${label}** — ${counts[i]} vote${counts[i] !== 1 ? 's' : ''} (${pct}%)\n\`${renderBar(pct)}\``;
+      return `${OPTION_EMOJIS[i]} **${label}** — ${counts[i]} ${counts[i] !== 1 ? votesLbl : voteLbl} (${pct}%)\n\`${renderBar(pct)}\``;
     });
 
+    const closedLbl = en ? ' • Closed' : ' • Fermé';
     return new EmbedBuilder()
       .setColor(closed ? 0x6B7280 : 0x38BDF8)
       .setTitle(`📊 ${question}`)
       .setDescription(lines.join('\n\n'))
-      .setFooter({ text: `Total votes: ${total}${closed ? ' • Closed' : ''}` })
-      .addFields({ name: closed ? 'Ended' : 'Ends', value: `<t:${endsAtUnix}:R>`, inline: true })
+      .setFooter({ text: `${en ? 'Total votes' : 'Total votes'}: ${total}${closed ? closedLbl : ''}` })
+      .addFields({ name: closed ? (en ? 'Ended' : 'Terminé') : (en ? 'Ends' : 'Termine'), value: `<t:${endsAtUnix}:R>`, inline: true })
       .setTimestamp();
   }
 
@@ -112,13 +120,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const choiceIdx = parseInt(btn.customId.split(':')[1], 10);
     if (Number.isNaN(choiceIdx) || choiceIdx < 0 || choiceIdx >= options.length) return;
 
+    const voterLocale = await getUserLocale(btn.user.id);
+    const ven = voterLocale === 'en';
     const prev = votes.get(btn.user.id);
     votes.set(btn.user.id, choiceIdx);
 
     const ack = btn.reply({
       content: prev === choiceIdx
-        ? `Your vote for **${options[choiceIdx]}** is recorded.`
-        : `Vote ${prev === undefined ? 'recorded' : 'changed'}: **${options[choiceIdx]}**.`,
+        ? (ven
+            ? `Your vote for **${options[choiceIdx]}** is recorded.`
+            : `Ton vote pour **${options[choiceIdx]}** est enregistré.`)
+        : (ven
+            ? `Vote ${prev === undefined ? 'recorded' : 'changed'}: **${options[choiceIdx]}**.`
+            : `Vote ${prev === undefined ? 'enregistré' : 'modifié'} : **${options[choiceIdx]}**.`),
       flags: MessageFlags.Ephemeral,
     }).catch(() => null);
 

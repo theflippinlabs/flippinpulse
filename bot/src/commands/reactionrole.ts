@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { saveReactionRole, deleteReactionRole } from '../services/reactionRoles.js';
 import { successEmbed, errorEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const EMOJI_REGEX = /^(?:<a?:\w+:(\d+)>|(\p{Extended_Pictographic}|\p{Emoji_Presentation}))$/u;
 
@@ -41,8 +42,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!interaction.guild) {
-    await interaction.reply({ embeds: [errorEmbed('This command must be used in a server.')], ephemeral: true });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'This command must be used in a server.' : 'Cette commande doit être utilisée en serveur.')], ephemeral: true });
     return;
   }
 
@@ -54,7 +58,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const emoji = parseEmoji(emojiInput);
 
   if (!emoji) {
-    await interaction.editReply({ embeds: [errorEmbed('Invalid emoji. Use a unicode emoji or a custom server emoji.')] });
+    await interaction.editReply({ embeds: [errorEmbed(en
+      ? 'Invalid emoji. Use a unicode emoji or a custom server emoji.'
+      : 'Emoji invalide. Utilise un emoji Unicode ou un emoji custom du serveur.')] });
     return;
   }
 
@@ -64,13 +70,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const channelId = channelOpt?.id ?? interaction.channelId;
     const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
     if (!channel || channel.type !== ChannelType.GuildText) {
-      await interaction.editReply({ embeds: [errorEmbed('Target channel must be a text channel.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Target channel must be a text channel.' : 'Le salon cible doit être un salon texte.')] });
       return;
     }
 
     const message = await channel.messages.fetch(messageId).catch(() => null);
     if (!message) {
-      await interaction.editReply({ embeds: [errorEmbed('Message not found in that channel.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Message not found in that channel.' : 'Message introuvable dans ce salon.')] });
       return;
     }
 
@@ -86,12 +92,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
 
     if (!ok) {
-      await interaction.editReply({ embeds: [errorEmbed('Failed to save reaction role.')] });
+      await interaction.editReply({ embeds: [errorEmbed(en ? 'Failed to save reaction role.' : 'Impossible de sauvegarder le rôle de réaction.')] });
       return;
     }
 
     await interaction.editReply({
-      embeds: [successEmbed(`Reaction role added: ${emojiInput} → <@&${role.id}>`)],
+      embeds: [successEmbed(en
+        ? `Reaction role added: ${emojiInput} → <@&${role.id}>`
+        : `Rôle de réaction ajouté : ${emojiInput} → <@&${role.id}>`)],
     });
     return;
   }
@@ -100,8 +108,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const ok = await deleteReactionRole(messageId, emoji);
     await interaction.editReply({
       embeds: ok
-        ? [successEmbed(`Reaction role removed for ${emojiInput} on message ${messageId}.`)]
-        : [errorEmbed('Failed to remove reaction role.')],
+        ? [successEmbed(en
+            ? `Reaction role removed for ${emojiInput} on message ${messageId}.`
+            : `Rôle de réaction retiré pour ${emojiInput} sur le message ${messageId}.`)]
+        : [errorEmbed(en ? 'Failed to remove reaction role.' : 'Impossible de retirer le rôle de réaction.')],
     });
   }
 }
