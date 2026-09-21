@@ -22,6 +22,7 @@ import {
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
 import { buildPostGameRow } from '../utils/postgame.js';
+import { getUserLocale } from '../i18n.js';
 
 interface BlackjackConfig {
   min_bet: number;
@@ -80,8 +81,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 export async function runBlackjack(interaction: ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction, bet: number): Promise<void> {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('blackjack')) {
-    await interaction.reply({ embeds: [errorEmbed('Blackjack is currently disabled.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Blackjack is currently disabled.' : 'Le blackjack est désactivé pour l\'instant.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -89,19 +93,23 @@ export async function runBlackjack(interaction: ChatInputCommandInteraction | Mo
   const cfg: BlackjackConfig = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
 
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`
+      : `La mise doit être entre ${cfg.min_bet} et ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const bal = await getBalance(interaction.user.id);
   if (!bal || bal.balance < bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Insufficient PULSE. You have ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Not enough PULSE. You have ${bal?.balance ?? 0}.`
+      : `Pas assez de PULSE. Tu as ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const spend = await spendPulse(interaction.user.id, bet, 'blackjack_bet');
   if (!spend.success) {
-    await interaction.reply({ embeds: [errorEmbed(spend.error ?? 'Failed to place bet.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(spend.error ?? (en ? 'Failed to place bet.' : 'Échec de la mise.'))], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -134,15 +142,24 @@ export async function runBlackjack(interaction: ChatInputCommandInteraction | Mo
     }
 
     const net = payout - bet;
+    const yourHandLbl = en ? 'Your hand' : 'Ta main';
+    const dealerHandLbl = en ? 'Dealer hand' : 'Main du croupier';
+    const outcomeLine = en
+      ? (outcome === 'blackjack' ? `🎉 **Blackjack!** You win **${payout}** PULSE (net +${net}).`
+       : outcome === 'win'       ? `🎉 You win **${payout}** PULSE (net +${net}).`
+       : outcome === 'push'      ? `🤝 Push — bet returned.`
+       : outcome === 'bust'      ? `💥 Bust! You lose **${bet}** PULSE.`
+       :                            `❌ Dealer wins. You lose **${bet}** PULSE.`)
+      : (outcome === 'blackjack' ? `🎉 **Blackjack !** Tu gagnes **${payout}** PULSE (net +${net}).`
+       : outcome === 'win'       ? `🎉 Tu gagnes **${payout}** PULSE (net +${net}).`
+       : outcome === 'push'      ? `🤝 Égalité — mise remboursée.`
+       : outcome === 'bust'      ? `💥 Bust ! Tu perds **${bet}** PULSE.`
+       :                            `❌ Le croupier gagne. Tu perds **${bet}** PULSE.`);
     const desc = [
-      `**Your hand:** ${formatHand(player)} (**${handValue(player)}**)`,
-      `**Dealer hand:** ${formatHand(resolved)} (**${handValue(resolved)}**)`,
+      `**${yourHandLbl}:** ${formatHand(player)} (**${handValue(player)}**)`,
+      `**${dealerHandLbl}:** ${formatHand(resolved)} (**${handValue(resolved)}**)`,
       '',
-      outcome === 'blackjack' ? `🎉 **Blackjack!** You win **${payout}** PULSE (net +${net}).`
-        : outcome === 'win' ? `🎉 You win **${payout}** PULSE (net +${net}).`
-        : outcome === 'push' ? `🤝 Push — bet returned.`
-        : outcome === 'bust' ? `💥 Bust! You lose **${bet}** PULSE.`
-        : `❌ Dealer wins. You lose **${bet}** PULSE.`,
+      outcomeLine,
     ].join('\n');
 
     const embed = (outcome === 'win' || outcome === 'blackjack' ? successEmbed(desc) : outcome === 'push' ? pulseEmbed('🃏 Blackjack').setDescription(desc) : errorEmbed(desc)).setTitle('🃏 Blackjack');
@@ -150,8 +167,10 @@ export async function runBlackjack(interaction: ChatInputCommandInteraction | Mo
   }
 
   if (playerBJ || dealerBJ) {
+    const yourHandLbl = en ? 'Your hand' : 'Ta main';
+    const dealerLbl = en ? 'Dealer' : 'Croupier';
     await interaction.reply({
-      embeds: [pulseEmbed('🃏 Blackjack').setDescription(`**Your hand:** ${formatHand(player)} (**${handValue(player)}**)\n**Dealer:** ${formatHand(dealer)} (**${handValue(dealer)}**)`)],
+      embeds: [pulseEmbed('🃏 Blackjack').setDescription(`**${yourHandLbl}:** ${formatHand(player)} (**${handValue(player)}**)\n**${dealerLbl}:** ${formatHand(dealer)} (**${handValue(dealer)}**)`)],
     });
     if (playerBJ && !dealerBJ) await finish('blackjack', dealer);
     else if (!playerBJ && dealerBJ) await finish('lose', dealer);
@@ -159,15 +178,20 @@ export async function runBlackjack(interaction: ChatInputCommandInteraction | Mo
     return;
   }
 
-  const hitBtn = new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary);
-  const standBtn = new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Secondary);
+  const hitBtn = new ButtonBuilder().setCustomId('bj_hit').setLabel(en ? 'Hit' : 'Tirer').setStyle(ButtonStyle.Primary);
+  const standBtn = new ButtonBuilder().setCustomId('bj_stand').setLabel(en ? 'Stand' : 'Rester').setStyle(ButtonStyle.Secondary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(hitBtn, standBtn);
 
+  const betLbl = en ? 'Bet' : 'Mise';
+  const yourHandLbl = en ? 'Your hand' : 'Ta main';
+  const dealerShowsLbl = en ? 'Dealer shows' : 'Le croupier montre';
+  const turnFooter = en ? 'Hit to draw, Stand to end your turn.' : 'Tirer pour une carte, Rester pour finir ton tour.';
+
   const renderTurn = () => pulseEmbed('🃏 Blackjack').setDescription([
-    `**Bet:** ${bet} PULSE`,
-    `**Your hand:** ${formatHand(player)} (**${handValue(player)}**)`,
-    `**Dealer shows:** ${formatHand(dealer, true)}`,
-  ].join('\n')).setFooter({ text: 'Hit to draw, Stand to end your turn.' });
+    `**${betLbl}:** ${bet} PULSE`,
+    `**${yourHandLbl}:** ${formatHand(player)} (**${handValue(player)}**)`,
+    `**${dealerShowsLbl}:** ${formatHand(dealer, true)}`,
+  ].join('\n')).setFooter({ text: turnFooter });
 
   const reply = await interaction.reply({ embeds: [renderTurn()], components: [row], withResponse: true });
   const message = reply.resource?.message;

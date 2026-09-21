@@ -15,6 +15,7 @@ import {
   earnPulse,
 } from '../services/games.js';
 import { pulseEmbed, errorEmbed, successEmbed } from '../utils/embeds.js';
+import { getUserLocale } from '../i18n.js';
 
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
@@ -72,8 +73,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const locale = await getUserLocale(interaction.user.id);
+  const en = locale === 'en';
+
   if (!isGameEnabled('roulette')) {
-    await interaction.reply({ embeds: [errorEmbed('Roulette is currently disabled.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en ? 'Roulette is currently disabled.' : 'La roulette est désactivée pour l\'instant.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -85,31 +89,45 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const betNumber = interaction.options.getInteger('number');
 
   if (bet < cfg.min_bet || bet > cfg.max_bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Bet must be between ${cfg.min_bet} and ${cfg.max_bet} PULSE.`
+      : `La mise doit être entre ${cfg.min_bet} et ${cfg.max_bet} PULSE.`)], flags: MessageFlags.Ephemeral });
     return;
   }
   if (betType === 'number' && betNumber === null) {
-    await interaction.reply({ embeds: [errorEmbed('Provide a `number` (0-36) when betting on a single number.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? 'Provide a `number` (0-36) when betting on a single number.'
+      : 'Fournis un `number` (0-36) quand tu paries sur un numéro plein.')], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const bal = await getBalance(interaction.user.id);
   if (!bal || bal.balance < bet) {
-    await interaction.reply({ embeds: [errorEmbed(`Insufficient PULSE. You have ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(en
+      ? `Not enough PULSE. You have ${bal?.balance ?? 0}.`
+      : `Pas assez de PULSE. Tu as ${bal?.balance ?? 0}.`)], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const spend = await spendPulse(interaction.user.id, bet, 'roulette_bet');
   if (!spend.success) {
-    await interaction.reply({ embeds: [errorEmbed(spend.error ?? 'Failed to place bet.')], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [errorEmbed(spend.error ?? (en ? 'Failed to place bet.' : 'Échec de la mise.'))], flags: MessageFlags.Ephemeral });
     return;
   }
 
   const sessionId = await createGameSession('roulette', interaction.channelId, { bet, betType, betNumber });
   if (sessionId) await addGamePlayer(sessionId, interaction.user.id, bet);
 
+  // Localized short label for the bet type — kept for the "Bet on …" line
+  // and reused in both the intro and result embeds.
+  const typeLabel = en
+    ? { red: 'Red', black: 'Black', even: 'Even', odd: 'Odd', low: 'Low (1-18)', high: 'High (19-36)', number: `Number ${betNumber}` }[betType]
+    : { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: 'Bas (1-18)', high: 'Haut (19-36)', number: `Numéro ${betNumber}` }[betType];
+  const betLabel = en ? 'Bet' : 'Mise';
+  const spinningLine = en ? '*The wheel spins…*' : '*La roue tourne…*';
+
   await interaction.reply({
-    embeds: [pulseEmbed('🎡 Roulette').setDescription(`**Bet:** ${bet} PULSE on **${betType}${betType === 'number' ? ` ${betNumber}` : ''}**\n\n*The wheel spins…*`)],
+    embeds: [pulseEmbed('🎡 Roulette').setDescription(`**${betLabel}:** ${bet} PULSE — **${typeLabel}**\n\n${spinningLine}`)],
   });
 
   await new Promise(r => setTimeout(r, 1500));
@@ -128,10 +146,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await saveGameResult(sessionId, { spin, color: colorOf(spin), betType, betNumber, payout });
   }
 
-  const colorEmoji = colorOf(spin) === 'red' ? '🔴' : colorOf(spin) === 'black' ? '⚫' : '🟢';
+  const c = colorOf(spin);
+  const colorEmoji = c === 'red' ? '🔴' : c === 'black' ? '⚫' : '🟢';
+  const colorLabel = en
+    ? { red: 'red', black: 'black', green: 'green' }[c]
+    : { red: 'rouge', black: 'noir', green: 'vert' }[c];
   const result = won
-    ? successEmbed(`${colorEmoji} **${spin}** (${colorOf(spin)})\n\n🎉 You win **${payout}** PULSE!`).setTitle('🎡 Roulette')
-    : errorEmbed(`${colorEmoji} **${spin}** (${colorOf(spin)})\n\nYou lose **${bet}** PULSE.`).setTitle('🎡 Roulette');
+    ? successEmbed(en
+        ? `${colorEmoji} **${spin}** (${colorLabel})\n\n🎉 You win **${payout}** PULSE!`
+        : `${colorEmoji} **${spin}** (${colorLabel})\n\n🎉 Tu gagnes **${payout}** PULSE !`).setTitle('🎡 Roulette')
+    : errorEmbed(en
+        ? `${colorEmoji} **${spin}** (${colorLabel})\n\nYou lose **${bet}** PULSE.`
+        : `${colorEmoji} **${spin}** (${colorLabel})\n\nTu perds **${bet}** PULSE.`).setTitle('🎡 Roulette');
 
   await interaction.editReply({ embeds: [result] });
 }
