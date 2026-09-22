@@ -75,19 +75,19 @@ export default async function AppHub() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         {tiles.map(tile => (
           <Link
             key={tile.href}
             href={tile.href}
-            className="group relative bg-pulse-card border border-pulse-border rounded-xl overflow-hidden active:scale-[0.97] transition-transform hover:border-pulse-gold/50"
+            className="group relative bg-pulse-card border border-pulse-border rounded-2xl overflow-hidden active:scale-[0.98] transition-all hover:border-pulse-gold/50"
           >
             <div className="absolute inset-0 bg-card-glow opacity-50 pointer-events-none" />
-            <div className="relative flex items-center gap-3 p-3">
-              <div className="text-2xl leading-none shrink-0">{tile.emoji}</div>
+            <div className="relative flex items-center gap-3 p-4">
+              <div className="text-4xl leading-none shrink-0">{tile.emoji}</div>
               <div className="min-w-0 flex-1">
                 <div className="font-bold text-sm truncate">{tile.title}</div>
-                <div className="text-[10px] text-pulse-mute truncate">{tile.hint}</div>
+                <div className="text-[11px] text-pulse-mute truncate">{tile.hint}</div>
               </div>
             </div>
           </Link>

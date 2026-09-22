@@ -23,6 +23,16 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
   const [buying, setBuying] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ item: string; ok: boolean; text: string } | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
+  // Track which categories are expanded. Default: all collapsed except the
+  // active filter's category. Uses a Set of category keys.
+  const [expanded, setExpanded] = useState<Set<ShopCategory>>(new Set());
+  const toggleCategory = (c: ShopCategory) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c); else next.add(c);
+      return next;
+    });
+  };
 
   const catLabel = (c: ShopCategory): string => {
     const dict = translations[locale].shop.cat as Record<string, string>;
@@ -130,18 +140,23 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
         .filter(([, list]) => list.length > 0)
         .map(([cat, list]) => {
         const meta = CATEGORY_META[cat];
+        const isOpen = expanded.has(cat);
         return (
-          <section key={cat} className="mb-6">
-            {/* Category banner — distinct colored strip with emoji + name + count.
-                Sticky under the top bar so members always see which section
-                they're browsing while they scroll. */}
-            <div className={`sticky top-16 z-10 -mx-4 px-4 py-2 mb-3 bg-gradient-to-r ${meta.tint} backdrop-blur border-y border-current/10`}>
-              <div className="flex items-center gap-2">
-                <span className="text-xl leading-none">{meta.emoji}</span>
-                <span className="font-black uppercase tracking-widest text-sm">{catLabel(cat)}</span>
-                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-black/40 border border-current/20 font-mono">{list.length}</span>
-              </div>
-            </div>
+          <section key={cat} className="mb-3">
+            {/* Accordion header — click to expand/collapse the category's items.
+                Chevron on the right shows the state. */}
+            <button
+              type="button"
+              onClick={() => toggleCategory(cat)}
+              className={`w-full flex items-center gap-2 rounded-xl bg-gradient-to-r ${meta.tint} border px-3 py-3 mb-2`}
+              aria-expanded={isOpen}
+            >
+              <span className="text-xl leading-none">{meta.emoji}</span>
+              <span className="font-black uppercase tracking-widest text-sm">{catLabel(cat)}</span>
+              <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-black/40 border border-current/20 font-mono">{list.length}</span>
+              <span className={`text-lg leading-none transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+            </button>
+            {!isOpen ? null : (
             <div className="space-y-2">
               {list.map(item => {
                 const stock = item.stock_remaining;
@@ -202,6 +217,7 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
                 );
               })}
             </div>
+            )}
           </section>
         );
       })}
