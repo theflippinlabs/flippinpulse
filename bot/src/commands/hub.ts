@@ -285,13 +285,15 @@ async function renderLottery(interaction: Interaction, discordId: string): Promi
 async function renderLeaderboard(interaction: Interaction, sortBy: 'total' | 'week' | 'month' = 'total'): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
   const fr = await localeIsFR(interaction.user.id);
   const col = sortBy === 'week' ? 'points_week' : sortBy === 'month' ? 'points_month' : 'points_total';
-  const { data: top } = await supabase
-    .from('discord_users').select(`username, ${col}, balance_pulse, rank_name`)
-    .order(col, { ascending: false }).limit(10);
+  const lordIds = new Set((process.env.DASHBOARD_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean));
+  const { data: topRaw } = await supabase
+    .from('discord_users').select(`discord_id, username, ${col}, balance_pulse, rank_name`)
+    .order(col, { ascending: false }).limit(20);
+  const top = (topRaw ?? []).filter((u: unknown) => !lordIds.has((u as { discord_id: string }).discord_id)).slice(0, 10);
   const medals = ['🥇', '🥈', '🥉'];
-  const rows = (top ?? []).map((u, i) => {
+  const rows = top.map((u, i) => {
     const pts = (u as Record<string, unknown>)[col] as number ?? 0;
-    return `${medals[i] ?? `${i + 1}.`} **${u.username}** — ${pts} pts · ${u.balance_pulse ?? 0} PULSE`;
+    return `${medals[i] ?? `${i + 1}.`} **${(u as { username: string }).username}** — ${pts} pts · ${(u as { balance_pulse?: number }).balance_pulse ?? 0} PULSE`;
   });
   const desc = rows.length ? rows.join('\n') : (fr ? 'Personne au classement encore.' : 'Nobody on the board yet.');
   const title = sortBy === 'week' ? (fr ? '🏆 Top de la semaine' : '🏆 Top of the week')

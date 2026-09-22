@@ -26,13 +26,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                    : period === 'month'  ? (en ? 'Monthly'  : 'Mois')
                    :                       (en ? 'All Time' : 'Total');
 
-  const { data: users } = await supabase
+  // Fetch more than we need so we can filter out Lords (staff/admins) and
+  // still land on a top-10 list of members. Lords keep playing but they
+  // don't compete on the podium.
+  const lordIds = new Set((process.env.DASHBOARD_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean));
+  const { data: usersRaw } = await supabase
     .from('discord_users')
     .select('discord_id, username, rank_name, points_total, points_week, points_month')
     .order(column, { ascending: false })
-    .limit(10);
+    .limit(20);
+  const users = (usersRaw ?? []).filter(u => !lordIds.has(u.discord_id as string)).slice(0, 10);
 
-  if (!users?.length) {
+  if (!users.length) {
     await interaction.reply({ content: en ? 'No users found yet!' : 'Aucun membre pour l\'instant !', ephemeral: true });
     return;
   }

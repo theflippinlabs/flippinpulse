@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { getSession } from '@/lib/auth';
+import { getSession, isAdmin } from '@/lib/auth';
 import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -15,13 +15,17 @@ interface Row {
   avatar_url: string | null;
 }
 
+// Lords are excluded from the classement entirely — they can still play and
+// earn PULSE, but they don't compete with the members they moderate.
 async function load(): Promise<Row[]> {
   const { data } = await supabase
     .from('discord_users')
     .select('discord_id, username, balance_pulse, points_total, points_week, rank_name, avatar_url')
     .order('points_total', { ascending: false })
-    .limit(50);
-  return (data ?? []) as Row[];
+    .limit(60);
+  return ((data ?? []) as Row[])
+    .filter(r => !isAdmin(r.discord_id))
+    .slice(0, 50);
 }
 
 const MEDAL: Record<number, string> = { 0: '🥇', 1: '🥈', 2: '🥉' };
