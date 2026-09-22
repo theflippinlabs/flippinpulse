@@ -35,18 +35,16 @@ export default async function AppHub() {
   const locale = t('nav.home') === 'Home' ? 'en' : 'fr';
   const fr = locale === 'fr';
 
+  // Play / Shop / Leaderboard / Novus already live in the bottom nav, so keep
+  // the home tiles for content that is NOT reachable from that nav.
   const tiles: Tile[] = [
-    { href: '/app/play',        emoji: '🎮', title: t('home.tiles.play.title'),        hint: t('home.tiles.play.hint') },
     { href: '/app/battlepass',  emoji: '🎫', title: fr ? 'Battle Pass'   : 'Battle Pass', hint: fr ? 'Saison en cours'   : 'Current season' },
     { href: '/app/pet',         emoji: '🐾', title: fr ? 'Compagnon'     : 'Pet',         hint: fr ? 'Nourris, entraîne' : 'Feed, train'      },
     { href: '/app/cards',       emoji: '🎴', title: fr ? 'Cartes'        : 'Cards',       hint: fr ? 'Collection & packs': 'Collection & packs' },
     { href: '/app/compagnon',   emoji: '💫', title: fr ? 'Compagnon IA'  : 'AI Companion',hint: fr ? 'Ton IA perso'      : 'Your personal AI'  },
-    { href: '/app/shop',        emoji: '🛍️', title: t('home.tiles.shop.title'),        hint: t('home.tiles.shop.hint') },
     { href: '/app/tournaments', emoji: '🏟️', title: t('home.tiles.tournaments.title'), hint: `${s.activeTournois} ${t('home.tiles.tournaments.hint_active')}` },
     { href: '/app/lottery',     emoji: '🎰', title: t('home.tiles.lottery.title'),     hint: `${fmt(s.lotteryPot)} ${t('home.tiles.lottery.hint_pot')}` },
     { href: '/app/missions',    emoji: '🎯', title: t('home.tiles.missions.title'),    hint: `${s.activeMissions} ${t('home.tiles.missions.hint_active')}` },
-    { href: '/app/leaderboard', emoji: '🏆', title: t('home.tiles.leaderboard.title'), hint: t('home.tiles.leaderboard.hint') },
-    { href: '/app/novus',       emoji: '🧠', title: t('home.tiles.novus.title'),       hint: t('home.tiles.novus.hint') },
     { href: '/app/giveaways',   emoji: '🎉', title: t('home.tiles.giveaways.title'),   hint: `${s.activeGiveaways} ${t('home.tiles.giveaways.hint_active')}` },
   ];
 
@@ -77,18 +75,20 @@ export default async function AppHub() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2">
         {tiles.map(tile => (
           <Link
             key={tile.href}
             href={tile.href}
-            className="group relative aspect-square bg-pulse-card border border-pulse-border rounded-2xl overflow-hidden active:scale-[0.97] transition-transform hover:border-pulse-gold/50"
+            className="group relative bg-pulse-card border border-pulse-border rounded-xl overflow-hidden active:scale-[0.97] transition-transform hover:border-pulse-gold/50"
           >
-            <div className="absolute inset-0 bg-card-glow opacity-60 pointer-events-none" />
-            <div className="relative h-full flex flex-col items-center justify-center p-3 text-center">
-              <div className="text-4xl leading-none mb-2">{tile.emoji}</div>
-              <div className="font-bold text-sm">{tile.title}</div>
-              <div className="text-[11px] text-pulse-mute mt-0.5 line-clamp-1">{tile.hint}</div>
+            <div className="absolute inset-0 bg-card-glow opacity-50 pointer-events-none" />
+            <div className="relative flex items-center gap-3 p-3">
+              <div className="text-2xl leading-none shrink-0">{tile.emoji}</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-sm truncate">{tile.title}</div>
+                <div className="text-[10px] text-pulse-mute truncate">{tile.hint}</div>
+              </div>
             </div>
           </Link>
         ))}

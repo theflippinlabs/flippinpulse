@@ -34,6 +34,8 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
     [items, filter],
   );
 
+  // Group by category, and sort items within each group by ascending price.
+  // Cheap items surface first so members can find affordable choices quickly.
   const grouped = useMemo(() => {
     const m = new Map<ShopCategory, ShopItem[]>();
     for (const i of visible) {
@@ -41,8 +43,12 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
       arr.push(i);
       m.set(i.category, arr);
     }
+    for (const [, arr] of m) arr.sort((a, b) => a.price_pulse - b.price_pulse);
     return m;
   }, [visible]);
+
+  // Fixed category order so the layout doesn't shift as items change.
+  const CATEGORY_ORDER: ShopCategory[] = ['role', 'perk', 'ticket', 'cosmetic', 'irl'];
 
   const buy = async (item: ShopItem) => {
     if (buying) return;
@@ -119,15 +125,22 @@ export default function ShopClient({ items, initialBalance }: { items: ShopItem[
         </div>
       )}
 
-      {Array.from(grouped.entries()).map(([cat, list]) => {
+      {CATEGORY_ORDER
+        .map(cat => [cat, grouped.get(cat) ?? []] as const)
+        .filter(([, list]) => list.length > 0)
+        .map(([cat, list]) => {
         const meta = CATEGORY_META[cat];
         return (
-          <section key={cat} className="mb-5">
-            <div className="text-xs uppercase tracking-wide text-pulse-mute mb-2 flex items-center gap-2">
-              <span className="text-base">{meta.emoji}</span>
-              <span className="font-semibold">{catLabel(cat)}</span>
-              <span className="text-pulse-border">·</span>
-              <span>{list.length}</span>
+          <section key={cat} className="mb-6">
+            {/* Category banner — distinct colored strip with emoji + name + count.
+                Sticky under the top bar so members always see which section
+                they're browsing while they scroll. */}
+            <div className={`sticky top-16 z-10 -mx-4 px-4 py-2 mb-3 bg-gradient-to-r ${meta.tint} backdrop-blur border-y border-current/10`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl leading-none">{meta.emoji}</span>
+                <span className="font-black uppercase tracking-widest text-sm">{catLabel(cat)}</span>
+                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-black/40 border border-current/20 font-mono">{list.length}</span>
+              </div>
             </div>
             <div className="space-y-2">
               {list.map(item => {
