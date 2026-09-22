@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { SPECIES, type Pet, type SpeciesKey } from '@/lib/petsShared';
 import PetShowcase from './PetShowcase';
+import ChallengeDialog from '../ChallengeDialog';
 
 type BurstKind = 'feed' | 'play' | 'train' | 'level' | null;
 
@@ -13,6 +14,8 @@ interface Props {
   pet: Pet | null;
   species: typeof SPECIES;
   battles: { id: number; winner_pet_id: number | null; pulse_wagered: number; created_at: string }[];
+  channels: { channel_id: string; name: string }[];
+  defaultChannel: string;
 }
 
 const STAT_STYLE: Record<string, { color: string; emoji: string; labelFr: string; labelEn: string }> = {
@@ -37,12 +40,13 @@ function Bar({ value, statKey, fr }: { value: number; statKey: keyof typeof STAT
   );
 }
 
-export default function PetClient({ fr, pet, species, battles }: Props) {
+export default function PetClient({ fr, pet, species, battles, channels, defaultChannel }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [burst, setBurst] = useState<BurstKind>(null);
+  const [challengeOpen, setChallengeOpen] = useState(false);
 
   const [pickedSpecies, setPickedSpecies] = useState<SpeciesKey>(species[0].key);
   const [petName, setPetName] = useState('');
@@ -164,6 +168,10 @@ export default function PetClient({ fr, pet, species, battles }: Props) {
             <button onClick={() => callAction('train')} disabled={isPending} className="rounded-xl bg-purple-500/20 border border-purple-500/40 py-3 font-semibold disabled:opacity-60">🥋 {fr ? 'Entraîner (15)' : 'Train (15)'}</button>
           </div>
 
+          <button onClick={() => setChallengeOpen(true)} disabled={isPending} className="w-full rounded-xl bg-red-500/20 border border-red-500/40 text-red-100 py-2 text-sm disabled:opacity-60 mb-2 font-semibold">
+            ⚔️ {fr ? 'Défier un adversaire' : 'Challenge an opponent'}
+          </button>
+
           <button onClick={retire} disabled={isPending} className="w-full rounded-xl bg-pulse-card border border-pulse-border py-2 text-sm text-pulse-mute disabled:opacity-60 mb-6">
             {fr ? 'Retraite (+25 PULSE)' : 'Retire (+25 PULSE)'}
           </button>
@@ -187,6 +195,25 @@ export default function PetClient({ fr, pet, species, battles }: Props) {
           )}
         </>
       )}
+
+      <ChallengeDialog
+        open={challengeOpen}
+        onClose={() => setChallengeOpen(false)}
+        title={fr ? 'Défier un compagnon' : 'Challenge a pet'}
+        fr={fr}
+        channels={channels}
+        defaultChannel={defaultChannel}
+        onSubmit={async ({ opponentId, wager, channelId, opponentName }) => {
+          setError(null); setFlash(null);
+          const res = await fetch('/api/pet/challenge', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ opponentId, wager, channelId }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? 'error');
+          setFlash(fr ? `⚔️ Défi envoyé à ${opponentName}. Il apparaît sur Discord.` : `⚔️ Challenge sent to ${opponentName}. Check Discord.`);
+        }}
+      />
     </>
   );
 }

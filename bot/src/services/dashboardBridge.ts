@@ -309,6 +309,44 @@ async function handleBulkDrop(client: Client, cmd: DashboardCommand): Promise<vo
   await channel.send({ content: mentions, embeds: [embed] }).catch(() => null);
 }
 
+async function handlePetChallenge(client: Client, cmd: DashboardCommand): Promise<void> {
+  const p = cmd.payload_json as { challenger_id: string; opponent_id: string; wager: number; channel_id: string };
+  const { openChallenge } = await import('./pets.js');
+  const res = await openChallenge(p.challenger_id, 'web', p.opponent_id, p.wager, false);
+  if (!res.ok || !res.challengeId || !res.challenger) throw new Error(res.error ?? 'open_failed');
+  const channel = await client.channels.fetch(p.channel_id).catch(() => null);
+  if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) throw new Error('channel_not_sendable');
+  const embed = new EmbedBuilder()
+    .setColor(0xF5B62E)
+    .setTitle('⚔️ Défi entre compagnons !')
+    .setDescription(`<@${p.opponent_id}> tu es défié·e par ${res.challenger.emoji} **${res.challenger.name}** (Lv.${res.challenger.level}) de <@${p.challenger_id}> !\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Le défi expire dans 3 min._`);
+  const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`petpvp:accept:${res.challengeId}`).setLabel('Accepter').setEmoji('⚔️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`petpvp:decline:${res.challengeId}`).setLabel('Refuser').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
+  );
+  await (channel as TextChannel).send({ embeds: [embed], components: [row], allowedMentions: { users: [p.opponent_id] } });
+}
+
+async function handleCardChallenge(client: Client, cmd: DashboardCommand): Promise<void> {
+  const p = cmd.payload_json as { challenger_id: string; opponent_id: string; card_code: string; wager: number; channel_id: string };
+  const { openCardChallenge, RARITY_STYLE } = await import('./tcg.js');
+  const res = await openCardChallenge(p.challenger_id, 'web', p.opponent_id, p.card_code, p.wager);
+  if (!res.ok || !res.challengeId || !res.challengerCard) throw new Error(res.error ?? 'open_failed');
+  const cc = res.challengerCard;
+  const rst = RARITY_STYLE[cc.rarity];
+  const channel = await client.channels.fetch(p.channel_id).catch(() => null);
+  if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) throw new Error('channel_not_sendable');
+  const embed = new EmbedBuilder()
+    .setColor(0xF5B62E)
+    .setTitle('🎴 Duel de cartes !')
+    .setDescription(`<@${p.opponent_id}> tu es défié·e par <@${p.challenger_id}> !\n\nSa carte : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_\n⚔️ ATK ${cc.attack} · 🛡️ DEF ${cc.defense} · 💨 SPD ${cc.speed}\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ta carte champion. Expire dans 3 min._`);
+  const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`tcgpvp:accept:${res.challengeId}`).setLabel('Accepter').setEmoji('⚔️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`tcgpvp:decline:${res.challengeId}`).setLabel('Refuser').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
+  );
+  await (channel as TextChannel).send({ embeds: [embed], components: [row], allowedMentions: { users: [p.opponent_id] } });
+}
+
 async function processOne(client: Client, cmd: DashboardCommand): Promise<void> {
   try {
     if (cmd.command === 'announce') await handleAnnounce(client, cmd);
@@ -325,6 +363,8 @@ async function processOne(client: Client, cmd: DashboardCommand): Promise<void> 
     }
     else if (cmd.command === 'create_giveaway') await handleCreateGiveaway(client, cmd);
     else if (cmd.command === 'bulk_drop') await handleBulkDrop(client, cmd);
+    else if (cmd.command === 'pet_challenge') await handlePetChallenge(client, cmd);
+    else if (cmd.command === 'card_challenge') await handleCardChallenge(client, cmd);
     else throw new Error(`Unknown command: ${cmd.command}`);
     await markDone(cmd.id);
     log('INFO', `Dashboard cmd ${cmd.command} ${cmd.id} done`);

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { NEXT_RARITY, RARITY_STYLE, SELL_VALUE, rarityOrder, type Card, type Rarity } from '@/lib/tcgShared';
+import ChallengeDialog from '../ChallengeDialog';
 
 interface Props {
   fr: boolean;
@@ -11,6 +12,8 @@ interface Props {
   ownedRaw: { id: number; quantity: number }[];
   balance: number;
   packCost: number;
+  channels: { channel_id: string; name: string }[];
+  defaultChannel: string;
 }
 
 const RARITY_FILTERS: (Rarity | 'all')[] = ['all', 'common', 'rare', 'epic', 'legendary', 'mythic'];
@@ -37,7 +40,7 @@ function CardTile({ card, quantity, revealed = true, fr }: { card: Card; quantit
   );
 }
 
-export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBalance, packCost }: Props) {
+export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBalance, packCost, channels, defaultChannel }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<'all' | Rarity>('all');
@@ -47,6 +50,7 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
   const [balance, setBalance] = useState(initialBalance);
   const [error, setError] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [challengeOpen, setChallengeOpen] = useState(false);
   const [fuseMode, setFuseMode] = useState(false);
   const [fuseSelection, setFuseSelection] = useState<number[]>([]);
   const [fuseResult, setFuseResult] = useState<Card | null>(null);
@@ -154,23 +158,28 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-3 gap-2 mb-4">
         <button
           onClick={open}
           disabled={isPending || balance < packCost || fuseMode}
-          className="rounded-2xl bg-gradient-to-r from-pulse-gold to-yellow-300 text-black font-black py-4 shadow-[0_0_20px_rgba(245,182,46,.4)] disabled:opacity-60"
+          className="rounded-2xl bg-gradient-to-r from-pulse-gold to-yellow-300 text-black font-black py-3 shadow-[0_0_18px_rgba(245,182,46,.4)] disabled:opacity-60"
         >
           {fr ? `🎁 Booster` : `🎁 Pack`}
-          <div className="text-[10px] font-bold opacity-80 mt-0.5">{packCost} PULSE</div>
+          <div className="text-[9px] font-bold opacity-80 mt-0.5">{packCost}</div>
         </button>
         <button
           onClick={() => { setFuseMode(v => !v); setFuseSelection([]); setFuseResult(null); }}
-          className={`rounded-2xl font-black py-4 border-2 ${fuseMode ? 'bg-purple-500 text-white border-purple-400' : 'bg-purple-500/10 text-purple-200 border-purple-500/40'}`}
+          className={`rounded-2xl font-black py-3 border-2 ${fuseMode ? 'bg-purple-500 text-white border-purple-400' : 'bg-purple-500/10 text-purple-200 border-purple-500/40'}`}
         >
           {fr ? '🔀 Fusion' : '🔀 Fuse'}
-          <div className="text-[10px] font-bold opacity-80 mt-0.5">
-            {fuseMode ? (fr ? 'Choisis 3 cartes' : 'Pick 3 cards') : (fr ? '3 cartes → +1 rareté' : '3 cards → next rarity')}
-          </div>
+          <div className="text-[9px] font-bold opacity-80 mt-0.5">{fuseMode ? '0/3' : '3→+1'}</div>
+        </button>
+        <button
+          onClick={() => setChallengeOpen(true)}
+          className="rounded-2xl font-black py-3 border-2 bg-red-500/10 text-red-100 border-red-500/40"
+        >
+          {fr ? '⚔️ Défier' : '⚔️ Duel'}
+          <div className="text-[9px] font-bold opacity-80 mt-0.5">{fr ? 'pot ×2' : 'pot ×2'}</div>
         </button>
       </div>
 
@@ -417,6 +426,27 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
           </div>
         </div>
       )}
+
+      <ChallengeDialog
+        open={challengeOpen}
+        onClose={() => setChallengeOpen(false)}
+        title={fr ? 'Duel de cartes' : 'Card duel'}
+        fr={fr}
+        channels={channels}
+        defaultChannel={defaultChannel}
+        extraLabel={fr ? 'Code de ta carte' : 'Your card code'}
+        extraPlaceholder="l_solar_phoenix"
+        onSubmit={async ({ opponentId, wager, channelId, extra, opponentName }) => {
+          setError(null); setFlash(null);
+          const res = await fetch('/api/cards/challenge', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ opponentId, wager, channelId, cardCode: extra }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? 'error');
+          setFlash(fr ? `⚔️ Défi envoyé à ${opponentName}. Il apparaît sur Discord.` : `⚔️ Challenge sent to ${opponentName}. Check Discord.`);
+        }}
+      />
     </>
   );
 }
