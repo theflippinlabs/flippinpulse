@@ -1,7 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MAX_EQUIPMENT_SLOTS, RARITY_STYLE, effectiveStats, rarityOrder, type Card } from '@/lib/tcgShared';
+import {
+  EQUIPMENT_SLOTS,
+  MAX_EQUIPMENT_SLOTS,
+  RARITY_STYLE,
+  SLOT_LABEL,
+  effectiveStats,
+  rarityOrder,
+  scaledBonuses,
+  type Card,
+  type EquipmentSlot,
+  type EquippedItem,
+} from '@/lib/tcgShared';
 
 interface Member { discord_id: string; username: string; avatar_url: string | null; }
 
@@ -14,18 +25,19 @@ interface Props {
     wager: number;
     channelId: string;
     characterCardId: number;
-    equipmentCardIds: number[];
+    equipment: { cardId: number; level: number }[];
   }) => Promise<void> | void;
   fr: boolean;
   channels: { channel_id: string; name: string }[];
   defaultChannel: string;
   catalog: Card[];
-  ownedRaw: { id: number; quantity: number }[];
+  // (cardId → (level → quantity))
+  ownedLevels: Map<number, Map<number, number>>;
   maxWager?: number;
 }
 
 export default function CardDuelDialog({
-  open, onClose, onSubmit, fr, channels, defaultChannel, catalog, ownedRaw, maxWager = 10_000,
+  open, onClose, onSubmit, fr, channels, defaultChannel, catalog, ownedLevels, maxWager = 10_000,
 }: Props) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Member[]>([]);
@@ -33,15 +45,16 @@ export default function CardDuelDialog({
   const [wager, setWager] = useState(0);
   const [channelId, setChannelId] = useState(defaultChannel);
   const [character, setCharacter] = useState<Card | null>(null);
-  const [equipment, setEquipment] = useState<Card[]>([]);
+  const [loadout, setLoadout] = useState<Map<EquipmentSlot, EquippedItem>>(new Map());
+  const [activeSlot, setActiveSlot] = useState<EquipmentSlot>('weapon');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setQ(''); setResults([]); setPicked(null); setWager(0);
-      setChannelId(defaultChannel); setCharacter(null); setEquipment([]);
-      setError(null);
+      setChannelId(defaultChannel); setCharacter(null); setLoadout(new Map());
+      setActiveSlot('weapon'); setError(null);
     }
   }, [open, defaultChannel]);
 
@@ -56,28 +69,45 @@ export default function CardDuelDialog({
     return () => clearTimeout(h);
   }, [q, open]);
 
-  // Split the collection into characters + equipment the member actually owns.
-  const ownedIds = useMemo(() => new Set(ownedRaw.filter(r => r.quantity > 0).map(r => r.id)), [ownedRaw]);
-  const ownedCharacters = useMemo(
-    () => catalog
-      .filter(c => c.card_kind === 'character' && ownedIds.has(c.id))
-      .sort((a, b) => rarityOrder(b.rarity) - rarityOrder(a.rarity) || a.name.localeCompare(b.name)),
-    [catalog, ownedIds],
-  );
-  const ownedEquipment = useMemo(
-    () => catalog
-      .filter(c => c.card_kind === 'equipment' && ownedIds.has(c.id))
-      .sort((a, b) => rarityOrder(b.rarity) - rarityOrder(a.rarity) || a.name.localeCompare(b.name)),
-    [catalog, ownedIds],
-  );
+  const ownedCharacters = useMemo(() => {
+    return catalog
+      .filter(c => c.card_kind === 'character' && (ownedLevels.get(c.id)?.get(1) ?? 0) > 0)
+      .sort((a, b) => rarityOrder(b.rarity) - rarityOrder(a.rarity) || a.name.localeCompare(b.name));
+  }, [catalog, ownedLevels]);
 
-  const preview = character ? effectiveStats(character, equipment) : null;
+  const equipmentBySlot = useMemo(() => {
+    const map = new Map<EquipmentSlot, { card: Card; level: number; quantity: number }[]>();
+    for (const slot of EQUIPMENT_SLOTS) map.set(slot, []);
+    for (const c of catalog) {
+      if (c.card_kind !== 'equipment' || !c.equipment_slot) continue;
+      const levels = ownedLevels.get(c.id);
+      if (!levels) continue;
+      for (const [level, quantity] of levels) {
+        if (quantity > 0) {
+          map.get(c.equipment_slot)!.push({ card: c, level, quantity });
+        }
+      }
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => rarityOrder(b.card.rarity) - rarityOrder(a.card.rarity) || b.level - a.level || a.card.name.localeCompare(b.card.name));
+    }
+    return map;
+  }, [catalog, ownedLevels]);
 
-  function toggleEquipment(card: Card) {
-    setEquipment(prev => {
-      if (prev.some(e => e.id === card.id)) return prev.filter(e => e.id !== card.id);
-      if (prev.length >= MAX_EQUIPMENT_SLOTS) return prev;
-      return [...prev, card];
+  const equipmentArray = useMemo(() => Array.from(loadout.values()), [loadout]);
+  const preview = character ? effectiveStats(character, equipmentArray) : null;
+
+  function toggleEquipment(card: Card, level: number) {
+    if (!card.equipment_slot) return;
+    setLoadout(prev => {
+      const next = new Map(prev);
+      const cur = next.get(card.equipment_slot!);
+      if (cur && cur.card.id === card.id && cur.level === level) {
+        next.delete(card.equipment_slot!);
+      } else {
+        next.set(card.equipment_slot!, { card, level });
+      }
+      return next;
     });
   }
 
@@ -93,7 +123,7 @@ export default function CardDuelDialog({
         wager,
         channelId,
         characterCardId: character.id,
-        equipmentCardIds: equipment.map(e => e.id),
+        equipment: equipmentArray.map(e => ({ cardId: e.card.id, level: e.level })),
       });
       onClose();
     } catch (e) {
@@ -104,6 +134,9 @@ export default function CardDuelDialog({
   }
 
   if (!open) return null;
+
+  const activeSlotEquipment = equipmentBySlot.get(activeSlot) ?? [];
+  const equippedInActiveSlot = loadout.get(activeSlot);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={onClose}>
@@ -165,11 +198,11 @@ export default function CardDuelDialog({
           {ownedCharacters.length === 0 ? (
             <div className="mt-1 rounded-lg bg-red-500/10 border border-red-500/40 p-3 text-xs text-red-100">
               {fr
-                ? 'Tu ne possèdes aucun personnage. Ouvre un booster pour en tirer.'
-                : 'You do not own any character card yet. Open a pack to draw one.'}
+                ? 'Tu ne possèdes aucun personnage. Ouvre un booster.'
+                : 'You do not own any character yet. Open a pack.'}
             </div>
           ) : (
-            <div className="mt-1 grid grid-cols-4 gap-2 max-h-56 overflow-y-auto p-1">
+            <div className="mt-1 grid grid-cols-4 gap-2 max-h-52 overflow-y-auto p-1">
               {ownedCharacters.map(c => {
                 const st = RARITY_STYLE[c.rarity];
                 const isPicked = character?.id === c.id;
@@ -198,64 +231,74 @@ export default function CardDuelDialog({
           )}
         </div>
 
-        {/* Equipment slots */}
+        {/* Equipment slots — one row of slot tabs, then the roster for the active slot */}
         <div className="mb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <label className="text-xs text-pulse-mute uppercase tracking-wider">
               {fr ? 'Équipement' : 'Equipment'}{' '}
-              <span className="text-pulse-mute/70">({equipment.length}/{MAX_EQUIPMENT_SLOTS})</span>
+              <span className="text-pulse-mute/70">({loadout.size}/{MAX_EQUIPMENT_SLOTS})</span>
             </label>
-            {!character && (
-              <span className="text-[10px] text-pulse-mute">{fr ? 'Choisis un personnage d\'abord' : 'Pick a character first'}</span>
-            )}
           </div>
-          <div className="mt-1 grid grid-cols-3 gap-2">
-            {[0, 1, 2].map(i => {
-              const e = equipment[i];
-              if (!e) {
-                return (
-                  <div
-                    key={i}
-                    className="h-14 rounded-lg border border-dashed border-pulse-border flex items-center justify-center text-pulse-mute text-xs"
-                  >
-                    {fr ? 'Vide' : 'Empty'}
-                  </div>
-                );
-              }
+
+          <div className="grid grid-cols-6 gap-1 mb-2">
+            {EQUIPMENT_SLOTS.map(slot => {
+              const equipped = loadout.get(slot);
+              const isActive = activeSlot === slot;
+              const label = SLOT_LABEL[slot];
               return (
                 <button
-                  key={i}
-                  onClick={() => toggleEquipment(e)}
-                  className="h-14 rounded-lg bg-black/40 border border-pulse-gold/40 flex flex-col items-center justify-center gap-0.5"
+                  key={slot}
+                  onClick={() => setActiveSlot(slot)}
+                  className={`h-14 rounded-lg border flex flex-col items-center justify-center gap-0.5 ${
+                    isActive ? 'border-pulse-gold bg-pulse-gold/10' :
+                    equipped ? 'border-emerald-500/40 bg-emerald-500/5' :
+                    'border-pulse-border bg-pulse-card'
+                  }`}
+                  title={label[fr ? 'fr' : 'en']}
                 >
-                  <span className="text-lg leading-none">{e.emoji}</span>
-                  <span className="text-[8px] font-mono text-pulse-mute">
-                    {e.atk_bonus ? `+${e.atk_bonus}⚔` : ''}{e.def_bonus ? ` +${e.def_bonus}🛡` : ''}{e.spd_bonus ? ` +${e.spd_bonus}💨` : ''}
+                  <span className="text-base leading-none">{equipped?.card.emoji ?? label.icon}</span>
+                  <span className="text-[7px] uppercase tracking-wider text-pulse-mute">
+                    {label[fr ? 'fr' : 'en']}
+                    {equipped && equipped.level > 1 ? ` lv${equipped.level}` : ''}
                   </span>
                 </button>
               );
             })}
           </div>
-          {ownedEquipment.length > 0 && character && (
-            <div className="mt-2 grid grid-cols-6 gap-1.5 max-h-32 overflow-y-auto p-1">
-              {ownedEquipment.map(e => {
-                const st = RARITY_STYLE[e.rarity];
-                const isEquipped = equipment.some(x => x.id === e.id);
-                const disabled = !isEquipped && equipment.length >= MAX_EQUIPMENT_SLOTS;
+
+          {!character ? (
+            <div className="rounded-lg border border-pulse-border bg-black/40 p-3 text-xs text-pulse-mute text-center">
+              {fr ? 'Choisis un personnage pour équiper.' : 'Pick a character before equipping.'}
+            </div>
+          ) : activeSlotEquipment.length === 0 ? (
+            <div className="rounded-lg border border-pulse-border bg-black/40 p-3 text-xs text-pulse-mute text-center">
+              {fr
+                ? `Pas encore d'${SLOT_LABEL[activeSlot].fr.toLowerCase()} dans ta collection.`
+                : `No ${SLOT_LABEL[activeSlot].en.toLowerCase()} in your collection yet.`}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto p-1">
+              {activeSlotEquipment.map(({ card, level, quantity }) => {
+                const st = RARITY_STYLE[card.rarity];
+                const isEquipped = equippedInActiveSlot?.card.id === card.id && equippedInActiveSlot.level === level;
+                const b = scaledBonuses(card, level);
                 return (
                   <button
-                    key={e.id}
-                    onClick={() => toggleEquipment(e)}
-                    disabled={disabled}
+                    key={`${card.id}:${level}`}
+                    onClick={() => toggleEquipment(card, level)}
                     className={`relative rounded-md p-1.5 border ring-1 ${st.ring} ${
                       isEquipped ? 'border-pulse-gold bg-pulse-gold/10' : 'border-pulse-border bg-pulse-card'
-                    } ${disabled ? 'opacity-30' : ''} flex flex-col items-center`}
-                    title={e.name}
+                    } flex flex-col items-center`}
+                    title={`${card.name} lv${level} ×${quantity}`}
                   >
-                    <span className="text-lg leading-none">{e.emoji}</span>
+                    <span className="text-lg leading-none">{card.emoji}</span>
+                    <span className="text-[8px] font-bold text-pulse-gold mt-0.5">lv{level}</span>
                     <span className="text-[7px] font-mono text-pulse-mute">
-                      {e.atk_bonus ? `+${e.atk_bonus}⚔` : ''}{e.def_bonus ? `+${e.def_bonus}🛡` : ''}{e.spd_bonus ? `+${e.spd_bonus}💨` : ''}
+                      {b.atk ? `+${b.atk}⚔ ` : ''}{b.def ? `+${b.def}🛡 ` : ''}{b.spd ? `+${b.spd}💨` : ''}
                     </span>
+                    {quantity > 1 && (
+                      <span className="absolute top-0.5 right-0.5 text-[7px] px-1 rounded bg-black/60 text-pulse-mute font-mono">×{quantity}</span>
+                    )}
                     {isEquipped && (
                       <span className="absolute -top-1 -right-1 text-[7px] px-1 rounded bg-pulse-gold text-black font-black">✓</span>
                     )}
@@ -264,14 +307,9 @@ export default function CardDuelDialog({
               })}
             </div>
           )}
-          {ownedEquipment.length === 0 && (
-            <div className="mt-2 text-[10px] text-pulse-mute italic">
-              {fr ? 'Aucun équipement dans ta collection — ouvre un booster pour en obtenir.' : 'No equipment in your collection — open a pack to get some.'}
-            </div>
-          )}
         </div>
 
-        {/* Live preview of effective stats */}
+        {/* Live effective-stats preview */}
         {character && preview && (
           <div className="mb-4 rounded-lg border border-pulse-gold/40 bg-pulse-gold/10 p-3">
             <div className="text-[10px] text-pulse-gold uppercase tracking-wider mb-1 text-center">

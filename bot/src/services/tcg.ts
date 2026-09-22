@@ -5,6 +5,14 @@ import { log } from '../utils/logger.js';
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
 export type CardKind = 'character' | 'equipment';
+export type EquipmentSlot = 'weapon' | 'shield' | 'spell' | 'helmet' | 'boots' | 'amulet';
+
+export const EQUIPMENT_SLOTS: EquipmentSlot[] = ['weapon', 'shield', 'spell', 'helmet', 'boots', 'amulet'];
+// Champion may equip at most one item per slot; a full loadout tops out
+// at EQUIPMENT_SLOTS.length items.
+export const MAX_EQUIPMENT_SLOTS = EQUIPMENT_SLOTS.length;
+export const MAX_LEVEL = 5;
+export const MERGE_COST_COPIES = 3;
 
 export interface Card {
   id: number;
@@ -18,25 +26,37 @@ export interface Card {
   flavor: string;
   is_active: boolean;
   card_kind: CardKind;
+  equipment_slot: EquipmentSlot | null;
   atk_bonus: number;
   def_bonus: number;
   spd_bonus: number;
 }
 
-// Max equipment items that can attach to a champion in a duel.
-export const MAX_EQUIPMENT_SLOTS = 3;
+export interface EquippedItem { card: Card; level: number; }
+export interface EquipmentEntry { code: string; level: number; }
 
-export function effectiveStats(character: Card, equipment: Card[]): { attack: number; defense: number; speed: number } {
+export function scaledBonuses(card: Card, level: number): { atk: number; def: number; spd: number } {
+  const l = Math.max(1, Math.min(MAX_LEVEL, level));
   return {
-    attack:  character.attack  + equipment.reduce((s, e) => s + (e.atk_bonus ?? 0), 0),
-    defense: character.defense + equipment.reduce((s, e) => s + (e.def_bonus ?? 0), 0),
-    speed:   character.speed   + equipment.reduce((s, e) => s + (e.spd_bonus ?? 0), 0),
+    atk: (card.atk_bonus ?? 0) * l,
+    def: (card.def_bonus ?? 0) * l,
+    spd: (card.spd_bonus ?? 0) * l,
   };
+}
+
+export function effectiveStats(character: Card, equipment: EquippedItem[]): { attack: number; defense: number; speed: number } {
+  let atk = character.attack, def = character.defense, spd = character.speed;
+  for (const e of equipment) {
+    const b = scaledBonuses(e.card, e.level);
+    atk += b.atk; def += b.def; spd += b.spd;
+  }
+  return { attack: atk, defense: def, speed: spd };
 }
 
 export interface CollectionRow {
   card_id: number;
   quantity: number;
+  level: number;
   card?: Card;
 }
 
@@ -102,7 +122,6 @@ export async function openPack(discordId: string): Promise<OpenResult> {
   const pulls: { card: Card; isNew: boolean }[] = [];
   for (let i = 0; i < PACK_SIZE; i++) {
     let card: Card | null = null;
-    // Guarantee: at least one rare or better among the 5 pulls.
     if (i === PACK_SIZE - 1 && pulls.every(p => p.card.rarity === 'common')) {
       const forced = pickRarity();
       card = pickCardOfRarity(pool, forced === 'common' ? 'rare' : forced);
@@ -112,29 +131,42 @@ export async function openPack(discordId: string): Promise<OpenResult> {
     pulls.push({ card, isNew: false });
   }
 
-  // Persist to collection; determine "new" flag by looking up existing rows first.
+  // All new pulls land at level 1 in the collection. Merging equipment to
+  // higher levels is a separate action (upgradeEquipment).
   const cardIds = [...new Set(pulls.map(p => p.card.id))];
-  const { data: existing } = await supabase.from('tcg_collection').select('card_id').eq('discord_id', discordId).in('card_id', cardIds);
-  const owned = new Set((existing ?? []).map(r => r.card_id));
+  const { data: existingLv1 } = await supabase
+    .from('tcg_collection')
+    .select('card_id, quantity')
+    .eq('discord_id', discordId)
+    .eq('level', 1)
+    .in('card_id', cardIds);
+  const ownedLv1 = new Map<number, number>((existingLv1 ?? []).map(r => [r.card_id as number, r.quantity as number]));
+
+  const anyLevelIds = cardIds;
+  const { data: anyLevelRows } = await supabase
+    .from('tcg_collection')
+    .select('card_id')
+    .eq('discord_id', discordId)
+    .in('card_id', anyLevelIds);
+  const knewBefore = new Set<number>((anyLevelRows ?? []).map(r => r.card_id as number));
 
   const counts = new Map<number, number>();
   for (const p of pulls) counts.set(p.card.id, (counts.get(p.card.id) ?? 0) + 1);
 
   for (const [cardId, qty] of counts) {
-    const already = owned.has(cardId);
-    if (already) {
-      const { data: cur } = await supabase.from('tcg_collection').select('quantity').eq('discord_id', discordId).eq('card_id', cardId).maybeSingle();
-      const nextQty = (cur?.quantity ?? 0) + qty;
-      await supabase.from('tcg_collection').update({ quantity: nextQty }).eq('discord_id', discordId).eq('card_id', cardId);
+    if (ownedLv1.has(cardId)) {
+      const next = (ownedLv1.get(cardId) ?? 0) + qty;
+      await supabase.from('tcg_collection')
+        .update({ quantity: next })
+        .eq('discord_id', discordId).eq('card_id', cardId).eq('level', 1);
     } else {
-      await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: cardId, quantity: qty });
+      await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: cardId, level: 1, quantity: qty });
     }
   }
 
-  // Mark isNew on the first occurrence of each not-previously-owned card in the pull list.
   const seen = new Set<number>();
   for (const p of pulls) {
-    if (!owned.has(p.card.id) && !seen.has(p.card.id)) {
+    if (!knewBefore.has(p.card.id) && !seen.has(p.card.id)) {
       p.isNew = true;
       seen.add(p.card.id);
     }
@@ -153,12 +185,25 @@ export interface CollectionSummary {
 
 export async function getCollection(discordId: string): Promise<CollectionSummary> {
   const pool = await allCards();
-  const { data } = await supabase.from('tcg_collection').select('card_id, quantity').eq('discord_id', discordId);
-  const rows = (data ?? []) as CollectionRow[];
+  const { data } = await supabase
+    .from('tcg_collection')
+    .select('card_id, quantity, level')
+    .eq('discord_id', discordId);
   const cardById = new Map(pool.map(c => [c.id, c]));
-  const enriched = rows
-    .map(r => ({ ...r, card: cardById.get(r.card_id) }))
-    .filter((r): r is CollectionRow & { card: Card } => !!r.card);
+  // Aggregate across levels so /cards collection stays a "one row per card"
+  // summary. Equipment level detail lives in the web app view.
+  const agg = new Map<number, { quantity: number; level: number }>();
+  for (const r of (data ?? []) as CollectionRow[]) {
+    const cur = agg.get(r.card_id);
+    if (cur) { cur.quantity += r.quantity; cur.level = Math.max(cur.level, r.level); }
+    else agg.set(r.card_id, { quantity: r.quantity, level: r.level });
+  }
+  const enriched: (CollectionRow & { card: Card })[] = [];
+  for (const [cardId, v] of agg) {
+    const card = cardById.get(cardId);
+    if (!card) continue;
+    enriched.push({ card_id: cardId, quantity: v.quantity, level: v.level, card });
+  }
 
   const byRarity: CollectionSummary['byRarity'] = {
     common:    { owned: 0, total: 0 },
@@ -183,7 +228,8 @@ export function rarityOrder(r: Rarity): number {
   return { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 }[r];
 }
 
-// ---- Duel (fast card fight, best 2/3 stat rolls) ----
+// ---- Test duel between two catalog cards (no equipment). Kept for
+// /cards duel command as a quick standalone check.
 export interface DuelResult { ok: boolean; error?: string; myCard?: Card; oppCard?: Card; myScore?: number; oppScore?: number; won?: boolean; }
 
 export async function duel(discordId: string, myCardId: number, oppCardId: number): Promise<DuelResult> {
@@ -191,7 +237,10 @@ export async function duel(discordId: string, myCardId: number, oppCardId: numbe
   const my = pool.find(c => c.id === myCardId);
   const opp = pool.find(c => c.id === oppCardId);
   if (!my || !opp) return { ok: false, error: 'Card not found.' };
-  const { data: owned } = await supabase.from('tcg_collection').select('quantity').eq('discord_id', discordId).eq('card_id', myCardId).maybeSingle();
+  const { data: owned } = await supabase.from('tcg_collection')
+    .select('quantity')
+    .eq('discord_id', discordId).eq('card_id', myCardId).eq('level', 1)
+    .maybeSingle();
   if (!owned || (owned.quantity ?? 0) < 1) return { ok: false, error: 'You do not own that card.' };
   const stats: (keyof Pick<Card, 'attack' | 'defense' | 'speed'>)[] = ['attack', 'defense', 'speed'];
   let myScore = 0, oppScore = 0;
@@ -210,29 +259,46 @@ export const SELL_VALUE: Record<Rarity, number> = {
 
 export interface SellResult { ok: boolean; error?: string; card?: Card; quantity?: number; pulseEarned?: number; }
 
+// Selling from level 1 first protects upgraded copies from being spent by
+// accident. Callers still have to keep at least one copy of the card across
+// all levels combined.
 export async function sellCard(discordId: string, cardCode: string, quantity: number): Promise<SellResult> {
   const qty = Math.max(1, Math.floor(quantity));
   const { data: card } = await supabase.from('tcg_cards').select('*').eq('code', cardCode).maybeSingle();
   if (!card) return { ok: false, error: 'card_not_found' };
-  const { data: row } = await supabase.from('tcg_collection').select('quantity').eq('discord_id', discordId).eq('card_id', (card as Card).id).maybeSingle();
-  const owned = row?.quantity ?? 0;
-  if (owned <= 0) return { ok: false, error: 'not_owned' };
-  // Protect the last copy so the collection can't be emptied by mistake.
-  const maxSellable = Math.max(0, owned - 1);
+  const cardId = (card as Card).id;
+
+  const { data: rows } = await supabase.from('tcg_collection')
+    .select('quantity, level')
+    .eq('discord_id', discordId).eq('card_id', cardId);
+  const totalOwned = (rows ?? []).reduce((s, r) => s + (r.quantity as number), 0);
+  if (totalOwned <= 0) return { ok: false, error: 'not_owned' };
+  const maxSellable = Math.max(0, totalOwned - 1);
   if (maxSellable <= 0) return { ok: false, error: 'keep_last_copy' };
-  const sold = Math.min(qty, maxSellable);
-  const pulseEarned = sold * SELL_VALUE[(card as Card).rarity];
-  const newQty = owned - sold;
-  if (newQty <= 0) {
-    await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', (card as Card).id);
-  } else {
-    await supabase.from('tcg_collection').update({ quantity: newQty }).eq('discord_id', discordId).eq('card_id', (card as Card).id);
+
+  const wanted = Math.min(qty, maxSellable);
+  let remaining = wanted;
+  const sorted = [...(rows ?? [])].sort((a, b) => (a.level as number) - (b.level as number));
+  for (const r of sorted) {
+    if (remaining <= 0) break;
+    const have = r.quantity as number;
+    const take = Math.min(have, remaining);
+    if (take === have) {
+      await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', cardId).eq('level', r.level);
+    } else {
+      await supabase.from('tcg_collection').update({ quantity: have - take }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', r.level);
+    }
+    remaining -= take;
   }
-  await earnPulse(discordId, pulseEarned, `TCG sell ${sold}× ${cardCode}`, `tcg_sell:${cardCode}`);
-  return { ok: true, card: card as Card, quantity: sold, pulseEarned };
+
+  const pulseEarned = wanted * SELL_VALUE[(card as Card).rarity];
+  await earnPulse(discordId, pulseEarned, `TCG sell ${wanted}× ${cardCode}`, `tcg_sell:${cardCode}`);
+  return { ok: true, card: card as Card, quantity: wanted, pulseEarned };
 }
 
-// ---- Fusion (3 same-rarity cards → 1 random higher-rarity card) ----
+// ---- Character fusion (3 same-rarity characters → 1 random higher-rarity).
+// Equipment leveling is a separate flow (upgradeEquipment) — this only
+// applies to characters.
 const NEXT_RARITY: Record<Rarity, Rarity | null> = {
   common: 'rare', rare: 'epic', epic: 'legendary', legendary: 'mythic', mythic: null,
 };
@@ -245,54 +311,90 @@ export async function fuseCards(discordId: string, codes: string[]): Promise<Fus
   const pool = await allCards();
   const inputs = codes.map(c => pool.find(x => x.code === c)).filter((c): c is Card => !!c);
   if (inputs.length !== 3) return { ok: false, error: 'card_not_found' };
+  if (!inputs.every(c => c.card_kind === 'character')) return { ok: false, error: 'not_a_character' };
 
   const rarity = inputs[0].rarity;
   if (!inputs.every(c => c.rarity === rarity)) return { ok: false, error: 'mixed_rarity' };
   const target = NEXT_RARITY[rarity];
   if (!target) return { ok: false, error: 'max_rarity' };
 
-  // Verify ownership: each card must be owned ≥ its occurrence count in the input.
   const counts = new Map<number, number>();
   for (const c of inputs) counts.set(c.id, (counts.get(c.id) ?? 0) + 1);
   const ids = [...counts.keys()];
-  const { data: owned } = await supabase.from('tcg_collection').select('card_id, quantity').eq('discord_id', discordId).in('card_id', ids);
-  const ownedMap = new Map((owned ?? []).map(r => [r.card_id, r.quantity as number]));
+  const { data: owned } = await supabase.from('tcg_collection')
+    .select('card_id, quantity')
+    .eq('discord_id', discordId).eq('level', 1).in('card_id', ids);
+  const ownedMap = new Map((owned ?? []).map(r => [r.card_id as number, r.quantity as number]));
   for (const [id, need] of counts) {
     if ((ownedMap.get(id) ?? 0) < need) return { ok: false, error: 'not_enough_copies' };
   }
-
-  // Deduct the 3 cards (delete rows that hit zero).
   for (const [id, need] of counts) {
     const cur = ownedMap.get(id)!;
     const next = cur - need;
-    if (next <= 0) await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', id);
-    else await supabase.from('tcg_collection').update({ quantity: next }).eq('discord_id', discordId).eq('card_id', id);
+    if (next <= 0) await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', id).eq('level', 1);
+    else await supabase.from('tcg_collection').update({ quantity: next }).eq('discord_id', discordId).eq('card_id', id).eq('level', 1);
   }
 
-  // Roll a random card of the target rarity.
-  const targetPool = pool.filter(c => c.rarity === target);
+  const targetPool = pool.filter(c => c.rarity === target && c.card_kind === 'character');
   if (!targetPool.length) return { ok: false, error: 'no_target_pool' };
   const rolled = targetPool[Math.floor(Math.random() * targetPool.length)];
 
-  // Add it to the collection.
-  const { data: existing } = await supabase.from('tcg_collection').select('quantity').eq('discord_id', discordId).eq('card_id', rolled.id).maybeSingle();
-  if (existing) await supabase.from('tcg_collection').update({ quantity: (existing.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', rolled.id);
-  else await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: rolled.id, quantity: 1 });
+  const { data: existing } = await supabase.from('tcg_collection')
+    .select('quantity')
+    .eq('discord_id', discordId).eq('card_id', rolled.id).eq('level', 1).maybeSingle();
+  if (existing) {
+    await supabase.from('tcg_collection').update({ quantity: (existing.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', rolled.id).eq('level', 1);
+  } else {
+    await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: rolled.id, level: 1, quantity: 1 });
+  }
 
   return { ok: true, consumed: inputs, result: rolled };
 }
 
+// ---- Equipment upgrade: 3× (same card, level N) → 1× (same card, level N+1)
+export interface UpgradeResult { ok: boolean; error?: string; card?: Card; fromLevel?: number; toLevel?: number; }
+
+export async function upgradeEquipment(discordId: string, cardCode: string, fromLevel: number): Promise<UpgradeResult> {
+  const pool = await allCards();
+  const card = pool.find(c => c.code === cardCode);
+  if (!card) return { ok: false, error: 'card_not_found' };
+  if (card.card_kind !== 'equipment') return { ok: false, error: 'not_an_equipment' };
+  const from = Math.floor(fromLevel);
+  if (from < 1 || from >= MAX_LEVEL) return { ok: false, error: 'bad_level' };
+  const to = from + 1;
+
+  const { data: row } = await supabase.from('tcg_collection')
+    .select('quantity')
+    .eq('discord_id', discordId).eq('card_id', card.id).eq('level', from).maybeSingle();
+  const have = (row?.quantity as number) ?? 0;
+  if (have < MERGE_COST_COPIES) return { ok: false, error: 'not_enough_copies' };
+
+  const newFromQty = have - MERGE_COST_COPIES;
+  if (newFromQty <= 0) {
+    await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', card.id).eq('level', from);
+  } else {
+    await supabase.from('tcg_collection').update({ quantity: newFromQty }).eq('discord_id', discordId).eq('card_id', card.id).eq('level', from);
+  }
+
+  const { data: dest } = await supabase.from('tcg_collection')
+    .select('quantity')
+    .eq('discord_id', discordId).eq('card_id', card.id).eq('level', to).maybeSingle();
+  if (dest) {
+    await supabase.from('tcg_collection').update({ quantity: (dest.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', card.id).eq('level', to);
+  } else {
+    await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: card.id, level: to, quantity: 1 });
+  }
+  return { ok: true, card, fromLevel: from, toLevel: to };
+}
+
 // ---- PvP challenges ----
-// The challenger locks in a champion (character card) + up to 3 equipment
-// (equipment cards). Effective stats = base + sum(equipment bonuses).
-// The target picks the same shape when they accept.
 interface CardChallenge {
   id: string;
   challengerId: string;
   challengerName: string;
   targetId: string;
   challengerCardId: number;
-  challengerEquipIds: number[];
+  challengerEquip: { cardId: number; level: number }[];
   wager: number;
   createdAt: number;
 }
@@ -304,46 +406,64 @@ function pruneCardChallenges(): void {
   for (const [id, c] of cardChallenges) if (now - c.createdAt > CARD_CHALLENGE_TTL_MS) cardChallenges.delete(id);
 }
 
-// Validate a loadout for a given user: character must be a 'character' card
-// they own; every equipment entry must be an 'equipment' card they own; no
-// duplicates in the equipment list; at most MAX_EQUIPMENT_SLOTS items.
+// Parse a Discord modal / slash-command equipment string into {code, level}
+// entries. Format: comma-separated, optional ':N' suffix for level (default 1).
+//   "e_flame_saber, e_iron_shield:2, e_starcaller:3"
+export function parseEquipmentInput(raw: string | null | undefined): EquipmentEntry[] {
+  if (!raw) return [];
+  return raw.split(',').map(s => s.trim()).filter(Boolean).map(token => {
+    const [code, lvl] = token.split(':');
+    const level = Math.max(1, Math.min(MAX_LEVEL, Math.floor(Number(lvl ?? 1)) || 1));
+    return { code: code.trim(), level };
+  });
+}
+
 async function resolveLoadout(
   pool: Card[],
   discordId: string,
   characterCode: string,
-  equipmentCodes: string[],
-): Promise<{ ok: true; character: Card; equipment: Card[] } | { ok: false; error: string }> {
+  equipment: EquipmentEntry[],
+): Promise<{ ok: true; character: Card; equipment: EquippedItem[] } | { ok: false; error: string }> {
   const character = pool.find(c => c.code === characterCode);
   if (!character) return { ok: false, error: 'card_not_found' };
   if (character.card_kind !== 'character') return { ok: false, error: 'not_a_character' };
 
-  const uniqueEquipCodes = [...new Set(equipmentCodes.map(c => c.trim()).filter(Boolean))];
-  if (uniqueEquipCodes.length > MAX_EQUIPMENT_SLOTS) return { ok: false, error: 'too_many_equipment' };
-  const equipment: Card[] = [];
-  for (const code of uniqueEquipCodes) {
-    const e = pool.find(c => c.code === code);
-    if (!e) return { ok: false, error: 'card_not_found' };
-    if (e.card_kind !== 'equipment') return { ok: false, error: 'not_an_equipment' };
-    equipment.push(e);
+  if (equipment.length > MAX_EQUIPMENT_SLOTS) return { ok: false, error: 'too_many_equipment' };
+  const resolved: EquippedItem[] = [];
+  const slotsUsed = new Set<EquipmentSlot>();
+  for (const e of equipment) {
+    const card = pool.find(c => c.code === e.code);
+    if (!card) return { ok: false, error: 'card_not_found' };
+    if (card.card_kind !== 'equipment' || !card.equipment_slot) return { ok: false, error: 'not_an_equipment' };
+    if (slotsUsed.has(card.equipment_slot)) return { ok: false, error: 'slot_conflict' };
+    slotsUsed.add(card.equipment_slot);
+    resolved.push({ card, level: Math.max(1, Math.min(MAX_LEVEL, e.level)) });
   }
 
-  // Ownership check: every card involved needs to be in the collection.
-  const ids = [character.id, ...equipment.map(e => e.id)];
-  const { data: rows } = await supabase.from('tcg_collection').select('card_id, quantity').eq('discord_id', discordId).in('card_id', ids);
-  const owned = new Map((rows ?? []).map(r => [r.card_id as number, r.quantity as number]));
-  for (const id of ids) if ((owned.get(id) ?? 0) < 1) return { ok: false, error: 'not_owned' };
+  // Ownership: character (level 1) and every equipment at its stated level.
+  const { data: cRow } = await supabase.from('tcg_collection')
+    .select('quantity')
+    .eq('discord_id', discordId).eq('card_id', character.id).eq('level', 1).maybeSingle();
+  if (!cRow || (cRow.quantity ?? 0) < 1) return { ok: false, error: 'not_owned' };
 
-  return { ok: true, character, equipment };
+  for (const e of resolved) {
+    const { data: row } = await supabase.from('tcg_collection')
+      .select('quantity')
+      .eq('discord_id', discordId).eq('card_id', e.card.id).eq('level', e.level).maybeSingle();
+    if (!row || (row.quantity ?? 0) < 1) return { ok: false, error: 'not_owned' };
+  }
+
+  return { ok: true, character, equipment: resolved };
 }
 
-export interface OpenCardChallengeResult { ok: boolean; error?: string; challengeId?: string; challengerCard?: Card; challengerEquip?: Card[]; }
+export interface OpenCardChallengeResult { ok: boolean; error?: string; challengeId?: string; challengerCard?: Card; challengerEquip?: EquippedItem[]; }
 
 export async function openCardChallenge(
   challengerId: string,
   challengerName: string,
   targetId: string,
   characterCode: string,
-  equipmentCodes: string[],
+  equipment: EquipmentEntry[],
   wager: number,
 ): Promise<OpenCardChallengeResult> {
   pruneCardChallenges();
@@ -351,7 +471,7 @@ export async function openCardChallenge(
   if (wager < 0 || wager > 10_000) return { ok: false, error: 'bad_wager' };
 
   const pool = await allCards();
-  const loadout = await resolveLoadout(pool, challengerId, characterCode, equipmentCodes);
+  const loadout = await resolveLoadout(pool, challengerId, characterCode, equipment);
   if (!loadout.ok) return { ok: false, error: loadout.error };
 
   for (const c of cardChallenges.values()) {
@@ -367,7 +487,7 @@ export async function openCardChallenge(
   cardChallenges.set(id, {
     id, challengerId, challengerName, targetId,
     challengerCardId: loadout.character.id,
-    challengerEquipIds: loadout.equipment.map(e => e.id),
+    challengerEquip: loadout.equipment.map(e => ({ cardId: e.card.id, level: e.level })),
     wager, createdAt: Date.now(),
   });
   return { ok: true, challengeId: id, challengerCard: loadout.character, challengerEquip: loadout.equipment };
@@ -391,10 +511,10 @@ export interface PvPCardResult {
   ok: boolean;
   error?: string;
   challengerCard?: Card;
-  challengerEquip?: Card[];
+  challengerEquip?: EquippedItem[];
   challengerStats?: { attack: number; defense: number; speed: number };
   targetCard?: Card;
-  targetEquip?: Card[];
+  targetEquip?: EquippedItem[];
   targetStats?: { attack: number; defense: number; speed: number };
   turns?: { stat: 'attack' | 'defense' | 'speed'; challengerRoll: number; targetRoll: number; }[];
   challengerScore?: number;
@@ -407,16 +527,18 @@ export async function acceptCardChallenge(
   id: string,
   byUserId: string,
   targetCharacterCode: string,
-  targetEquipmentCodes: string[],
+  targetEquipment: EquipmentEntry[],
 ): Promise<PvPCardResult> {
   const c = cardChallenges.get(id);
   if (!c) return { ok: false, error: 'not_found' };
   if (byUserId !== c.targetId) return { ok: false, error: 'not_target' };
   const pool = await allCards();
-  const targetLoadout = await resolveLoadout(pool, c.targetId, targetCharacterCode, targetEquipmentCodes);
+  const targetLoadout = await resolveLoadout(pool, c.targetId, targetCharacterCode, targetEquipment);
   if (!targetLoadout.ok) return { ok: false, error: targetLoadout.error };
   const challengerCard = pool.find(x => x.id === c.challengerCardId);
-  const challengerEquip = c.challengerEquipIds.map(id => pool.find(x => x.id === id)).filter((x): x is Card => !!x);
+  const challengerEquip = c.challengerEquip
+    .map(e => { const card = pool.find(x => x.id === e.cardId); return card ? { card, level: e.level } : null; })
+    .filter((x): x is EquippedItem => !!x);
   if (!challengerCard) return { ok: false, error: 'card_not_found' };
 
   if (c.wager > 0) {

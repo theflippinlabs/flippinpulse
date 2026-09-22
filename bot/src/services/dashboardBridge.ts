@@ -347,10 +347,10 @@ async function handleCardChallenge(client: Client, cmd: DashboardCommand): Promi
   const p = cmd.payload_json as {
     challenger_id: string;
     opponent_id: string;
-    // New shape: character_code + equipment_codes. Older builds only sent
-    // card_code — fall back to it so an in-flight command from a pre-refactor
-    // web version still resolves cleanly.
     character_code?: string;
+    equipment?: { code: string; level: number }[];
+    // Older builds only sent codes; keep a fallback path so an in-flight
+    // command from a pre-refactor web version still resolves.
     equipment_codes?: string[];
     card_code?: string;
     wager: number;
@@ -364,8 +364,12 @@ async function handleCardChallenge(client: Client, cmd: DashboardCommand): Promi
   ]);
   const fr = locale === 'fr';
   const characterCode = p.character_code ?? p.card_code ?? '';
-  const equipmentCodes = Array.isArray(p.equipment_codes) ? p.equipment_codes : [];
-  const res = await openCardChallenge(p.challenger_id, challengerName, p.opponent_id, characterCode, equipmentCodes, p.wager);
+  const equipment = Array.isArray(p.equipment)
+    ? p.equipment.map(e => ({ code: e.code, level: e.level ?? 1 }))
+    : Array.isArray(p.equipment_codes)
+      ? p.equipment_codes.map(code => ({ code, level: 1 }))
+      : [];
+  const res = await openCardChallenge(p.challenger_id, challengerName, p.opponent_id, characterCode, equipment, p.wager);
   if (!res.ok || !res.challengeId || !res.challengerCard) throw new Error(res.error ?? 'open_failed');
   const cc = res.challengerCard;
   const eq = res.challengerEquip ?? [];
@@ -374,11 +378,11 @@ async function handleCardChallenge(client: Client, cmd: DashboardCommand): Promi
   const channel = await client.channels.fetch(p.channel_id).catch(() => null);
   if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) throw new Error('channel_not_sendable');
   const equipLine = eq.length
-    ? `\n${fr ? '🎽 Équipement' : '🎽 Equipment'} : ${eq.map(e => `${e.emoji} ${e.name}`).join(' · ')}`
+    ? `\n${fr ? '🎽 Équipement' : '🎽 Equipment'} : ${eq.map(e => `${e.card.emoji} ${e.card.name}${e.level > 1 ? ` \`lv${e.level}\`` : ''}`).join(' · ')}`
     : '';
   const desc = fr
-    ? `<@${p.opponent_id}> tu es défié·e par <@${p.challenger_id}> !\n\nSon champion : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_${equipLine}\n⚔️ ATK ${stats.attack} · 🛡️ DEF ${stats.defense} · 💨 SPD ${stats.speed}\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ton champion et jusqu'à 3 équipements. Expire dans 3 min._`
-    : `<@${p.opponent_id}> you have been challenged by <@${p.challenger_id}>!\n\nTheir champion: ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_${equipLine}\n⚔️ ATK ${stats.attack} · 🛡️ DEF ${stats.defense} · 💨 SPD ${stats.speed}\n\n💰 Wager: **${p.wager} PULSE** each · Pot: **${p.wager * 2} PULSE**\n\n_Tap **Accept** to pick your champion and up to 3 equipment. Expires in 3 min._`;
+    ? `<@${p.opponent_id}> tu es défié·e par <@${p.challenger_id}> !\n\nSon champion : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_${equipLine}\n⚔️ ATK ${stats.attack} · 🛡️ DEF ${stats.defense} · 💨 SPD ${stats.speed}\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ton champion et jusqu'à 6 équipements (1 par slot). Expire dans 3 min._`
+    : `<@${p.opponent_id}> you have been challenged by <@${p.challenger_id}>!\n\nTheir champion: ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_${equipLine}\n⚔️ ATK ${stats.attack} · 🛡️ DEF ${stats.defense} · 💨 SPD ${stats.speed}\n\n💰 Wager: **${p.wager} PULSE** each · Pot: **${p.wager * 2} PULSE**\n\n_Tap **Accept** to pick your champion and up to 6 equipment items (1 per slot). Expires in 3 min._`;
   const embed = new EmbedBuilder()
     .setColor(0xF5B62E)
     .setTitle(fr ? '🎴 Duel de cartes !' : '🎴 Card duel!')

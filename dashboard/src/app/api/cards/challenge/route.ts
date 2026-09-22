@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { MAX_EQUIPMENT_SLOTS, MAX_LEVEL } from '@/lib/tcgShared';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_EQUIPMENT_SLOTS = 3;
+interface EquipInput { cardId: number; level: number; }
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -14,64 +15,50 @@ export async function POST(req: NextRequest) {
   const opponentId = String(body.opponentId ?? '');
   const wager = Math.max(0, Math.min(10_000, Math.floor(Number(body.wager ?? 0))));
   const channelId = String(body.channelId ?? '');
-
-  // New payload: characterCardId + equipmentCardIds. We also accept a legacy
-  // cardCode/characterCode/equipmentCodes shape so older callers keep working
-  // while the web app rolls forward.
-  const characterCardId = Number(body.characterCardId);
-  const equipmentCardIds: number[] = Array.isArray(body.equipmentCardIds)
-    ? body.equipmentCardIds.map((n: unknown) => Number(n)).filter((n: number) => Number.isFinite(n) && n > 0)
-    : [];
-  const legacyCode = String(body.cardCode ?? body.characterCode ?? '').trim();
-  const legacyEquipmentCodes: string[] = Array.isArray(body.equipmentCodes)
-    ? body.equipmentCodes.map((s: unknown) => String(s ?? '').trim()).filter(Boolean)
-    : [];
+  const characterCardId = Math.floor(Number(body.characterCardId));
+  const rawEquip: unknown[] = Array.isArray(body.equipment) ? body.equipment : [];
 
   if (!/^\d{15,20}$/.test(opponentId)) return NextResponse.json({ error: 'bad_opponent' }, { status: 400 });
   if (opponentId === session.id) return NextResponse.json({ error: 'self_challenge' }, { status: 400 });
   if (!channelId) return NextResponse.json({ error: 'no_channel' }, { status: 400 });
-  if (equipmentCardIds.length > MAX_EQUIPMENT_SLOTS) return NextResponse.json({ error: 'too_many_equipment' }, { status: 400 });
+  if (!Number.isFinite(characterCardId) || characterCardId <= 0) return NextResponse.json({ error: 'bad_card' }, { status: 400 });
 
-  // Resolve card IDs → codes so the bot side stays with codes end-to-end. If
-  // the caller only sent legacy codes we skip the lookup and pass them along.
-  let characterCode = legacyCode;
-  let equipmentCodes = legacyEquipmentCodes;
-
-  const idsToResolve: number[] = [];
-  if (Number.isFinite(characterCardId) && characterCardId > 0) idsToResolve.push(characterCardId);
-  idsToResolve.push(...equipmentCardIds);
-  if (idsToResolve.length > 0) {
-    const { data: rows } = await supabase.from('tcg_cards').select('id, code, card_kind').in('id', idsToResolve);
-    const byId = new Map((rows ?? []).map(r => [r.id as number, r as { code: string; card_kind: string }]));
-
-    if (Number.isFinite(characterCardId) && characterCardId > 0) {
-      const char = byId.get(characterCardId);
-      if (!char) return NextResponse.json({ error: 'bad_card' }, { status: 400 });
-      if (char.card_kind !== 'character') return NextResponse.json({ error: 'not_a_character' }, { status: 400 });
-      characterCode = char.code;
-    }
-    const resolvedEquip: string[] = [];
-    for (const eid of equipmentCardIds) {
-      const eq = byId.get(eid);
-      if (!eq) return NextResponse.json({ error: 'bad_equipment' }, { status: 400 });
-      if (eq.card_kind !== 'equipment') return NextResponse.json({ error: 'not_an_equipment' }, { status: 400 });
-      resolvedEquip.push(eq.code);
-    }
-    if (resolvedEquip.length > 0) equipmentCodes = resolvedEquip;
+  const equipment: EquipInput[] = [];
+  for (const e of rawEquip) {
+    const cardId = Math.floor(Number((e as { cardId?: unknown })?.cardId));
+    const level = Math.max(1, Math.min(MAX_LEVEL, Math.floor(Number((e as { level?: unknown })?.level ?? 1)) || 1));
+    if (!Number.isFinite(cardId) || cardId <= 0) return NextResponse.json({ error: 'bad_equipment' }, { status: 400 });
+    equipment.push({ cardId, level });
   }
+  if (equipment.length > MAX_EQUIPMENT_SLOTS) return NextResponse.json({ error: 'too_many_equipment' }, { status: 400 });
 
-  if (!characterCode) return NextResponse.json({ error: 'bad_card' }, { status: 400 });
+  // Resolve every card ID → code so the bot bridge stays on codes end-to-end.
+  const allIds = [characterCardId, ...equipment.map(e => e.cardId)];
+  const { data: rows } = await supabase.from('tcg_cards').select('id, code, card_kind, equipment_slot').in('id', allIds);
+  const byId = new Map((rows ?? []).map(r => [r.id as number, r as { code: string; card_kind: string; equipment_slot: string | null }]));
+
+  const char = byId.get(characterCardId);
+  if (!char) return NextResponse.json({ error: 'bad_card' }, { status: 400 });
+  if (char.card_kind !== 'character') return NextResponse.json({ error: 'not_a_character' }, { status: 400 });
+
+  const slotsUsed = new Set<string>();
+  const equipmentEntries: { code: string; level: number }[] = [];
+  for (const e of equipment) {
+    const eq = byId.get(e.cardId);
+    if (!eq) return NextResponse.json({ error: 'bad_equipment' }, { status: 400 });
+    if (eq.card_kind !== 'equipment' || !eq.equipment_slot) return NextResponse.json({ error: 'not_an_equipment' }, { status: 400 });
+    if (slotsUsed.has(eq.equipment_slot)) return NextResponse.json({ error: 'slot_conflict' }, { status: 400 });
+    slotsUsed.add(eq.equipment_slot);
+    equipmentEntries.push({ code: eq.code, level: e.level });
+  }
 
   const { error } = await supabase.from('dashboard_commands').insert({
     command: 'card_challenge',
     payload_json: {
       challenger_id: session.id,
       opponent_id: opponentId,
-      // Kept for backwards compatibility with earlier bot builds that only
-      // read card_code — the new bot reads character_code + equipment_codes.
-      card_code: characterCode,
-      character_code: characterCode,
-      equipment_codes: equipmentCodes,
+      character_code: char.code,
+      equipment: equipmentEntries,
       wager,
       channel_id: channelId,
     },
