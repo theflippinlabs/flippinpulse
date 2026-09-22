@@ -21,6 +21,7 @@ import { startChannelSync } from './services/channelSync.js';
 import { runDailyBirthdaySweep } from './services/birthdays.js';
 import { runReminderSweep } from './services/calendar.js';
 import { runWeeklyAnalyticsSweep } from './services/analytics.js';
+import { runSagaSweep } from './services/sagas.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -97,6 +98,12 @@ client.once('ready', async () => {
   setInterval(() => {
     runWeeklyAnalyticsSweep(client).catch(err => log('ERROR', 'Weekly analytics tick failed', err));
   }, 6 * 60 * 60 * 1000);
+
+  // Saga scheduler: promote scheduled → running once start time hits and
+  // end running → ended once end time hits. Runs every 5 minutes.
+  setInterval(() => {
+    runSagaSweep(client).catch(err => log('ERROR', 'Saga sweep tick failed', err));
+  }, 5 * 60 * 1000);
 
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });

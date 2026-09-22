@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getLocale } from '@/lib/i18n';
 import MemberShell from './MemberShell';
 import InstallHint from './InstallHint';
+import PushToggle from './PushToggle';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const session = getSession();
@@ -21,6 +22,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       locale={locale}
     >
       <InstallHint fr={locale === 'fr'} />
+      <PushToggle fr={locale === 'fr'} />
       {children}
     </MemberShell>
   );

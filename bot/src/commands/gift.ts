@@ -52,6 +52,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       )],
     });
   } catch (err) { log('INFO', 'Gift DM failed (recipient DMs closed?)', err); }
+  // Also enqueue a push notification for the recipient's PWA.
+  const { enqueuePush } = await import('../services/pushQueue.js');
+  await enqueuePush(recipient.id, fr ? '🎁 Cadeau reçu !' : '🎁 Gift received!', fr
+    ? `${interaction.user.username} t'a offert ${amount} PULSE.`
+    : `${interaction.user.username} sent you ${amount} PULSE.`);
 
   await interaction.reply({
     embeds: [successEmbed(fr
