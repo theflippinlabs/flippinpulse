@@ -4,6 +4,7 @@ import { earnPulse } from './games.js';
 import { log } from '../utils/logger.js';
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export type CardKind = 'character' | 'equipment';
 
 export interface Card {
   id: number;
@@ -16,6 +17,21 @@ export interface Card {
   speed: number;
   flavor: string;
   is_active: boolean;
+  card_kind: CardKind;
+  atk_bonus: number;
+  def_bonus: number;
+  spd_bonus: number;
+}
+
+// Max equipment items that can attach to a champion in a duel.
+export const MAX_EQUIPMENT_SLOTS = 3;
+
+export function effectiveStats(character: Card, equipment: Card[]): { attack: number; defense: number; speed: number } {
+  return {
+    attack:  character.attack  + equipment.reduce((s, e) => s + (e.atk_bonus ?? 0), 0),
+    defense: character.defense + equipment.reduce((s, e) => s + (e.def_bonus ?? 0), 0),
+    speed:   character.speed   + equipment.reduce((s, e) => s + (e.spd_bonus ?? 0), 0),
+  };
 }
 
 export interface CollectionRow {
@@ -267,12 +283,16 @@ export async function fuseCards(discordId: string, codes: string[]): Promise<Fus
 }
 
 // ---- PvP challenges ----
+// The challenger locks in a champion (character card) + up to 3 equipment
+// (equipment cards). Effective stats = base + sum(equipment bonuses).
+// The target picks the same shape when they accept.
 interface CardChallenge {
   id: string;
   challengerId: string;
   challengerName: string;
   targetId: string;
   challengerCardId: number;
+  challengerEquipIds: number[];
   wager: number;
   createdAt: number;
 }
@@ -284,18 +304,55 @@ function pruneCardChallenges(): void {
   for (const [id, c] of cardChallenges) if (now - c.createdAt > CARD_CHALLENGE_TTL_MS) cardChallenges.delete(id);
 }
 
-export interface OpenCardChallengeResult { ok: boolean; error?: string; challengeId?: string; challengerCard?: Card; }
+// Validate a loadout for a given user: character must be a 'character' card
+// they own; every equipment entry must be an 'equipment' card they own; no
+// duplicates in the equipment list; at most MAX_EQUIPMENT_SLOTS items.
+async function resolveLoadout(
+  pool: Card[],
+  discordId: string,
+  characterCode: string,
+  equipmentCodes: string[],
+): Promise<{ ok: true; character: Card; equipment: Card[] } | { ok: false; error: string }> {
+  const character = pool.find(c => c.code === characterCode);
+  if (!character) return { ok: false, error: 'card_not_found' };
+  if (character.card_kind !== 'character') return { ok: false, error: 'not_a_character' };
 
-export async function openCardChallenge(challengerId: string, challengerName: string, targetId: string, cardCode: string, wager: number): Promise<OpenCardChallengeResult> {
+  const uniqueEquipCodes = [...new Set(equipmentCodes.map(c => c.trim()).filter(Boolean))];
+  if (uniqueEquipCodes.length > MAX_EQUIPMENT_SLOTS) return { ok: false, error: 'too_many_equipment' };
+  const equipment: Card[] = [];
+  for (const code of uniqueEquipCodes) {
+    const e = pool.find(c => c.code === code);
+    if (!e) return { ok: false, error: 'card_not_found' };
+    if (e.card_kind !== 'equipment') return { ok: false, error: 'not_an_equipment' };
+    equipment.push(e);
+  }
+
+  // Ownership check: every card involved needs to be in the collection.
+  const ids = [character.id, ...equipment.map(e => e.id)];
+  const { data: rows } = await supabase.from('tcg_collection').select('card_id, quantity').eq('discord_id', discordId).in('card_id', ids);
+  const owned = new Map((rows ?? []).map(r => [r.card_id as number, r.quantity as number]));
+  for (const id of ids) if ((owned.get(id) ?? 0) < 1) return { ok: false, error: 'not_owned' };
+
+  return { ok: true, character, equipment };
+}
+
+export interface OpenCardChallengeResult { ok: boolean; error?: string; challengeId?: string; challengerCard?: Card; challengerEquip?: Card[]; }
+
+export async function openCardChallenge(
+  challengerId: string,
+  challengerName: string,
+  targetId: string,
+  characterCode: string,
+  equipmentCodes: string[],
+  wager: number,
+): Promise<OpenCardChallengeResult> {
   pruneCardChallenges();
   if (challengerId === targetId) return { ok: false, error: 'self_challenge' };
   if (wager < 0 || wager > 10_000) return { ok: false, error: 'bad_wager' };
 
   const pool = await allCards();
-  const card = pool.find(c => c.code === cardCode);
-  if (!card) return { ok: false, error: 'card_not_found' };
-  const { data: owned } = await supabase.from('tcg_collection').select('quantity').eq('discord_id', challengerId).eq('card_id', card.id).maybeSingle();
-  if (!owned || (owned.quantity ?? 0) < 1) return { ok: false, error: 'not_owned' };
+  const loadout = await resolveLoadout(pool, challengerId, characterCode, equipmentCodes);
+  if (!loadout.ok) return { ok: false, error: loadout.error };
 
   for (const c of cardChallenges.values()) {
     if ((c.challengerId === challengerId && c.targetId === targetId) || (c.challengerId === targetId && c.targetId === challengerId)) {
@@ -307,8 +364,13 @@ export async function openCardChallenge(challengerId: string, challengerName: st
     if (!d.success) return { ok: false, error: d.error ?? 'debit_failed' };
   }
   const id = `tcgpvp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  cardChallenges.set(id, { id, challengerId, challengerName, targetId, challengerCardId: card.id, wager, createdAt: Date.now() });
-  return { ok: true, challengeId: id, challengerCard: card };
+  cardChallenges.set(id, {
+    id, challengerId, challengerName, targetId,
+    challengerCardId: loadout.character.id,
+    challengerEquipIds: loadout.equipment.map(e => e.id),
+    wager, createdAt: Date.now(),
+  });
+  return { ok: true, challengeId: id, challengerCard: loadout.character, challengerEquip: loadout.equipment };
 }
 
 export function getCardChallenge(id: string): CardChallenge | undefined {
@@ -329,7 +391,11 @@ export interface PvPCardResult {
   ok: boolean;
   error?: string;
   challengerCard?: Card;
+  challengerEquip?: Card[];
+  challengerStats?: { attack: number; defense: number; speed: number };
   targetCard?: Card;
+  targetEquip?: Card[];
+  targetStats?: { attack: number; defense: number; speed: number };
   turns?: { stat: 'attack' | 'defense' | 'speed'; challengerRoll: number; targetRoll: number; }[];
   challengerScore?: number;
   targetScore?: number;
@@ -337,16 +403,21 @@ export interface PvPCardResult {
   pot?: number;
 }
 
-export async function acceptCardChallenge(id: string, byUserId: string, targetCardCode: string): Promise<PvPCardResult> {
+export async function acceptCardChallenge(
+  id: string,
+  byUserId: string,
+  targetCharacterCode: string,
+  targetEquipmentCodes: string[],
+): Promise<PvPCardResult> {
   const c = cardChallenges.get(id);
   if (!c) return { ok: false, error: 'not_found' };
   if (byUserId !== c.targetId) return { ok: false, error: 'not_target' };
   const pool = await allCards();
-  const targetCard = pool.find(x => x.code === targetCardCode);
+  const targetLoadout = await resolveLoadout(pool, c.targetId, targetCharacterCode, targetEquipmentCodes);
+  if (!targetLoadout.ok) return { ok: false, error: targetLoadout.error };
   const challengerCard = pool.find(x => x.id === c.challengerCardId);
-  if (!targetCard || !challengerCard) return { ok: false, error: 'card_not_found' };
-  const { data: owned } = await supabase.from('tcg_collection').select('quantity').eq('discord_id', c.targetId).eq('card_id', targetCard.id).maybeSingle();
-  if (!owned || (owned.quantity ?? 0) < 1) return { ok: false, error: 'not_owned' };
+  const challengerEquip = c.challengerEquipIds.map(id => pool.find(x => x.id === id)).filter((x): x is Card => !!x);
+  if (!challengerCard) return { ok: false, error: 'card_not_found' };
 
   if (c.wager > 0) {
     const d = await spendPulse(c.targetId, c.wager, 'TCG duel accepted wager');
@@ -358,17 +429,24 @@ export async function acceptCardChallenge(id: string, byUserId: string, targetCa
   }
   cardChallenges.delete(id);
 
+  const cStats = effectiveStats(challengerCard, challengerEquip);
+  const tStats = effectiveStats(targetLoadout.character, targetLoadout.equipment);
   const stats: ('attack' | 'defense' | 'speed')[] = ['attack', 'defense', 'speed'];
   let challengerScore = 0, targetScore = 0;
   const turns: PvPCardResult['turns'] = [];
   for (const s of stats) {
-    const cRoll = challengerCard[s] + Math.random() * 5;
-    const tRoll = targetCard[s] + Math.random() * 5;
+    const cRoll = cStats[s] + Math.random() * 5;
+    const tRoll = tStats[s] + Math.random() * 5;
     if (cRoll >= tRoll) challengerScore += 1; else targetScore += 1;
     turns.push({ stat: s, challengerRoll: Math.round(cRoll * 10) / 10, targetRoll: Math.round(tRoll * 10) / 10 });
   }
   const winnerId = challengerScore > targetScore ? c.challengerId : c.targetId;
   const pot = c.wager * 2;
   if (pot > 0) await earnPulse(winnerId, pot, `TCG duel win vs opponent`, `tcg_pvp:${id}`);
-  return { ok: true, challengerCard, targetCard, turns, challengerScore, targetScore, winnerId, pot };
+  return {
+    ok: true,
+    challengerCard, challengerEquip, challengerStats: cStats,
+    targetCard: targetLoadout.character, targetEquip: targetLoadout.equipment, targetStats: tStats,
+    turns, challengerScore, targetScore, winnerId, pot,
+  };
 }

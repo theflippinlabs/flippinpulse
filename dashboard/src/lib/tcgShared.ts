@@ -2,6 +2,7 @@
 // pulling in the server-only Supabase client that lib/tcg needs.
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export type CardKind = 'character' | 'equipment';
 
 export interface Card {
   id: number;
@@ -14,10 +15,16 @@ export interface Card {
   speed: number;
   flavor: string;
   is_active: boolean;
+  card_kind: CardKind;
+  atk_bonus: number;
+  def_bonus: number;
+  spd_bonus: number;
 }
 
 export const PACK_COST = 100;
 export const PACK_SIZE = 5;
+// Max equipment items that can attach to a champion in a duel.
+export const MAX_EQUIPMENT_SLOTS = 3;
 
 export const RARITY_STYLE: Record<Rarity, { color: string; ring: string; glow: string; label: { fr: string; en: string } }> = {
   common:    { color: 'text-gray-300',   ring: 'ring-gray-500/40',    glow: 'shadow-none',                                           label: { fr: 'Commune',    en: 'Common'    } },
@@ -39,3 +46,12 @@ export const SELL_VALUE: Record<Rarity, number> = {
 export const NEXT_RARITY: Record<Rarity, Rarity | null> = {
   common: 'rare', rare: 'epic', epic: 'legendary', legendary: 'mythic', mythic: null,
 };
+
+// Effective stats for a champion once equipment is attached.
+export function effectiveStats(character: Card, equipment: Card[]): { attack: number; defense: number; speed: number } {
+  return {
+    attack:  character.attack  + equipment.reduce((s, e) => s + (e.atk_bonus ?? 0), 0),
+    defense: character.defense + equipment.reduce((s, e) => s + (e.def_bonus ?? 0), 0),
+    speed:   character.speed   + equipment.reduce((s, e) => s + (e.spd_bonus ?? 0), 0),
+  };
+}

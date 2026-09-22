@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { NEXT_RARITY, RARITY_STYLE, SELL_VALUE, rarityOrder, type Card, type Rarity } from '@/lib/tcgShared';
-import ChallengeDialog from '../ChallengeDialog';
+import CardDuelDialog from './CardDuelDialog';
 
 interface Props {
   fr: boolean;
@@ -21,6 +21,14 @@ const RARITY_FILTERS: (Rarity | 'all')[] = ['all', 'common', 'rare', 'epic', 'le
 function CardTile({ card, quantity, revealed = true, fr }: { card: Card; quantity: number; revealed?: boolean; fr: boolean }) {
   const st = RARITY_STYLE[card.rarity];
   const dim = quantity === 0 ? 'opacity-30 grayscale' : '';
+  const isEquipment = card.card_kind === 'equipment';
+  const statLine = isEquipment
+    ? [
+        card.atk_bonus ? `+${card.atk_bonus}⚔` : null,
+        card.def_bonus ? `+${card.def_bonus}🛡` : null,
+        card.spd_bonus ? `+${card.spd_bonus}💨` : null,
+      ].filter(Boolean).join(' ') || '·'
+    : `${card.attack}/${card.defense}/${card.speed}`;
   return (
     <div className={`relative rounded-xl bg-gradient-to-br from-pulse-card to-black border border-pulse-border ring-1 ${st.ring} ${st.glow} ${dim} ${revealed ? '' : 'animate-pulse'} p-2 flex flex-col items-center`}>
       <div className="text-3xl mb-1">{revealed ? card.emoji : '❓'}</div>
@@ -33,8 +41,13 @@ function CardTile({ card, quantity, revealed = true, fr }: { card: Card; quantit
       {quantity === 0 && (
         <span className="absolute top-1 right-1 text-[9px] px-1 rounded bg-black/60 text-pulse-mute font-mono">?</span>
       )}
+      {revealed && isEquipment && (
+        <span className="absolute top-1 left-1 text-[8px] px-1 rounded bg-purple-500/30 text-purple-100 font-black uppercase tracking-wider">
+          {fr ? 'ÉQUIP' : 'EQP'}
+        </span>
+      )}
       <div className="mt-1 text-[8px] text-pulse-mute font-mono text-center">
-        {revealed ? `${card.attack}/${card.defense}/${card.speed}` : ''}
+        {revealed ? statLine : ''}
       </div>
     </div>
   );
@@ -77,6 +90,14 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
     mixed_rarity: fr ? 'Les 3 cartes doivent être de même rareté.' : 'All 3 cards must share rarity.',
     max_rarity: fr ? 'Les mythiques ne se fusionnent plus.' : 'Mythics cannot fuse further.',
     not_enough_copies: fr ? 'Copies insuffisantes.' : 'Not enough copies.',
+    not_a_character: fr ? 'Ton champion doit être un personnage.' : 'Your champion must be a character card.',
+    not_an_equipment: fr ? "L'objet choisi n'est pas un équipement." : 'That card is not an equipment.',
+    too_many_equipment: fr ? 'Maximum 3 équipements.' : 'Max 3 equipment items.',
+    bad_equipment: fr ? "Équipement invalide." : 'Invalid equipment.',
+    bad_card: fr ? 'Choisis un personnage.' : 'Pick a character.',
+    bad_opponent: fr ? 'Adversaire invalide.' : 'Invalid opponent.',
+    self_challenge: fr ? 'Tu ne peux pas te défier toi-même.' : "You can't challenge yourself.",
+    no_channel: fr ? 'Choisis un salon.' : 'Pick a channel.',
   }[code] ?? code);
 
   async function sellSelected(qty: number) {
@@ -376,8 +397,17 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
                 <div className="text-pulse-gold font-bold mb-1">⚔️ {fr ? 'Défier un membre' : 'Challenge a member'}</div>
                 <p className="text-pulse-mute">
                   {fr
-                    ? 'Sur Discord : `/cards challenge opponent:@toi card:code wager:100`. Ta carte affronte la sienne sur ATK / DEF / SPD → gagnant sur 2 rounds prend le pot (2× la mise).'
-                    : 'On Discord: `/cards challenge opponent:@you card:code wager:100`. Your card fights theirs on ATK / DEF / SPD → best of 3 takes the pot (2× wager).'}
+                    ? 'Bouton **⚔️ Défier** ci-dessus, ou sur Discord : `/cards challenge`. Choisis un **personnage** champion et attache jusqu\'à **3 équipements** pour booster ses stats. Les stats effectives (base + bonus) s\'affrontent sur ATK / DEF / SPD → gagnant sur 2 rounds prend le pot (2× la mise).'
+                    : 'Use the **⚔️ Duel** button above, or on Discord: `/cards challenge`. Pick a **character** champion and attach up to **3 equipment** to boost its stats. Effective stats (base + bonuses) clash on ATK / DEF / SPD → best of 3 takes the pot (2× wager).'}
+                </p>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">🎽 {fr ? 'Personnages & équipements' : 'Characters & equipment'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? 'Deux familles de cartes : **Personnages** (attaquent, ont des stats ATK/DEF/SPD) et **Équipements** (s\'attachent à un personnage, ajoutent des bonus). Un équipement ne peut PAS combattre seul. Empile jusqu\'à 3 équipements sur ton champion pour transformer un personnage rare en tueur légendaire.'
+                    : 'Two card families: **Characters** (attack, carry ATK/DEF/SPD stats) and **Equipment** (attach to a character, add stat bonuses). Equipment cannot fight alone. Stack up to 3 equipment items on your champion to turn a rare into a legendary killer.'}
                 </p>
               </section>
 
@@ -427,23 +457,22 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
         </div>
       )}
 
-      <ChallengeDialog
+      <CardDuelDialog
         open={challengeOpen}
         onClose={() => setChallengeOpen(false)}
-        title={fr ? 'Duel de cartes' : 'Card duel'}
         fr={fr}
         channels={channels}
         defaultChannel={defaultChannel}
-        extraLabel={fr ? 'Code de ta carte' : 'Your card code'}
-        extraPlaceholder="l_solar_phoenix"
-        onSubmit={async ({ opponentId, wager, channelId, extra, opponentName }) => {
+        catalog={catalog}
+        ownedRaw={ownedRaw}
+        onSubmit={async ({ opponentId, wager, channelId, characterCardId, equipmentCardIds, opponentName }) => {
           setError(null); setFlash(null);
           const res = await fetch('/api/cards/challenge', {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ opponentId, wager, channelId, cardCode: extra }),
+            body: JSON.stringify({ opponentId, wager, channelId, characterCardId, equipmentCardIds }),
           });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? 'error');
+          if (!res.ok) throw new Error(errorLabel(data.error ?? 'error'));
           setFlash(fr ? `⚔️ Défi envoyé à ${opponentName}. Il apparaît sur Discord.` : `⚔️ Challenge sent to ${opponentName}. Check Discord.`);
         }}
       />
