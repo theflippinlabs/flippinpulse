@@ -18,6 +18,7 @@ import { handleChallengeInteraction } from '../services/challenges.js';
 import { handlePokerInteraction } from '../commands/poker.js';
 import { handleBattlePassInteraction } from '../commands/battlepass.js';
 import { handlePetInteraction } from '../commands/pet.js';
+import { seedLocaleFromDiscord } from '../i18n.js';
 import { log } from '../utils/logger.js';
 
 async function handleGiveawayButton(interaction: ButtonInteraction): Promise<void> {
@@ -47,6 +48,13 @@ async function handleGiveawayButton(interaction: ButtonInteraction): Promise<voi
 }
 
 export async function handleInteractionCreate(interaction: Interaction): Promise<void> {
+  // Prime each member's Novarys locale from their Discord client locale on
+  // first contact. Fire-and-forget — the seed only writes when we don't
+  // already have one on file, so this stays a no-op after the first time.
+  if ('user' in interaction && interaction.user) {
+    void seedLocaleFromDiscord(interaction.user.id, interaction.locale ?? null);
+  }
+
   if (
     (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isUserSelectMenu() || interaction.isModalSubmit())
     && interaction.customId.startsWith('panel:')

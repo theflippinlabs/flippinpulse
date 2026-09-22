@@ -25,7 +25,12 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption(o => o
     .setName('hours')
     .setDescription('How many hours back (1-72, default 24) / Combien d\'heures en arrière')
-    .setMinValue(1).setMaxValue(72).setRequired(false));
+    .setMinValue(1).setMaxValue(72).setRequired(false))
+  .addStringOption(o => o
+    .setName('language')
+    .setDescription('Force output language (defaults to your /language) / Force la langue de sortie')
+    .addChoices({ name: '🇫🇷 Français', value: 'fr' }, { name: '🇬🇧 English', value: 'en' })
+    .setRequired(false));
 
 async function fetchWindow(channel: TextBasedChannel, sinceMs: number): Promise<Message[]> {
   const out: Message[] = [];
@@ -46,7 +51,9 @@ async function fetchWindow(channel: TextBasedChannel, sinceMs: number): Promise<
 }
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  const locale = await getUserLocale(interaction.user.id);
+  const forced = interaction.options.getString('language');
+  const stored = await getUserLocale(interaction.user.id);
+  const locale = forced === 'en' || forced === 'fr' ? forced : stored;
   const en = locale === 'en';
 
   if (!interaction.guild) {

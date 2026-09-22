@@ -28,6 +28,44 @@ export async function setUserLocale(discordId: string, locale: Locale): Promise<
   cache.set(discordId, { locale, ts: Date.now() });
 }
 
+// Map a Discord client locale (e.g. "en-US", "fr", "de", "pt-BR") to our two
+// supported languages. Anything that clearly starts with "fr" is French; every
+// other tag defaults to English — better a wrong non-francophone gets English
+// than French.
+export function inferLocaleFromDiscord(discordLocale: string | null | undefined): Locale {
+  if (!discordLocale) return 'fr';
+  return discordLocale.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+}
+
+// Seed the stored locale for a member the first time we see them, using the
+// language Discord tells us their client is in. If a row already carries a
+// locale, this is a no-op. Fail-soft: never throws.
+export async function seedLocaleFromDiscord(discordId: string, discordLocale: string | null | undefined): Promise<void> {
+  try {
+    // If the cache already knows the user, nothing to do.
+    if (cache.has(discordId)) return;
+    const { data } = await supabase
+      .from('discord_users')
+      .select('locale')
+      .eq('discord_id', discordId)
+      .maybeSingle();
+    const existing = (data as { locale?: string } | null)?.locale;
+    if (existing === 'fr' || existing === 'en') {
+      cache.set(discordId, { locale: existing as Locale, ts: Date.now() });
+      return;
+    }
+    const inferred = inferLocaleFromDiscord(discordLocale);
+    // Only touch the row if it exists (so we don't create ghost user rows on
+    // unrelated interactions). If the row doesn't exist yet, just prime the
+    // cache with the inferred locale — the row will be created by the normal
+    // activity path and pick up the value later.
+    await supabase.from('discord_users').update({ locale: inferred }).eq('discord_id', discordId);
+    cache.set(discordId, { locale: inferred, ts: Date.now() });
+  } catch {
+    // Ignore — this is a nice-to-have, not a correctness path.
+  }
+}
+
 // The dictionary. Kept flat for readability. Values can carry {placeholders}.
 export const M = {
   fr: {
