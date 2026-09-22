@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { SPECIES, type Pet, type SpeciesKey } from '@/lib/petsShared';
+import PetShowcase from './PetShowcase';
+
+type BurstKind = 'feed' | 'play' | 'train' | 'level' | null;
 
 interface Props {
   fr: boolean;
@@ -39,9 +42,16 @@ export default function PetClient({ fr, pet, species, battles }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [burst, setBurst] = useState<BurstKind>(null);
 
   const [pickedSpecies, setPickedSpecies] = useState<SpeciesKey>(species[0].key);
   const [petName, setPetName] = useState('');
+
+  useEffect(() => {
+    if (!burst) return;
+    const t = setTimeout(() => setBurst(null), 1600);
+    return () => clearTimeout(t);
+  }, [burst]);
 
   const errorLabel = (code: string): string => {
     const map: Record<string, { fr: string; en: string }> = {
@@ -65,6 +75,9 @@ export default function PetClient({ fr, pet, species, battles }: Props) {
     });
     const data = await res.json();
     if (!res.ok) { setError(errorLabel(data.error ?? 'error')); return; }
+    // Fire the visual burst first, so the animation is already running when
+    // Router.refresh triggers the server re-render.
+    setBurst(data.leveledUp ? 'level' : kind);
     if (data.leveledUp) setFlash(fr ? `✨ Niveau ${data.pet.level} !` : `✨ Level ${data.pet.level}!`);
     startTransition(() => router.refresh());
   }
@@ -134,16 +147,9 @@ export default function PetClient({ fr, pet, species, battles }: Props) {
         </>
       ) : (
         <>
-          <div className="rounded-2xl p-4 bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 border border-pulse-gold/40 mb-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="text-5xl">{pet.emoji}</div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xl font-bold truncate">{pet.name}</div>
-                <div className="text-xs text-pulse-mute">
-                  {fr ? 'Niveau' : 'Level'} {pet.level} · {pet.xp}/100 XP · 🏆 {pet.wins} · 💔 {pet.losses}
-                </div>
-              </div>
-            </div>
+          <PetShowcase pet={pet} fr={fr} actionBurst={burst} />
+
+          <div className="rounded-2xl p-4 bg-pulse-card border border-pulse-border mb-4">
             <div className="grid gap-2.5">
               <Bar value={pet.hunger}    statKey="hunger"    fr={fr} />
               <Bar value={pet.happiness} statKey="happiness" fr={fr} />
