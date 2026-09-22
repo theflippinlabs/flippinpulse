@@ -2,6 +2,7 @@ import { getSession, isAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getLocale } from '@/lib/i18n';
 import MemberShell from './MemberShell';
+import InstallHint from './InstallHint';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const session = getSession();
@@ -19,6 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       isLord={isAdmin(session.id)}
       locale={locale}
     >
+      <InstallHint fr={locale === 'fr'} />
       {children}
     </MemberShell>
   );
