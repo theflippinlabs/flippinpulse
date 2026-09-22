@@ -60,9 +60,9 @@ function ShellInner({ username, avatarUrl, isLord, children }: Omit<Props, 'loca
           <div className="flex items-center gap-2">
             <LocaleToggle />
             {isLord && (
-              <a href="/dashboard" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-gold/20 text-pulse-gold border border-pulse-gold/40 font-semibold">
+              <Link href="/dashboard" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-gold/20 text-pulse-gold border border-pulse-gold/40 font-semibold">
                 {t('nav.command_deck')}
-              </a>
+              </Link>
             )}
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

@@ -6,7 +6,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'Novarys',
     description: 'Novarys — Discord community hub, games, shop and battle pass.',
     start_url: '/app',
-    scope: '/app',
+    // Widened to '/' so Lords can jump from /app to /dashboard inside the
+    // installed PWA without being kicked out to Safari.
+    scope: '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#000000',

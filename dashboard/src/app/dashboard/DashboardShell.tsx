@@ -85,9 +85,9 @@ function ShellInner({ username, avatarUrl, children }: { username: string; avata
           </div>
           <div className="flex items-center gap-2">
             <LocaleToggle />
-            <a href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">
+            <Link href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">
               🎮
-            </a>
+            </Link>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="w-7 h-7 rounded-full ring-1 ring-pulse-gold/40" />
@@ -125,9 +125,9 @@ function ShellInner({ username, avatarUrl, children }: { username: string; avata
         <div className="px-4 py-4 border-t border-pulse-border">
           <div className="flex items-center gap-2 mb-3">
             <LocaleToggle />
-            <a href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">
+            <Link href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">
               🎮 App
-            </a>
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             {avatarUrl ? (
