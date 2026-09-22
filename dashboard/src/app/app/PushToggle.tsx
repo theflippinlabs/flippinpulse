@@ -24,6 +24,13 @@ export default function PushToggle({ fr }: { fr: boolean }) {
     setState(Notification.permission as State);
   }, []);
 
+  // Auto-dismiss the post-activation confirmation toast after 4s.
+  useEffect(() => {
+    if (!message) return;
+    const h = setTimeout(() => setMessage(null), 4000);
+    return () => clearTimeout(h);
+  }, [message]);
+
   async function enable() {
     setMessage(null);
     try {
@@ -53,25 +60,28 @@ export default function PushToggle({ fr }: { fr: boolean }) {
     }
   }
 
-  if (state === 'unsupported') return null;
-  if (state === 'granted') {
-    return (
-      <div className="mx-3 mt-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-2 text-xs text-emerald-200">
-        🔔 {fr ? 'Notifications actives' : 'Notifications active'}
-      </div>
-    );
+  // Once notifications are granted (or denied, or unsupported) there's
+  // nothing useful to say — hide the banner completely so the hub stays
+  // clean. The message toast is still shown briefly right after activation.
+  if (state === 'unsupported' || state === 'granted' || state === 'denied') {
+    if (message) {
+      return (
+        <div className="mx-3 mt-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-200">
+          {message}
+        </div>
+      );
+    }
+    return null;
   }
-  if (state === 'denied') return null;
 
   return (
-    <div className="mx-3 mt-2 rounded-xl border border-pulse-gold/40 bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 p-3 flex items-center gap-3">
-      <span className="text-xl leading-none">🔔</span>
-      <div className="flex-1 text-xs">
-        <div className="font-semibold text-pulse-gold">{fr ? 'Active les notifications' : 'Enable notifications'}</div>
-        <div className="text-pulse-mute">{fr ? 'Pour être prévenu·e des cadeaux, défis et récaps.' : 'Get pinged on gifts, challenges and recaps.'}</div>
-        {message && <div className="mt-1">{message}</div>}
+    <div className="mx-3 mt-2 rounded-xl border border-pulse-gold/40 bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 px-3 py-2 flex items-center gap-2">
+      <span className="text-base leading-none">🔔</span>
+      <div className="flex-1 text-[11px] min-w-0">
+        <div className="font-semibold text-pulse-gold truncate">{fr ? 'Active les notifications' : 'Enable notifications'}</div>
+        <div className="text-pulse-mute truncate">{fr ? 'Cadeaux, défis, récaps.' : 'Gifts, challenges, recaps.'}</div>
       </div>
-      <button onClick={enable} className="text-xs font-bold px-3 py-1.5 rounded-full bg-pulse-gold text-black">
+      <button onClick={enable} className="text-[11px] font-bold px-3 py-1 rounded-full bg-pulse-gold text-black shrink-0">
         {fr ? 'Activer' : 'Enable'}
       </button>
     </div>
