@@ -67,6 +67,8 @@ import * as birthday from './birthday.js';
 import * as marriage from './marriage.js';
 import * as bank from './bank.js';
 import * as event from './event.js';
+import * as guild from './guild.js';
+import * as hunt from './hunt.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -84,7 +86,7 @@ const commandList: Command[] = [
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
   jeux, hub, setupaccueil, jail, achievements, tournoi, cosmetics, chicken, automod, charts, music,
   language, catchup, compagnon, poker, battlepass, pet, cards, gift, birthday,
-  marriage, bank, event,
+  marriage, bank, event, guild, hunt,
 ];
 
 export const commands = new Map<string, Command>();

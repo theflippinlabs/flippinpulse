@@ -20,6 +20,7 @@ import { startDashboardBridge } from './services/dashboardBridge.js';
 import { startChannelSync } from './services/channelSync.js';
 import { runDailyBirthdaySweep } from './services/birthdays.js';
 import { runReminderSweep } from './services/calendar.js';
+import { runWeeklyAnalyticsSweep } from './services/analytics.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -89,6 +90,13 @@ client.once('ready', async () => {
   setInterval(() => {
     runReminderSweep(client).catch(err => log('ERROR', 'Calendar reminder tick failed', err));
   }, 60 * 1000);
+
+  // Weekly analytics: check every 6 hours if the current week's report has
+  // been delivered yet. Fires on Monday 00:00 UTC-ish (first tick after
+  // that moment). Idempotent via the weekly_analytics.week_starts_at row.
+  setInterval(() => {
+    runWeeklyAnalyticsSweep(client).catch(err => log('ERROR', 'Weekly analytics tick failed', err));
+  }, 6 * 60 * 60 * 1000);
 
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });
