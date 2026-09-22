@@ -133,7 +133,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
   if (sub === 'claim') {
-    const res = await claimPending(interaction.user.id);
+    const res = await claimPending(interaction.user.id, interaction.client, interaction.guildId ?? undefined);
     if (res.error) { await interaction.reply({ embeds: [errorEmbed(res.error)], flags: MessageFlags.Ephemeral }); return; }
     if (!res.claimed.length) { await interaction.reply({ embeds: [errorEmbed(fr ? 'Rien à réclamer.' : 'Nothing to claim.')], flags: MessageFlags.Ephemeral }); return; }
     const totalPulse = res.claimed.reduce((a, r) => a + r.pulseAwarded, 0);
@@ -168,7 +168,7 @@ export async function handleBattlePassInteraction(interaction: Interaction): Pro
   const action = btn.customId.split(':')[1];
 
   if (action === 'claim') {
-    const res = await claimPending(btn.user.id);
+    const res = await claimPending(btn.user.id, btn.client, btn.guildId ?? undefined);
     if (!res.claimed.length) {
       await btn.reply({ embeds: [errorEmbed(fr ? 'Rien à réclamer.' : 'Nothing to claim.')], flags: MessageFlags.Ephemeral });
       return;

@@ -1,3 +1,4 @@
+import { Client } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { earnPulse } from './games.js';
 import { spendPulse } from './economy.js';
@@ -95,7 +96,7 @@ export interface ClaimResult {
   error?: string;
 }
 
-export async function claimPending(discordId: string): Promise<ClaimResult> {
+export async function claimPending(discordId: string, client?: Client, guildId?: string): Promise<ClaimResult> {
   const season = await getActiveSeason();
   if (!season) return { claimed: [], error: 'No active season.' };
   const [tiers, progress] = await Promise.all([getTiers(season.id), getProgress(discordId, season.id)]);
@@ -105,12 +106,12 @@ export async function claimPending(discordId: string): Promise<ClaimResult> {
   for (const t of tiers) {
     if (t.tier_number > currentTier) break;
     if (!progress.claimed_free.includes(t.tier_number)) {
-      const awarded = await grantReward(discordId, t.free_reward_kind, t.free_reward_value, `Battle Pass S${season.id} T${t.tier_number} free`, `bp:${season.id}:${t.tier_number}:free`);
+      const awarded = await grantReward(discordId, t.free_reward_kind, t.free_reward_value, `Battle Pass S${season.id} T${t.tier_number} free`, `bp:${season.id}:${t.tier_number}:free`, client, guildId);
       progress.claimed_free.push(t.tier_number);
       claimed.push({ tier: t.tier_number, track: 'free', label: t.free_reward_label, pulseAwarded: awarded });
     }
     if (progress.is_premium && !progress.claimed_premium.includes(t.tier_number)) {
-      const awarded = await grantReward(discordId, t.premium_reward_kind, t.premium_reward_value, `Battle Pass S${season.id} T${t.tier_number} premium`, `bp:${season.id}:${t.tier_number}:premium`);
+      const awarded = await grantReward(discordId, t.premium_reward_kind, t.premium_reward_value, `Battle Pass S${season.id} T${t.tier_number} premium`, `bp:${season.id}:${t.tier_number}:premium`, client, guildId);
       progress.claimed_premium.push(t.tier_number);
       claimed.push({ tier: t.tier_number, track: 'premium', label: t.premium_reward_label, pulseAwarded: awarded });
     }
@@ -119,13 +120,70 @@ export async function claimPending(discordId: string): Promise<ClaimResult> {
   return { claimed };
 }
 
-async function grantReward(discordId: string, kind: RewardKind, value: Record<string, unknown>, reason: string, refId: string): Promise<number> {
+async function grantReward(
+  discordId: string,
+  kind: RewardKind,
+  value: Record<string, unknown>,
+  reason: string,
+  refId: string,
+  client?: Client,
+  guildId?: string,
+): Promise<number> {
   if (kind === 'pulse') {
     const amount = Number(value.amount ?? 0);
     if (amount > 0) await earnPulse(discordId, amount, reason, refId);
     return amount;
   }
-  // Non-PULSE rewards (cosmetic, role, shop_item) are recorded on the progress row; a background reconciler / dashboard can grant the actual role or cosmetic. For now they display in the claim summary and the progress log persists the earned tier.
+  if (kind === 'role') {
+    const roleId = String(value.role_id ?? '');
+    if (roleId && client && guildId) {
+      try {
+        const guild = await client.guilds.fetch(guildId).catch(() => null);
+        const member = guild ? await guild.members.fetch(discordId).catch(() => null) : null;
+        if (member) await member.roles.add(roleId, `Battle Pass reward — ${reason}`).catch(err => log('ERROR', 'BP role grant failed', err));
+      } catch (err) { log('ERROR', 'BP role grant crashed', err); }
+    }
+    return 0;
+  }
+  if (kind === 'cosmetic') {
+    // Insert into user_cosmetics with the cosmetic's key. Free-form: any admin
+    // seeded cosmetic key can be used and the shop cosmetics UI already reads
+    // this table.
+    const cosmeticKey = String(value.key ?? '');
+    const label = String(value.label ?? cosmeticKey);
+    if (cosmeticKey) {
+      try {
+        await supabase.from('user_cosmetics').insert({
+          discord_id: discordId,
+          cosmetic_key: cosmeticKey,
+          source: 'battle_pass',
+          note: label,
+        });
+      } catch (err) { log('ERROR', 'BP cosmetic insert failed', err); }
+    }
+    return 0;
+  }
+  if (kind === 'shop_item') {
+    // Grant a shop item by name/id. Same pattern: record as an admin-approved fulfillment.
+    const itemName = String(value.name ?? '');
+    if (itemName) {
+      try {
+        await supabase.from('shop_purchases').insert({
+          discord_id: discordId,
+          item_name: itemName,
+          price_paid: 0,
+          status: 'approved',
+          note: `Battle Pass reward — ${reason}`,
+        });
+      } catch (err) { log('ERROR', 'BP shop_item insert failed', err); }
+    }
+    return 0;
+  }
+  if (kind === 'xp_boost') {
+    // XP boosts are a future feature — for now record the intent.
+    log('INFO', `BP xp_boost reward for ${discordId} — pending future feature`);
+    return 0;
+  }
   return 0;
 }
 

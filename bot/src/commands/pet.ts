@@ -26,6 +26,7 @@ import {
   type Pet,
   type SpeciesKey,
 } from '../services/pets.js';
+import { buySkin, equipSkin, getOwnedSkins, listSkins } from '../services/petSkins.js';
 
 function bar(v: number): string {
   const filled = Math.round((v / 100) * 10);
@@ -77,6 +78,11 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s.setName('challenge').setDescription("Challenge another member's pet / Défier un autre membre")
     .addUserOption(o => o.setName('opponent').setDescription('Opponent / Adversaire').setRequired(true))
     .addIntegerOption(o => o.setName('wager').setDescription('PULSE wager (0-10000)').setMinValue(0).setMaxValue(10_000).setRequired(false)))
+  .addSubcommand(s => s.setName('skins').setDescription('Browse pet skins / Parcourir les skins'))
+  .addSubcommand(s => s.setName('buyskin').setDescription('Buy a pet skin / Acheter un skin')
+    .addStringOption(o => o.setName('code').setDescription('Skin code (e.g. golden_aura)').setRequired(true)))
+  .addSubcommand(s => s.setName('equipskin').setDescription('Equip an owned skin / Équiper un skin')
+    .addStringOption(o => o.setName('code').setDescription('Skin code, or "none" to unequip').setRequired(true)))
   .addSubcommand(s => s.setName('retire').setDescription('Retire your pet / Retraite pour ton compagnon'));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -150,6 +156,64 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       : (fr ? `💥 Défaite. Ton compagnon retourne se reposer.` : `💥 Defeat. Your pet goes to rest.`);
     await interaction.reply({
       embeds: [pulseEmbed(fr ? '⚔️ Combat sauvage' : '⚔️ Wild battle').setDescription(`${log}\n\n${summary}`)],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (sub === 'skins') {
+    const [skins, owned] = await Promise.all([listSkins(), getOwnedSkins(interaction.user.id)]);
+    if (!skins.length) {
+      await interaction.reply({ embeds: [errorEmbed(fr ? 'Aucun skin disponible.' : 'No skins available.')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const lines = skins.map(s => {
+      const own = owned.has(s.id) ? '✅' : '🛒';
+      const color = s.aura_hex;
+      return `${own} **${s.name}** _(${s.rarity})_ — ${s.price_pulse} PULSE\n\`${s.code}\` · aura ${color}${s.emoji_override ? ` · emoji ${s.emoji_override}` : ''}`;
+    }).join('\n\n');
+    await interaction.reply({
+      embeds: [pulseEmbed(fr ? '🎨 Skins de compagnon' : '🎨 Pet skins').setDescription(
+        lines + '\n\n' + (fr ? '_Acheter : `/pet buyskin code:X` · Équiper : `/pet equipskin code:X`_' : '_Buy: `/pet buyskin code:X` · Equip: `/pet equipskin code:X`_'))],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (sub === 'buyskin') {
+    const code = interaction.options.getString('code', true).trim();
+    const res = await buySkin(interaction.user.id, code);
+    if (!res.ok || !res.skin) {
+      const msg = res.error === 'skin_not_found' ? (fr ? 'Skin inconnu.' : 'Unknown skin.')
+        : res.error === 'already_owned' ? (fr ? 'Tu possèdes déjà ce skin.' : 'You already own this skin.')
+        : (fr ? 'Achat impossible.' : 'Purchase failed.');
+      await interaction.reply({ embeds: [errorEmbed(msg)], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    await interaction.reply({
+      embeds: [successEmbed(fr
+        ? `🎨 Skin **${res.skin.name}** acheté ! Utilise \`/pet equipskin code:${res.skin.code}\` pour l'équiper.`
+        : `🎨 Skin **${res.skin.name}** bought! Use \`/pet equipskin code:${res.skin.code}\` to equip it.`)],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (sub === 'equipskin') {
+    const code = interaction.options.getString('code', true).trim().toLowerCase();
+    const res = await equipSkin(interaction.user.id, code === 'none' ? null : code);
+    if (!res.ok) {
+      const msg = res.error === 'no_pet' ? (fr ? 'Pas de compagnon actif.' : 'No active pet.')
+        : res.error === 'skin_not_found' ? (fr ? 'Skin inconnu.' : 'Unknown skin.')
+        : res.error === 'not_owned' ? (fr ? 'Tu ne possèdes pas ce skin.' : 'You do not own this skin.')
+        : (fr ? 'Équipement impossible.' : 'Equip failed.');
+      await interaction.reply({ embeds: [errorEmbed(msg)], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    await interaction.reply({
+      embeds: [successEmbed(fr
+        ? `✨ ${res.skin ? `Skin **${res.skin.name}** équipé !` : 'Skin retiré.'}`
+        : `✨ ${res.skin ? `Skin **${res.skin.name}** equipped!` : 'Skin removed.'}`)],
       flags: MessageFlags.Ephemeral,
     });
     return;

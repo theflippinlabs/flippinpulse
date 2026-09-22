@@ -18,6 +18,7 @@ import { startJailScheduler } from './services/jail.js';
 import { startCosmeticsScheduler } from './services/cosmetics.js';
 import { startDashboardBridge } from './services/dashboardBridge.js';
 import { startChannelSync } from './services/channelSync.js';
+import { runDailyBirthdaySweep } from './services/birthdays.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -73,6 +74,15 @@ client.once('ready', async () => {
   startCosmeticsScheduler(client);
   startDashboardBridge(client);
   startChannelSync(client);
+
+  // Birthday sweep: runs once at startup and then every hour. The service
+  // internally skips members already celebrated for the current year, so
+  // hourly ticks are cheap and cost nothing if nobody has a birthday today.
+  void runDailyBirthdaySweep(client).catch(err => log('ERROR', 'Initial birthday sweep failed', err));
+  setInterval(() => {
+    runDailyBirthdaySweep(client).catch(err => log('ERROR', 'Birthday sweep tick failed', err));
+  }, 60 * 60 * 1000);
+
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });
 
