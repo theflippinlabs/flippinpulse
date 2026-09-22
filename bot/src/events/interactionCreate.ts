@@ -18,6 +18,7 @@ import { handleChallengeInteraction } from '../services/challenges.js';
 import { handlePokerInteraction } from '../commands/poker.js';
 import { handleBattlePassInteraction } from '../commands/battlepass.js';
 import { handlePetInteraction } from '../commands/pet.js';
+import { handleCardChallengeInteraction } from '../commands/cards.js';
 import { seedLocaleFromDiscord } from '../i18n.js';
 import { log } from '../utils/logger.js';
 
@@ -105,6 +106,15 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handlePetInteraction(interaction);
     } catch (err) {
       log('ERROR', 'Pet interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('tcgpvp:')) {
+    try {
+      await handleCardChallengeInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'TCG PvP interaction handler crashed', err);
     }
     return;
   }

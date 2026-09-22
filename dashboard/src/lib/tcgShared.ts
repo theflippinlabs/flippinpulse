@@ -30,3 +30,12 @@ export const RARITY_STYLE: Record<Rarity, { color: string; ring: string; glow: s
 export function rarityOrder(r: Rarity): number {
   return { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 }[r];
 }
+
+export const SELL_VALUE: Record<Rarity, number> = {
+  common: 10, rare: 30, epic: 100, legendary: 300, mythic: 1000,
+};
+
+// null = terminal rarity (mythic can't be fused up).
+export const NEXT_RARITY: Record<Rarity, Rarity | null> = {
+  common: 'rare', rare: 'epic', epic: 'legendary', legendary: 'mythic', mythic: null,
+};

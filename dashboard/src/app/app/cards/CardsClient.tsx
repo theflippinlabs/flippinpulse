@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { RARITY_STYLE, rarityOrder, type Card, type Rarity } from '@/lib/tcgShared';
+import { NEXT_RARITY, RARITY_STYLE, SELL_VALUE, rarityOrder, type Card, type Rarity } from '@/lib/tcgShared';
 
 interface Props {
   fr: boolean;
@@ -46,6 +46,11 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
   const [revealIdx, setRevealIdx] = useState(0);
   const [balance, setBalance] = useState(initialBalance);
   const [error, setError] = useState<string | null>(null);
+  const [showRules, setShowRules] = useState(false);
+  const [fuseMode, setFuseMode] = useState(false);
+  const [fuseSelection, setFuseSelection] = useState<number[]>([]);
+  const [fuseResult, setFuseResult] = useState<Card | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
 
   const ownedMap = useMemo(() => new Map(ownedRaw.map(r => [r.id, r.quantity])), [ownedRaw]);
 
@@ -61,7 +66,56 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
     catalog_empty: fr ? 'Catalogue vide.' : 'Empty catalog.',
     user_not_found: fr ? 'Compte introuvable.' : 'Account not found.',
     unauthorized: fr ? 'Non autorisé.' : 'Unauthorized.',
+    not_owned: fr ? 'Tu ne possèdes pas cette carte.' : 'You do not own this card.',
+    keep_last_copy: fr ? 'Tu ne peux pas vendre ta dernière copie.' : 'You cannot sell your last copy.',
+    card_not_found: fr ? 'Carte introuvable.' : 'Card not found.',
+    need_3_cards: fr ? 'Sélectionne 3 cartes.' : 'Select 3 cards.',
+    mixed_rarity: fr ? 'Les 3 cartes doivent être de même rareté.' : 'All 3 cards must share rarity.',
+    max_rarity: fr ? 'Les mythiques ne se fusionnent plus.' : 'Mythics cannot fuse further.',
+    not_enough_copies: fr ? 'Copies insuffisantes.' : 'Not enough copies.',
   }[code] ?? code);
+
+  async function sellSelected(qty: number) {
+    if (!selected) return;
+    setError(null); setFlash(null);
+    const res = await fetch('/api/cards/sell', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cardId: selected.id, quantity: qty }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(errorLabel(data.error ?? 'error')); return; }
+    setBalance(data.newBalance);
+    setFlash(fr ? `💰 Vendu ${data.sold}× pour +${data.pulseEarned} PULSE.` : `💰 Sold ${data.sold}× for +${data.pulseEarned} PULSE.`);
+    setSelected(null);
+    startTransition(() => router.refresh());
+  }
+
+  function toggleFuseCard(id: number) {
+    setFuseSelection(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
+    });
+  }
+
+  async function runFuse() {
+    setError(null); setFlash(null); setFuseResult(null);
+    const res = await fetch('/api/cards/fuse', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cardIds: fuseSelection }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(errorLabel(data.error ?? 'error')); return; }
+    setFuseResult(data.result);
+    setFuseSelection([]);
+    startTransition(() => router.refresh());
+  }
+
+  const fuseSelectionCards = fuseSelection
+    .map(id => catalog.find(c => c.id === id))
+    .filter((c): c is Card => !!c);
+  const fuseRarity = fuseSelectionCards[0]?.rarity;
+  const fuseValid = fuseSelectionCards.length === 3 && fuseSelectionCards.every(c => c.rarity === fuseRarity) && !!fuseRarity && NEXT_RARITY[fuseRarity] !== null;
 
   async function open() {
     setError(null);
@@ -90,19 +144,76 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
       </Link>
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-2xl font-bold">🎴 {fr ? 'Cartes' : 'Cards'}</h1>
-        <div className="text-xs text-pulse-mute">
-          {fr ? 'Collection' : 'Collection'} : <span className="text-pulse-gold font-mono">{totalUnique}/{catalog.length}</span> · <span className="font-mono">{balance} PULSE</span>
+        <div className="flex items-center gap-2 text-xs">
+          <button onClick={() => setShowRules(true)} className="text-pulse-gold underline underline-offset-2">
+            {fr ? 'Règles' : 'Rules'}
+          </button>
+          <span className="text-pulse-mute">
+            <span className="text-pulse-gold font-mono">{totalUnique}/{catalog.length}</span> · <span className="font-mono">{balance} PULSE</span>
+          </span>
         </div>
       </div>
 
-      <button
-        onClick={open}
-        disabled={isPending || balance < packCost}
-        className="w-full rounded-2xl bg-gradient-to-r from-pulse-gold to-yellow-300 text-black font-black py-4 mb-4 shadow-[0_0_20px_rgba(245,182,46,.4)] disabled:opacity-60"
-      >
-        {fr ? `🎁 Ouvrir un booster (${packCost} PULSE)` : `🎁 Open a pack (${packCost} PULSE)`}
-      </button>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <button
+          onClick={open}
+          disabled={isPending || balance < packCost || fuseMode}
+          className="rounded-2xl bg-gradient-to-r from-pulse-gold to-yellow-300 text-black font-black py-4 shadow-[0_0_20px_rgba(245,182,46,.4)] disabled:opacity-60"
+        >
+          {fr ? `🎁 Booster` : `🎁 Pack`}
+          <div className="text-[10px] font-bold opacity-80 mt-0.5">{packCost} PULSE</div>
+        </button>
+        <button
+          onClick={() => { setFuseMode(v => !v); setFuseSelection([]); setFuseResult(null); }}
+          className={`rounded-2xl font-black py-4 border-2 ${fuseMode ? 'bg-purple-500 text-white border-purple-400' : 'bg-purple-500/10 text-purple-200 border-purple-500/40'}`}
+        >
+          {fr ? '🔀 Fusion' : '🔀 Fuse'}
+          <div className="text-[10px] font-bold opacity-80 mt-0.5">
+            {fuseMode ? (fr ? 'Choisis 3 cartes' : 'Pick 3 cards') : (fr ? '3 cartes → +1 rareté' : '3 cards → next rarity')}
+          </div>
+        </button>
+      </div>
 
+      {fuseMode && (
+        <div className="mb-4 rounded-2xl border border-purple-500/40 bg-purple-500/10 p-3">
+          <div className="flex items-center gap-2 mb-2 text-sm">
+            <span className="font-semibold text-purple-200">{fr ? 'Sélection' : 'Selection'}:</span>
+            <span className="text-pulse-mute">{fuseSelection.length} / 3</span>
+          </div>
+          <div className="flex gap-2 mb-2">
+            {[0, 1, 2].map(i => {
+              const card = fuseSelectionCards[i];
+              if (!card) {
+                return <div key={i} className="flex-1 h-14 rounded-lg border border-dashed border-pulse-border flex items-center justify-center text-pulse-mute text-xs">?</div>;
+              }
+              return (
+                <button key={i} onClick={() => toggleFuseCard(card.id)} className="flex-1 h-14 rounded-lg bg-black/40 border border-pulse-border flex items-center justify-center gap-1 text-lg">
+                  <span>{card.emoji}</span><span className="text-xs">{card.name.slice(0, 8)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={runFuse}
+            disabled={isPending || !fuseValid}
+            className="w-full rounded-lg bg-purple-500 text-white font-bold py-2 disabled:opacity-60"
+          >
+            {fuseValid
+              ? (fr ? `✨ Fusionner → ${NEXT_RARITY[fuseRarity!]?.toUpperCase()}` : `✨ Fuse → ${NEXT_RARITY[fuseRarity!]?.toUpperCase()}`)
+              : (fr ? '3 cartes de même rareté' : '3 cards of the same rarity')}
+          </button>
+          {fuseResult && (
+            <div className="mt-3 rounded-lg bg-black/40 border border-pulse-gold/40 p-3 text-center">
+              <div className="text-xs text-pulse-gold uppercase tracking-wider">{fr ? 'Obtenue' : 'Earned'}</div>
+              <div className="text-4xl">{fuseResult.emoji}</div>
+              <div className="font-bold">{fuseResult.name}</div>
+              <div className="text-xs text-pulse-mute">{fuseResult.rarity}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {flash && <div className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">{flash}</div>}
       {error && <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm">{error}</div>}
 
       {opening && (
@@ -136,9 +247,28 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
       <div className="grid grid-cols-4 gap-2">
         {filtered.map(card => {
           const q = ownedMap.get(card.id) ?? 0;
+          const inFuse = fuseSelection.includes(card.id);
+          const disabledForFuse = fuseMode && (q === 0 || (!inFuse && fuseSelection.length >= 3));
+          const onClick = () => {
+            if (fuseMode) {
+              if (q > 0) toggleFuseCard(card.id);
+            } else {
+              setSelected(card);
+            }
+          };
           return (
-            <button key={card.id} onClick={() => setSelected(card)} className="text-left">
+            <button
+              key={card.id}
+              onClick={onClick}
+              disabled={disabledForFuse}
+              className={`text-left relative ${inFuse ? 'ring-2 ring-purple-400 rounded-xl' : ''} ${disabledForFuse ? 'opacity-40' : ''}`}
+            >
               <CardTile card={card} quantity={q} fr={fr} />
+              {inFuse && (
+                <span className="absolute -top-1 -left-1 text-[8px] px-1.5 py-0.5 rounded bg-purple-500 text-white font-black">
+                  {fuseSelection.indexOf(card.id) + 1}
+                </span>
+              )}
             </button>
           );
         })}
@@ -162,11 +292,127 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
             <div className="mt-4 text-center text-xs text-pulse-mute">
               {ownedMap.get(selected.id) ? (fr ? `Tu en possèdes ×${ownedMap.get(selected.id)}` : `You own ×${ownedMap.get(selected.id)}`) : (fr ? 'Pas encore possédée' : 'Not owned yet')}
             </div>
+            {(() => {
+              const owned = ownedMap.get(selected.id) ?? 0;
+              const spareOne = owned > 1;
+              const spareAll = Math.max(0, owned - 1);
+              const unitValue = SELL_VALUE[selected.rarity];
+              if (spareOne) {
+                return (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); sellSelected(1); }}
+                      className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 py-2 text-xs font-semibold"
+                    >
+                      {fr ? `💰 Vendre 1 (+${unitValue})` : `💰 Sell 1 (+${unitValue})`}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); sellSelected(spareAll); }}
+                      className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 py-2 text-xs font-semibold"
+                    >
+                      {fr ? `💰 Vendre ×${spareAll} (+${unitValue * spareAll})` : `💰 Sell ×${spareAll} (+${unitValue * spareAll})`}
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <button
-              onClick={() => setSelected(null)}
+              onClick={(e) => { e.stopPropagation(); setSelected(null); }}
               className="mt-4 w-full rounded-xl bg-pulse-card border border-pulse-border py-2 text-sm"
             >
               {fr ? 'Fermer' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showRules && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          onClick={() => setShowRules(false)}
+        >
+          <div
+            className="max-w-md w-full max-h-[85vh] overflow-y-auto rounded-2xl bg-gradient-to-b from-pulse-card to-black border border-pulse-gold/40 p-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-black">🎴 {fr ? 'Comment jouer' : 'How to play'}</h2>
+              <button onClick={() => setShowRules(false)} className="text-2xl text-pulse-mute leading-none px-1">×</button>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">🎯 {fr ? 'But du jeu' : 'Goal'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? 'Collectionne les 32 cartes, défie les autres membres, et gagne du PULSE.'
+                    : 'Collect all 32 cards, challenge other members, and earn PULSE.'}
+                </p>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">🎁 {fr ? 'Ouvrir un booster' : 'Open a pack'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? `${packCost} PULSE = 5 cartes aléatoires. Anti-loose : si tes 4 premières sont communes, la 5ᵉ est garantie Rare+.`
+                    : `${packCost} PULSE = 5 random cards. Pity: if the first 4 pulls are all commons, the 5th is guaranteed Rare or better.`}
+                </p>
+                <div className="mt-2 text-[10px] font-mono text-pulse-mute">
+                  ⚪ 68% · 🔵 23% · 🟣 7% · 🟠 1.8% · 🔴 0.2%
+                </div>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">⚔️ {fr ? 'Défier un membre' : 'Challenge a member'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? 'Sur Discord : `/cards challenge opponent:@toi card:code wager:100`. Ta carte affronte la sienne sur ATK / DEF / SPD → gagnant sur 2 rounds prend le pot (2× la mise).'
+                    : 'On Discord: `/cards challenge opponent:@you card:code wager:100`. Your card fights theirs on ATK / DEF / SPD → best of 3 takes the pot (2× wager).'}
+                </p>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">💰 {fr ? 'Vendre les doublons' : 'Sell duplicates'}</div>
+                <p className="text-pulse-mute mb-1">
+                  {fr
+                    ? 'Tape sur une carte que tu as en plusieurs exemplaires → bouton **Vendre**. Ta dernière copie est protégée.'
+                    : 'Tap a card you own multiple times → **Sell** button. Your last copy is always protected.'}
+                </p>
+                <div className="grid grid-cols-5 gap-1 text-[10px] font-mono text-center">
+                  <div><div className="text-gray-400">⚪</div><div>{SELL_VALUE.common}</div></div>
+                  <div><div className="text-blue-400">🔵</div><div>{SELL_VALUE.rare}</div></div>
+                  <div><div className="text-purple-400">🟣</div><div>{SELL_VALUE.epic}</div></div>
+                  <div><div className="text-amber-400">🟠</div><div>{SELL_VALUE.legendary}</div></div>
+                  <div><div className="text-red-400">🔴</div><div>{SELL_VALUE.mythic}</div></div>
+                </div>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">🔀 {fr ? 'Fusionner' : 'Fuse'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? '3 cartes de la MÊME rareté → 1 carte aléatoire de la rareté supérieure. Idéal pour monter en gamme sans dépendre du hasard des boosters.'
+                    : '3 cards of the SAME rarity → 1 random card of the next rarity. Perfect for climbing without pack RNG.'}
+                </p>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">💡 {fr ? 'Astuces' : 'Tips'}</div>
+                <ul className="text-pulse-mute list-disc list-inside space-y-0.5">
+                  <li>{fr ? 'Vends tes doublons commun/rare pour refinancer des boosters.' : 'Sell extra commons/rares to fund new packs.'}</li>
+                  <li>{fr ? 'Fusionne 3 rares pour aller chercher une épique sans booster.' : 'Fuse 3 rares to chase an epic without opening packs.'}</li>
+                  <li>{fr ? 'Utilise `/cards challenge` sur Discord pour battre un ami et doubler ta mise.' : 'Use `/cards challenge` on Discord to fight a friend and double your wager.'}</li>
+                  <li>{fr ? 'Complète les 32 cartes du catalogue — la collection compte pour le prestige.' : 'Complete all 32 cards — collection completion is prestige.'}</li>
+                </ul>
+              </section>
+            </div>
+
+            <button
+              onClick={() => setShowRules(false)}
+              className="mt-5 w-full rounded-xl bg-pulse-gold text-black font-bold py-2.5"
+            >
+              {fr ? 'Compris !' : 'Got it!'}
             </button>
           </div>
         </div>
