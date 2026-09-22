@@ -96,28 +96,53 @@ export async function claimPending(discordId: string): Promise<{ claimed: ClaimS
   for (const t of tiers) {
     if (t.tier_number > currentTier) break;
     if (!progress.claimed_free.includes(t.tier_number)) {
-      if (t.free_reward_kind === 'pulse') {
-        const amt = Number(t.free_reward_value.amount ?? 0);
-        if (amt > 0) await creditPulse(discordId, amt, `Battle Pass S${season.id} T${t.tier_number} free`, `bp:${season.id}:${t.tier_number}:free`);
-        claimed.push({ tier: t.tier_number, track: 'free', label: t.free_reward_label, pulseAwarded: amt });
-      } else {
-        claimed.push({ tier: t.tier_number, track: 'free', label: t.free_reward_label, pulseAwarded: 0 });
-      }
+      const amt = await grantNonPulseOrPulse(discordId, t.free_reward_kind, t.free_reward_value, `Battle Pass S${season.id} T${t.tier_number} free`, `bp:${season.id}:${t.tier_number}:free`);
+      claimed.push({ tier: t.tier_number, track: 'free', label: t.free_reward_label, pulseAwarded: amt });
       progress.claimed_free.push(t.tier_number);
     }
     if (progress.is_premium && !progress.claimed_premium.includes(t.tier_number)) {
-      if (t.premium_reward_kind === 'pulse') {
-        const amt = Number(t.premium_reward_value.amount ?? 0);
-        if (amt > 0) await creditPulse(discordId, amt, `Battle Pass S${season.id} T${t.tier_number} premium`, `bp:${season.id}:${t.tier_number}:premium`);
-        claimed.push({ tier: t.tier_number, track: 'premium', label: t.premium_reward_label, pulseAwarded: amt });
-      } else {
-        claimed.push({ tier: t.tier_number, track: 'premium', label: t.premium_reward_label, pulseAwarded: 0 });
-      }
+      const amt = await grantNonPulseOrPulse(discordId, t.premium_reward_kind, t.premium_reward_value, `Battle Pass S${season.id} T${t.tier_number} premium`, `bp:${season.id}:${t.tier_number}:premium`);
+      claimed.push({ tier: t.tier_number, track: 'premium', label: t.premium_reward_label, pulseAwarded: amt });
       progress.claimed_premium.push(t.tier_number);
     }
   }
   await upsertProgress(progress);
   return { claimed };
+}
+
+async function grantNonPulseOrPulse(
+  discordId: string,
+  kind: RewardKind,
+  value: Record<string, unknown>,
+  reason: string,
+  refId: string,
+): Promise<number> {
+  if (kind === 'pulse') {
+    const amt = Number(value.amount ?? 0);
+    if (amt > 0) await creditPulse(discordId, amt, reason, refId);
+    return amt;
+  }
+  if (kind === 'cosmetic') {
+    const cosmeticKey = String(value.key ?? '');
+    const label = String(value.label ?? cosmeticKey);
+    if (cosmeticKey) {
+      await supabase.from('member_owned_cosmetics').upsert({
+        discord_id: discordId, cosmetic_key: cosmeticKey, label, source: 'battle_pass',
+      }, { onConflict: 'discord_id,cosmetic_key' });
+    }
+    await supabase.from('reward_grants_ledger').insert({
+      discord_id: discordId, source: 'battle_pass', kind: 'cosmetic',
+      payload_json: { key: cosmeticKey, label, reason, ref: refId },
+    });
+    return 0;
+  }
+  // role / shop_item / xp_boost — the web has no Discord client, so we queue
+  // the intent in the ledger. The bot process reconciles.
+  await supabase.from('reward_grants_ledger').insert({
+    discord_id: discordId, source: 'battle_pass', kind,
+    payload_json: { value, reason, ref: refId, fulfillment: kind === 'shop_item' ? 'pending' : 'web_queued' },
+  });
+  return 0;
 }
 
 export async function buyPremium(discordId: string): Promise<{ ok: boolean; error?: string; alreadyOwned?: boolean }> {

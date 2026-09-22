@@ -146,42 +146,52 @@ async function grantReward(
     return 0;
   }
   if (kind === 'cosmetic') {
-    // Insert into user_cosmetics with the cosmetic's key. Free-form: any admin
-    // seeded cosmetic key can be used and the shop cosmetics UI already reads
-    // this table.
+    // Cosmetics live in member_owned_cosmetics — one row per (member, key).
+    // Idempotent via upsert so re-claiming after a rollback stays clean.
     const cosmeticKey = String(value.key ?? '');
     const label = String(value.label ?? cosmeticKey);
     if (cosmeticKey) {
       try {
-        await supabase.from('user_cosmetics').insert({
+        await supabase.from('member_owned_cosmetics').upsert({
           discord_id: discordId,
           cosmetic_key: cosmeticKey,
+          label,
           source: 'battle_pass',
-          note: label,
+        }, { onConflict: 'discord_id,cosmetic_key' });
+        await supabase.from('reward_grants_ledger').insert({
+          discord_id: discordId,
+          source: 'battle_pass',
+          kind: 'cosmetic',
+          payload_json: { key: cosmeticKey, label, reason, ref: refId },
         });
-      } catch (err) { log('ERROR', 'BP cosmetic insert failed', err); }
+      } catch (err) { log('ERROR', 'BP cosmetic grant failed', err); }
     }
     return 0;
   }
   if (kind === 'shop_item') {
-    // Grant a shop item by name/id. Same pattern: record as an admin-approved fulfillment.
+    // Shop items granted via BP go straight into the reward ledger with a
+    // manual-fulfillment flag. No shop_purchases table today — a Lord fulfills
+    // these from the ledger view.
     const itemName = String(value.name ?? '');
-    if (itemName) {
-      try {
-        await supabase.from('shop_purchases').insert({
-          discord_id: discordId,
-          item_name: itemName,
-          price_paid: 0,
-          status: 'approved',
-          note: `Battle Pass reward — ${reason}`,
-        });
-      } catch (err) { log('ERROR', 'BP shop_item insert failed', err); }
-    }
+    try {
+      await supabase.from('reward_grants_ledger').insert({
+        discord_id: discordId,
+        source: 'battle_pass',
+        kind: 'shop_item',
+        payload_json: { name: itemName, reason, ref: refId, fulfillment: 'pending' },
+      });
+    } catch (err) { log('ERROR', 'BP shop_item grant failed', err); }
     return 0;
   }
   if (kind === 'xp_boost') {
-    // XP boosts are a future feature — for now record the intent.
-    log('INFO', `BP xp_boost reward for ${discordId} — pending future feature`);
+    try {
+      await supabase.from('reward_grants_ledger').insert({
+        discord_id: discordId,
+        source: 'battle_pass',
+        kind: 'xp_boost',
+        payload_json: { value, reason, ref: refId },
+      });
+    } catch (err) { log('ERROR', 'BP xp_boost grant failed', err); }
     return 0;
   }
   return 0;

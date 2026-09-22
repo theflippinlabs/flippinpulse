@@ -309,20 +309,36 @@ async function handleBulkDrop(client: Client, cmd: DashboardCommand): Promise<vo
   await channel.send({ content: mentions, embeds: [embed] }).catch(() => null);
 }
 
+async function fetchUsername(client: Client, discordId: string): Promise<string> {
+  try {
+    const user = await client.users.fetch(discordId);
+    return user.username;
+  } catch { return discordId.slice(-6); }
+}
+
 async function handlePetChallenge(client: Client, cmd: DashboardCommand): Promise<void> {
   const p = cmd.payload_json as { challenger_id: string; opponent_id: string; wager: number; channel_id: string };
   const { openChallenge } = await import('./pets.js');
-  const res = await openChallenge(p.challenger_id, 'web', p.opponent_id, p.wager, false);
+  const { getUserLocale } = await import('../i18n.js');
+  const [locale, challengerName] = await Promise.all([
+    getUserLocale(p.challenger_id),
+    fetchUsername(client, p.challenger_id),
+  ]);
+  const fr = locale === 'fr';
+  const res = await openChallenge(p.challenger_id, challengerName, p.opponent_id, p.wager, !fr);
   if (!res.ok || !res.challengeId || !res.challenger) throw new Error(res.error ?? 'open_failed');
   const channel = await client.channels.fetch(p.channel_id).catch(() => null);
   if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) throw new Error('channel_not_sendable');
+  const desc = fr
+    ? `<@${p.opponent_id}> tu es défié·e par ${res.challenger.emoji} **${res.challenger.name}** (Lv.${res.challenger.level}) de <@${p.challenger_id}> !\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Le défi expire dans 3 min._`
+    : `<@${p.opponent_id}> you have been challenged by ${res.challenger.emoji} **${res.challenger.name}** (Lv.${res.challenger.level}) from <@${p.challenger_id}>!\n\n💰 Wager: **${p.wager} PULSE** each · Pot: **${p.wager * 2} PULSE**\n\n_Challenge expires in 3 min._`;
   const embed = new EmbedBuilder()
     .setColor(0xF5B62E)
-    .setTitle('⚔️ Défi entre compagnons !')
-    .setDescription(`<@${p.opponent_id}> tu es défié·e par ${res.challenger.emoji} **${res.challenger.name}** (Lv.${res.challenger.level}) de <@${p.challenger_id}> !\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Le défi expire dans 3 min._`);
+    .setTitle(fr ? '⚔️ Défi entre compagnons !' : '⚔️ Pet challenge!')
+    .setDescription(desc);
   const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`petpvp:accept:${res.challengeId}`).setLabel('Accepter').setEmoji('⚔️').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`petpvp:decline:${res.challengeId}`).setLabel('Refuser').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`petpvp:accept:${res.challengeId}`).setLabel(fr ? 'Accepter' : 'Accept').setEmoji('⚔️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`petpvp:decline:${res.challengeId}`).setLabel(fr ? 'Refuser' : 'Decline').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
   );
   await (channel as TextChannel).send({ embeds: [embed], components: [row], allowedMentions: { users: [p.opponent_id] } });
 }
@@ -330,19 +346,28 @@ async function handlePetChallenge(client: Client, cmd: DashboardCommand): Promis
 async function handleCardChallenge(client: Client, cmd: DashboardCommand): Promise<void> {
   const p = cmd.payload_json as { challenger_id: string; opponent_id: string; card_code: string; wager: number; channel_id: string };
   const { openCardChallenge, RARITY_STYLE } = await import('./tcg.js');
-  const res = await openCardChallenge(p.challenger_id, 'web', p.opponent_id, p.card_code, p.wager);
+  const { getUserLocale } = await import('../i18n.js');
+  const [locale, challengerName] = await Promise.all([
+    getUserLocale(p.challenger_id),
+    fetchUsername(client, p.challenger_id),
+  ]);
+  const fr = locale === 'fr';
+  const res = await openCardChallenge(p.challenger_id, challengerName, p.opponent_id, p.card_code, p.wager);
   if (!res.ok || !res.challengeId || !res.challengerCard) throw new Error(res.error ?? 'open_failed');
   const cc = res.challengerCard;
   const rst = RARITY_STYLE[cc.rarity];
   const channel = await client.channels.fetch(p.channel_id).catch(() => null);
   if (!channel || !channel.isTextBased() || channel.isDMBased() || !channel.isSendable()) throw new Error('channel_not_sendable');
+  const desc = fr
+    ? `<@${p.opponent_id}> tu es défié·e par <@${p.challenger_id}> !\n\nSa carte : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_\n⚔️ ATK ${cc.attack} · 🛡️ DEF ${cc.defense} · 💨 SPD ${cc.speed}\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ta carte champion. Expire dans 3 min._`
+    : `<@${p.opponent_id}> you have been challenged by <@${p.challenger_id}>!\n\nTheir card: ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_\n⚔️ ATK ${cc.attack} · 🛡️ DEF ${cc.defense} · 💨 SPD ${cc.speed}\n\n💰 Wager: **${p.wager} PULSE** each · Pot: **${p.wager * 2} PULSE**\n\n_Tap **Accept** to pick your champion. Expires in 3 min._`;
   const embed = new EmbedBuilder()
     .setColor(0xF5B62E)
-    .setTitle('🎴 Duel de cartes !')
-    .setDescription(`<@${p.opponent_id}> tu es défié·e par <@${p.challenger_id}> !\n\nSa carte : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_\n⚔️ ATK ${cc.attack} · 🛡️ DEF ${cc.defense} · 💨 SPD ${cc.speed}\n\n💰 Mise : **${p.wager} PULSE** chacun · Pot : **${p.wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ta carte champion. Expire dans 3 min._`);
+    .setTitle(fr ? '🎴 Duel de cartes !' : '🎴 Card duel!')
+    .setDescription(desc);
   const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`tcgpvp:accept:${res.challengeId}`).setLabel('Accepter').setEmoji('⚔️').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`tcgpvp:decline:${res.challengeId}`).setLabel('Refuser').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`tcgpvp:accept:${res.challengeId}`).setLabel(fr ? 'Accepter' : 'Accept').setEmoji('⚔️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`tcgpvp:decline:${res.challengeId}`).setLabel(fr ? 'Refuser' : 'Decline').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
   );
   await (channel as TextChannel).send({ embeds: [embed], components: [row], allowedMentions: { users: [p.opponent_id] } });
 }
