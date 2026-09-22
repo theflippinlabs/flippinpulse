@@ -19,6 +19,7 @@ import { startCosmeticsScheduler } from './services/cosmetics.js';
 import { startDashboardBridge } from './services/dashboardBridge.js';
 import { startChannelSync } from './services/channelSync.js';
 import { runDailyBirthdaySweep } from './services/birthdays.js';
+import { runReminderSweep } from './services/calendar.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -82,6 +83,12 @@ client.once('ready', async () => {
   setInterval(() => {
     runDailyBirthdaySweep(client).catch(err => log('ERROR', 'Birthday sweep tick failed', err));
   }, 60 * 60 * 1000);
+
+  // Calendar 15-min reminder sweep: check every 60s if any scheduled event
+  // is within the next 15 minutes and hasn't been reminded yet.
+  setInterval(() => {
+    runReminderSweep(client).catch(err => log('ERROR', 'Calendar reminder tick failed', err));
+  }, 60 * 1000);
 
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });

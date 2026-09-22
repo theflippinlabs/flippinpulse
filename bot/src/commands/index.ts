@@ -64,6 +64,9 @@ import * as pet from './pet.js';
 import * as cards from './cards.js';
 import * as gift from './gift.js';
 import * as birthday from './birthday.js';
+import * as marriage from './marriage.js';
+import * as bank from './bank.js';
+import * as event from './event.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -81,6 +84,7 @@ const commandList: Command[] = [
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
   jeux, hub, setupaccueil, jail, achievements, tournoi, cosmetics, chicken, automod, charts, music,
   language, catchup, compagnon, poker, battlepass, pet, cards, gift, birthday,
+  marriage, bank, event,
 ];
 
 export const commands = new Map<string, Command>();

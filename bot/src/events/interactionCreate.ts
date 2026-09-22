@@ -19,6 +19,8 @@ import { handlePokerInteraction } from '../commands/poker.js';
 import { handleBattlePassInteraction } from '../commands/battlepass.js';
 import { handlePetInteraction } from '../commands/pet.js';
 import { handleCardChallengeInteraction } from '../commands/cards.js';
+import { handleMarriageInteraction } from '../commands/marriage.js';
+import { handleEventInteraction } from '../commands/event.js';
 import { seedLocaleFromDiscord } from '../i18n.js';
 import { log } from '../utils/logger.js';
 
@@ -115,6 +117,24 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handleCardChallengeInteraction(interaction);
     } catch (err) {
       log('ERROR', 'TCG PvP interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('marriage:')) {
+    try {
+      await handleMarriageInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Marriage interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('event:')) {
+    try {
+      await handleEventInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Event interaction handler crashed', err);
     }
     return;
   }
