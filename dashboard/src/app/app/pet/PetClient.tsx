@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { SPECIES, type Pet, type SpeciesKey } from '@/lib/pets';
+import { SPECIES, type Pet, type SpeciesKey } from '@/lib/petsShared';
 
 interface Props {
   fr: boolean;

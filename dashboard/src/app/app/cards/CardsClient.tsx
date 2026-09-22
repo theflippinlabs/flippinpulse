@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { RARITY_STYLE, rarityOrder, type Card, type Rarity } from '@/lib/tcg';
+import { RARITY_STYLE, rarityOrder, type Card, type Rarity } from '@/lib/tcgShared';
 
 interface Props {
   fr: boolean;
