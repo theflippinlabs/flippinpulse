@@ -12,10 +12,14 @@ import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { getUserLocale } from '../i18n.js';
 import {
   SPECIES,
+  acceptChallenge,
   adoptPet,
   battlePvE,
+  declineChallenge,
   feedPet,
   getActivePet,
+  getChallenge,
+  openChallenge,
   playPet,
   retirePet,
   trainPet,
@@ -70,6 +74,9 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s.setName('train').setDescription('Train your pet / Entraîner ton compagnon'))
   .addSubcommand(s => s.setName('battle').setDescription('Send your pet into a wild battle / Combat sauvage')
     .addIntegerOption(o => o.setName('wager').setDescription('PULSE wager (0-1000)').setMinValue(0).setMaxValue(1000).setRequired(false)))
+  .addSubcommand(s => s.setName('challenge').setDescription("Challenge another member's pet / Défier un autre membre")
+    .addUserOption(o => o.setName('opponent').setDescription('Opponent / Adversaire').setRequired(true))
+    .addIntegerOption(o => o.setName('wager').setDescription('PULSE wager (0-10000)').setMinValue(0).setMaxValue(10_000).setRequired(false)))
   .addSubcommand(s => s.setName('retire').setDescription('Retire your pet / Retraite pour ton compagnon'));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -148,6 +155,31 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  if (sub === 'challenge') {
+    const opponent = interaction.options.getUser('opponent', true);
+    const wager = interaction.options.getInteger('wager') ?? 0;
+    if (opponent.bot) {
+      await interaction.reply({ embeds: [errorEmbed(fr ? "Impossible de défier un bot." : "You can't challenge a bot.")], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const res = await openChallenge(interaction.user.id, interaction.user.username, opponent.id, wager, !fr);
+    if (!res.ok || !res.challengeId || !res.challenger) {
+      await interaction.reply({ embeds: [errorEmbed(res.error ?? 'Error')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const embed = pulseEmbed(fr ? '⚔️ Défi entre compagnons !' : '⚔️ Pet challenge!').setDescription(
+      (fr
+        ? `<@${opponent.id}> tu es défié·e par ${res.challenger.emoji} **${res.challenger.name}** (Lv.${res.challenger.level}) de <@${interaction.user.id}> !\n\n💰 Mise : **${wager} PULSE** chacun · Pot total : **${wager * 2} PULSE**\n\n_Le défi expire dans 3 min._`
+        : `<@${opponent.id}> you've been challenged by ${res.challenger.emoji} **${res.challenger.name}** (Lv.${res.challenger.level}) from <@${interaction.user.id}>!\n\n💰 Wager: **${wager} PULSE** each · Total pot: **${wager * 2} PULSE**\n\n_Challenge expires in 3 min._`)
+    );
+    const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(`petpvp:accept:${res.challengeId}`).setLabel(fr ? 'Accepter' : 'Accept').setEmoji('⚔️').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`petpvp:decline:${res.challengeId}`).setLabel(fr ? 'Refuser' : 'Decline').setEmoji('🏳️').setStyle(ButtonStyle.Danger),
+    );
+    await interaction.reply({ embeds: [embed], components: [row], allowedMentions: { users: [opponent.id] } });
+    return;
+  }
+
   if (sub === 'retire') {
     const res = await retirePet(interaction.user.id);
     if (!res.ok) { await interaction.reply({ embeds: [errorEmbed(res.error ?? 'Error')], flags: MessageFlags.Ephemeral }); return; }
@@ -160,9 +192,56 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
 export async function handlePetInteraction(interaction: import('discord.js').Interaction): Promise<void> {
   if (!interaction.isButton()) return;
-  if (!interaction.customId.startsWith('pet:')) return;
   const locale = await getUserLocale(interaction.user.id);
   const fr = locale === 'fr';
+
+  if (interaction.customId.startsWith('petpvp:')) {
+    const [, kind, challengeId] = interaction.customId.split(':');
+    const c = getChallenge(challengeId);
+    if (!c) {
+      await interaction.reply({ embeds: [errorEmbed(fr ? 'Défi expiré ou introuvable.' : 'Challenge expired or missing.')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    if (interaction.user.id !== c.targetId && interaction.user.id !== c.challengerId) {
+      await interaction.reply({ embeds: [errorEmbed(fr ? "Tu n'es pas concerné·e par ce défi." : 'This challenge is not for you.')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    if (kind === 'decline') {
+      const r = await declineChallenge(challengeId, interaction.user.id, !fr);
+      if (!r.ok) { await interaction.reply({ embeds: [errorEmbed(r.error ?? 'Error')], flags: MessageFlags.Ephemeral }); return; }
+      await interaction.update({
+        embeds: [errorEmbed(fr ? `Défi refusé par <@${interaction.user.id}>. Mise remboursée.` : `Challenge declined by <@${interaction.user.id}>. Wager refunded.`)],
+        components: [],
+      });
+      return;
+    }
+    if (kind === 'accept') {
+      if (interaction.user.id !== c.targetId) {
+        await interaction.reply({ embeds: [errorEmbed(fr ? 'Seule la cible peut accepter.' : 'Only the target can accept.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      await interaction.deferUpdate().catch(() => null);
+      const r = await acceptChallenge(challengeId, interaction.user.id, !fr);
+      if (!r.ok || !r.turns || !r.challengerPet || !r.targetPet) {
+        await interaction.editReply({ embeds: [errorEmbed(r.error ?? 'Error')], components: [] }).catch(() => null);
+        return;
+      }
+      const log = r.turns.map(t => `• **${t.attacker}** ${t.move} → **-${t.damage}** ${t.defender}`).join('\n').slice(0, 3500);
+      const winnerId = r.winnerId!;
+      const winnerName = winnerId === c.challengerId ? r.challengerPet.name : r.targetPet.name;
+      const summary = fr
+        ? `🏆 **${winnerName}** l'emporte ! <@${winnerId}> gagne **+${r.pot} PULSE**.`
+        : `🏆 **${winnerName}** wins! <@${winnerId}> takes **+${r.pot} PULSE**.`;
+      await interaction.editReply({
+        embeds: [pulseEmbed(fr ? '⚔️ Combat entre compagnons — Fin' : '⚔️ Pet duel — End').setDescription(`${log}\n\n${summary}`)],
+        components: [],
+      }).catch(() => null);
+      return;
+    }
+    return;
+  }
+
+  if (!interaction.customId.startsWith('pet:')) return;
   const action = interaction.customId.split(':')[1];
   let res;
   if (action === 'feed') res = await feedPet(interaction.user.id, !fr);

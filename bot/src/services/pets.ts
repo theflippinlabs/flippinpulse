@@ -248,3 +248,151 @@ export async function battlePvE(discordId: string, wager: number, en: boolean): 
   await supabase.from('pet_battles').insert({ attacker_pet_id: p.id, defender_pet_id: p.id, winner_pet_id: won ? p.id : null, pulse_wagered: wager, log_json: turns });
   return { ok: true, winnerId: won ? p.id : undefined, loserId: won ? undefined : p.id, turns, wager, payout };
 }
+
+// ---- PvP challenges ----
+interface PendingChallenge {
+  id: string;
+  challengerId: string;
+  challengerName: string;
+  targetId: string;
+  wager: number;
+  createdAt: number;
+}
+const pendingChallenges = new Map<string, PendingChallenge>();
+const CHALLENGE_TTL_MS = 3 * 60_000;
+
+function pruneChallenges(): void {
+  const now = Date.now();
+  for (const [id, c] of pendingChallenges) {
+    if (now - c.createdAt > CHALLENGE_TTL_MS) pendingChallenges.delete(id);
+  }
+}
+
+export interface OpenChallengeResult { ok: boolean; error?: string; challengeId?: string; challenger?: Pet; }
+
+export async function openChallenge(challengerId: string, challengerName: string, targetId: string, wager: number, en: boolean): Promise<OpenChallengeResult> {
+  pruneChallenges();
+  if (challengerId === targetId) return { ok: false, error: en ? "You can't challenge yourself." : "Tu ne peux pas te défier toi-même." };
+  if (wager < 0 || wager > 10_000) return { ok: false, error: en ? 'Wager 0-10000 PULSE.' : 'Mise 0-10000 PULSE.' };
+
+  const [me, opp] = await Promise.all([getActivePet(challengerId), getActivePet(targetId)]);
+  if (!me) return { ok: false, error: en ? 'You have no pet.' : "Tu n'as pas de compagnon." };
+  if (!opp) return { ok: false, error: en ? 'Your target has no active pet.' : "L'adversaire n'a pas de compagnon actif." };
+  if (me.energy < 25 || me.health < 40) return { ok: false, error: en ? `${me.name} is not fit to battle.` : `${me.name} n'est pas en état de combattre.` };
+  const cd = cooldownGate(me.last_battle_at, BATTLE_COOLDOWN_MIN, en, 'combattre', 'battle');
+  if (!cd.ok) return { ok: false, error: cd.error };
+
+  // Only one open challenge per pair at a time.
+  for (const c of pendingChallenges.values()) {
+    if ((c.challengerId === challengerId && c.targetId === targetId) || (c.challengerId === targetId && c.targetId === challengerId)) {
+      return { ok: false, error: en ? 'A challenge is already pending between you two.' : 'Un défi est déjà en attente entre vous.' };
+    }
+  }
+
+  if (wager > 0) {
+    const debit = await spendPulse(challengerId, wager, `Pet PvP wager (pending)`);
+    if (!debit.success) return { ok: false, error: debit.error ?? 'Cannot debit wager.' };
+  }
+  const id = `pvp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  pendingChallenges.set(id, { id, challengerId, challengerName, targetId, wager, createdAt: Date.now() });
+  return { ok: true, challengeId: id, challenger: me };
+}
+
+export function getChallenge(id: string): PendingChallenge | undefined {
+  pruneChallenges();
+  return pendingChallenges.get(id);
+}
+
+export async function declineChallenge(id: string, byUserId: string, en: boolean): Promise<{ ok: boolean; refundedTo?: string; error?: string }> {
+  const c = pendingChallenges.get(id);
+  if (!c) return { ok: false, error: en ? 'Challenge not found or expired.' : 'Défi introuvable ou expiré.' };
+  if (byUserId !== c.targetId && byUserId !== c.challengerId) return { ok: false, error: en ? "You can't decline this challenge." : "Tu ne peux pas refuser ce défi." };
+  if (c.wager > 0) await earnPulse(c.challengerId, c.wager, `Pet PvP declined refund`, `pet_pvp:${id}`);
+  pendingChallenges.delete(id);
+  return { ok: true, refundedTo: c.challengerId };
+}
+
+export interface PvPResult {
+  ok: boolean;
+  error?: string;
+  turns?: BattleTurn[];
+  winnerId?: string;
+  loserId?: string;
+  pot?: number;
+  challengerPet?: Pet;
+  targetPet?: Pet;
+}
+
+export async function acceptChallenge(id: string, byUserId: string, en: boolean): Promise<PvPResult> {
+  const c = pendingChallenges.get(id);
+  if (!c) return { ok: false, error: en ? 'Challenge not found or expired.' : 'Défi introuvable ou expiré.' };
+  if (byUserId !== c.targetId) return { ok: false, error: en ? 'Only the target can accept.' : 'Seule la cible peut accepter.' };
+  pendingChallenges.delete(id);
+
+  const [challenger, target] = await Promise.all([getActivePet(c.challengerId), getActivePet(c.targetId)]);
+  if (!challenger || !target) {
+    if (c.wager > 0) await earnPulse(c.challengerId, c.wager, `Pet PvP refund (missing pet)`, `pet_pvp:${id}`);
+    return { ok: false, error: en ? 'A pet is missing.' : 'Un compagnon est introuvable.' };
+  }
+  if (c.wager > 0) {
+    const debit = await spendPulse(c.targetId, c.wager, `Pet PvP accepted wager`);
+    if (!debit.success) {
+      await earnPulse(c.challengerId, c.wager, `Pet PvP refund (target debit failed)`, `pet_pvp:${id}`);
+      return { ok: false, error: debit.error ?? 'Target could not cover wager.' };
+    }
+  }
+
+  // Simulate the fight — same damage curve as PvE, but both sides are real pets.
+  let hpA = challenger.health;
+  let hpB = target.health;
+  const turns: BattleTurn[] = [];
+  // Speed-driven initiative: highest-speed pet strikes first. Speed comes from
+  // the level for now (equal, so ties go to challenger).
+  let challengerFirst = challenger.level >= target.level;
+  let step = 0;
+  while (hpA > 0 && hpB > 0 && step < 24) {
+    const attackerIsA = (step % 2 === 0) === challengerFirst;
+    if (attackerIsA) {
+      const { damage, move } = rollDamage(challenger, target);
+      hpB -= damage;
+      turns.push({ attacker: challenger.name, defender: target.name, damage, move });
+    } else {
+      const { damage, move } = rollDamage(target, challenger);
+      hpA -= damage;
+      turns.push({ attacker: target.name, defender: challenger.name, damage, move });
+    }
+    step += 1;
+  }
+
+  const challengerWon = hpA > 0 && (hpB <= 0 || hpA > hpB);
+  const winner = challengerWon ? challenger : target;
+  const loser = challengerWon ? target : challenger;
+  const pot = c.wager * 2;
+
+  // Post-battle stats: energy -20 each, health floor 1, cooldown set, XP + records.
+  const now = new Date().toISOString();
+  const applyPost = async (p: Pet, hpAfter: number, won: boolean) => {
+    p.energy = Math.max(0, p.energy - 20);
+    p.health = Math.max(1, Math.round(hpAfter));
+    p.last_battle_at = now;
+    if (won) { p.wins += 1; gainXP(p, 40); }
+    else p.losses += 1;
+    await supabase.from('pets').update({ energy: p.energy, health: p.health, wins: p.wins, losses: p.losses, xp: p.xp, level: p.level, last_battle_at: p.last_battle_at }).eq('id', p.id);
+  };
+  await applyPost(challenger, hpA, challengerWon);
+  await applyPost(target, hpB, !challengerWon);
+
+  if (pot > 0) await earnPulse(challengerWon ? c.challengerId : c.targetId, pot, `Pet PvP win vs opponent`, `pet_pvp:${id}`);
+  await supabase.from('pet_battles').insert({ attacker_pet_id: challenger.id, defender_pet_id: target.id, winner_pet_id: winner.id, pulse_wagered: c.wager, log_json: turns });
+
+  return {
+    ok: true,
+    turns,
+    winnerId: challengerWon ? c.challengerId : c.targetId,
+    loserId: challengerWon ? c.targetId : c.challengerId,
+    pot,
+    challengerPet: challenger,
+    targetPet: target,
+  };
+  void loser;
+}

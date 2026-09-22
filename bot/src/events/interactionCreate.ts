@@ -100,7 +100,7 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
     return;
   }
 
-  if (interaction.isButton() && interaction.customId.startsWith('pet:')) {
+  if (interaction.isButton() && (interaction.customId.startsWith('pet:') || interaction.customId.startsWith('petpvp:'))) {
     try {
       await handlePetInteraction(interaction);
     } catch (err) {

@@ -90,8 +90,14 @@ export default function CompanionClient({ fr, companion, initialHistory }: Props
     setMessages([]);
   }
 
+  // In settings mode we let the page scroll naturally (no fixed height) so the
+  // memory textarea and Save button never end up trapped under the bottom nav.
+  const wrapperClass = showSettings
+    ? 'flex flex-col'
+    : 'flex flex-col h-[calc(100vh-160px)]';
+
   return (
-    <div className="flex flex-col h-[calc(100vh-160px)]">
+    <div className={wrapperClass}>
       <div className="flex items-center gap-2 mb-3">
         <Link href="/app" className="inline-flex items-center gap-1 text-sm text-pulse-mute hover:text-pulse-gold">
           <span className="text-lg leading-none">‹</span><span>{fr ? 'Retour' : 'Back'}</span>
@@ -120,7 +126,7 @@ export default function CompanionClient({ fr, companion, initialHistory }: Props
       )}
 
       {showSettings && (
-        <div className="rounded-2xl bg-pulse-card border border-pulse-border p-4 mb-3 space-y-3">
+        <div className="rounded-2xl bg-pulse-card border border-pulse-border p-4 mb-6 space-y-3">
           <div>
             <label className="text-xs text-pulse-mute uppercase tracking-wider">{fr ? 'Nom' : 'Name'}</label>
             <input value={name} onChange={e => setName(e.target.value)} maxLength={40} className="w-full mt-1 rounded-lg bg-black border border-pulse-border px-3 py-2" />
@@ -173,51 +179,55 @@ export default function CompanionClient({ fr, companion, initialHistory }: Props
 
       {error && <div className="mb-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-xs">{error}</div>}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 pb-2">
-        {messages.length === 0 && current && (
-          <div className="text-center text-sm text-pulse-mute py-8">
-            {fr ? `Dis bonjour à ${current.name} ${current.emoji}` : `Say hi to ${current.name} ${current.emoji}`}
-          </div>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${m.role === 'user' ? 'bg-pulse-gold text-black' : 'bg-pulse-card border border-pulse-border'}`}>
-              <div className="text-sm whitespace-pre-wrap">{m.content}</div>
-            </div>
-          </div>
-        ))}
-        {pending && (
-          <div className="flex justify-start">
-            <div className="rounded-2xl px-3 py-2 bg-pulse-card border border-pulse-border">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-pulse-mute animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-pulse-mute animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-pulse-mute animate-bounce" style={{ animationDelay: '300ms' }} />
+      {!showSettings && (
+        <>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 pb-2">
+            {messages.length === 0 && current && (
+              <div className="text-center text-sm text-pulse-mute py-8">
+                {fr ? `Dis bonjour à ${current.name} ${current.emoji}` : `Say hi to ${current.name} ${current.emoji}`}
               </div>
-            </div>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${m.role === 'user' ? 'bg-pulse-gold text-black' : 'bg-pulse-card border border-pulse-border'}`}>
+                  <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+                </div>
+              </div>
+            ))}
+            {pending && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl px-3 py-2 bg-pulse-card border border-pulse-border">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-pulse-mute animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-pulse-mute animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-pulse-mute animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <form
-        onSubmit={e => { e.preventDefault(); send(); }}
-        className="flex gap-2 pt-2 sticky bottom-0"
-      >
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          disabled={!current || pending}
-          placeholder={current ? (fr ? 'Message…' : 'Message…') : (fr ? 'Configure d\'abord ton compagnon' : 'Set up your companion first')}
-          className="flex-1 rounded-full bg-pulse-card border border-pulse-border px-4 py-2.5 text-sm focus:outline-none focus:border-pulse-gold"
-        />
-        <button
-          type="submit"
-          disabled={!current || pending || !input.trim()}
-          className="w-10 h-10 rounded-full bg-pulse-gold text-black text-lg font-bold disabled:opacity-40"
-        >
-          ↑
-        </button>
-      </form>
+          <form
+            onSubmit={e => { e.preventDefault(); send(); }}
+            className="flex gap-2 pt-2"
+          >
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              disabled={!current || pending}
+              placeholder={current ? (fr ? 'Message…' : 'Message…') : (fr ? 'Configure d\'abord ton compagnon' : 'Set up your companion first')}
+              className="flex-1 rounded-full bg-pulse-card border border-pulse-border px-4 py-2.5 text-sm focus:outline-none focus:border-pulse-gold"
+            />
+            <button
+              type="submit"
+              disabled={!current || pending || !input.trim()}
+              className="w-10 h-10 rounded-full bg-pulse-gold text-black text-lg font-bold disabled:opacity-40"
+            >
+              ↑
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }
