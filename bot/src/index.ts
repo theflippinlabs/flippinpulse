@@ -22,6 +22,7 @@ import { runDailyBirthdaySweep } from './services/birthdays.js';
 import { runReminderSweep } from './services/calendar.js';
 import { runWeeklyAnalyticsSweep } from './services/analytics.js';
 import { runSagaSweep } from './services/sagas.js';
+import { runStreamAlertsSweep } from './services/streamAlerts.js';
 import { runDbSetup } from './setup-db.js';
 import { registerCommands } from './registerCommands.js';
 import { log } from './utils/logger.js';
@@ -104,6 +105,13 @@ client.once('ready', async () => {
   setInterval(() => {
     runSagaSweep(client).catch(err => log('ERROR', 'Saga sweep tick failed', err));
   }, 5 * 60 * 1000);
+
+  // Stream alerts poll — every 90s ping Twitch (and YouTube if
+  // YOUTUBE_API_KEY is set) for every linked member. Silently degrades
+  // if credentials aren't configured.
+  setInterval(() => {
+    runStreamAlertsSweep(client).catch(err => log('ERROR', 'Stream alerts tick failed', err));
+  }, 90 * 1000);
 
   log('INFO', `${BRAND.ecosystem} // ${BRAND.agent} — systems operational.`);
 });
