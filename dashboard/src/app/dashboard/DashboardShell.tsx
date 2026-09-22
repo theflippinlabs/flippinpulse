@@ -23,10 +23,14 @@ const DESKTOP_NAV = [
   { href: '/dashboard/hub', label: '⚡ Hub' },
   { href: '/dashboard/games', label: '🎮 Games' },
   { href: '/dashboard/tournaments', label: '🏟️ Tournaments' },
+  { href: '/dashboard/battlepass', label: '🎫 Battle Pass' },
+  { href: '/dashboard/pets', label: '🐾 Pets' },
+  { href: '/dashboard/cards', label: '🎴 Cards' },
+  { href: '/dashboard/companions', label: '💫 AI Companions' },
   { href: '/dashboard/novus', label: '🧠 Novus' },
   { href: '/dashboard/missions', label: '🎯 Missions' },
   { href: '/dashboard/cosmetics', label: '✨ Cosmetics' },
-  { href: '/dashboard/lottery', label: '🎫 Lottery' },
+  { href: '/dashboard/lottery', label: '🎰 Lottery' },
   { href: '/dashboard/automod', label: '🛡️ Auto-mod' },
   { href: '/dashboard/charts', label: '📊 Charts' },
 ];
@@ -41,7 +45,7 @@ interface Props {
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
   if (href === '/dashboard/hub') {
-    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/play', '/dashboard/reserve', '/dashboard/shop', '/dashboard/jails']
+    return ['/dashboard/hub', '/dashboard/games', '/dashboard/tournaments', '/dashboard/cosmetics', '/dashboard/lottery', '/dashboard/novus', '/dashboard/missions', '/dashboard/automod', '/dashboard/play', '/dashboard/reserve', '/dashboard/shop', '/dashboard/jails', '/dashboard/battlepass', '/dashboard/pets', '/dashboard/cards', '/dashboard/companions']
       .some(p => pathname === p || pathname.startsWith(p + '/'));
   }
   return pathname === href || pathname.startsWith(href + '/');

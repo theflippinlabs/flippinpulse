@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 async function loadQuickStats() {
-  const [games, tournois, cosmetics, lottery, pulsar, missions, mod, jails] = await Promise.all([
+  const [games, tournois, cosmetics, lottery, pulsar, missions, mod, jails, bpSeason, bpProgress, petsCount, cardsInCirc, companionsCount] = await Promise.all([
     supabase.from('games_config').select('is_enabled'),
     supabase.from('tournaments').select('*', { count: 'exact', head: true }),
     supabase.from('user_cosmetics').select('*', { count: 'exact', head: true }),
@@ -13,10 +13,16 @@ async function loadQuickStats() {
     supabase.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('settings').select('value_json').eq('key', 'mod_config').maybeSingle(),
     supabase.from('jailed_members').select('*', { count: 'exact', head: true }),
+    supabase.from('battle_pass_seasons').select('name, ends_at').eq('is_active', true).order('id', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('battle_pass_progress').select('*', { count: 'exact', head: true }),
+    supabase.from('pets').select('*', { count: 'exact', head: true }).eq('is_active', true),
+    supabase.from('tcg_collection').select('quantity'),
+    supabase.from('ai_companions').select('*', { count: 'exact', head: true }).eq('is_active', true),
   ]);
   const enabled = (games.data ?? []).filter(g => (g as { is_enabled?: boolean }).is_enabled).length;
   const pulsarCfg = (pulsar.data as { value_json?: { enabled?: boolean } } | null)?.value_json ?? {};
   const modCfg = (mod.data as { value_json?: { automod_enabled?: boolean } } | null)?.value_json ?? {};
+  const totalCards = (cardsInCirc.data ?? []).reduce((a, r) => a + ((r as { quantity?: number }).quantity ?? 0), 0);
   return {
     gamesEnabled: enabled,
     gamesTotal: games.data?.length ?? 0,
@@ -27,6 +33,11 @@ async function loadQuickStats() {
     activeMissions: missions.count ?? 0,
     automodOn: modCfg.automod_enabled === true,
     jailed: jails.count ?? 0,
+    bpSeasonName: (bpSeason.data as { name?: string } | null)?.name ?? '—',
+    bpParticipants: bpProgress.count ?? 0,
+    petsAlive: petsCount.count ?? 0,
+    cardsInCirc: totalCards,
+    companionsAlive: companionsCount.count ?? 0,
   };
 }
 
@@ -47,7 +58,11 @@ export default async function HubPage() {
     { href: '/dashboard/wheel',       emoji: '🎡', title: 'Roue',        hint: 'Tirage au sort' },
     { href: '/dashboard/games',       emoji: '⚙️', title: 'Games',       hint: `${s.gamesEnabled} / ${s.gamesTotal} ON` },
     { href: '/dashboard/tournaments', emoji: '🏟️', title: 'Tournaments', hint: `${s.tournois} held` },
-    { href: '/dashboard/lottery',     emoji: '🎫', title: 'Lottery',     hint: `${s.lotteryPot.toLocaleString('en-US')} pot` },
+    { href: '/dashboard/battlepass',  emoji: '🎫', title: 'Battle Pass', hint: `${s.bpSeasonName} · ${s.bpParticipants} joueurs` },
+    { href: '/dashboard/pets',        emoji: '🐾', title: 'Pets',        hint: `${s.petsAlive} compagnons` },
+    { href: '/dashboard/cards',       emoji: '🎴', title: 'Cards',       hint: `${s.cardsInCirc.toLocaleString('en-US')} en circulation` },
+    { href: '/dashboard/companions',  emoji: '💫', title: 'Compagnons IA', hint: `${s.companionsAlive} actifs` },
+    { href: '/dashboard/lottery',     emoji: '🎰', title: 'Lottery',     hint: `${s.lotteryPot.toLocaleString('en-US')} pot` },
     { href: '/dashboard/novus',       emoji: '🧠', title: 'Novus',       hint: s.novusOn ? 'ON — AI running' : 'OFF' },
     { href: '/dashboard/missions',    emoji: '🎯', title: 'Missions',    hint: `${s.activeMissions} active` },
     { href: '/dashboard/cosmetics',   emoji: '✨', title: 'Cosmetics',   hint: `${s.cosmetics} bought` },
