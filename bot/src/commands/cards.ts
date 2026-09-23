@@ -23,11 +23,13 @@ import {
   acceptCardChallenge,
   declineCardChallenge,
   duel,
+  effectiveStats,
   fuseCards,
   getCardChallenge,
   getCollection,
   openCardChallenge,
   openPack,
+  parseEquipmentInput,
   rarityOrder,
   sellCard,
   type Card,
@@ -62,7 +64,8 @@ export const data = new SlashCommandBuilder()
     .addStringOption(o => o.setName('opponent').setDescription('Opponent card code / Code de la carte adverse').setRequired(true)))
   .addSubcommand(s => s.setName('challenge').setDescription("Challenge another member's card / Défier un autre membre")
     .addUserOption(o => o.setName('opponent').setDescription('Opponent / Adversaire').setRequired(true))
-    .addStringOption(o => o.setName('card').setDescription('Your champion card code / Code de ta carte champion').setRequired(true))
+    .addStringOption(o => o.setName('card').setDescription('Champion character code / Code de ton personnage champion').setRequired(true))
+    .addStringOption(o => o.setName('equipment').setDescription('Equipment codes (comma-sep, e.g. e_flame_saber, e_iron_shield:2)').setRequired(false))
     .addIntegerOption(o => o.setName('wager').setDescription('PULSE wager (0-10000)').setMinValue(0).setMaxValue(10_000).setRequired(false)))
   .addSubcommand(s => s.setName('sell').setDescription('Sell duplicate cards / Vendre des doublons')
     .addStringOption(o => o.setName('code').setDescription('Card code / Code de carte').setRequired(true))
@@ -201,28 +204,39 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   if (sub === 'challenge') {
     const opponent = interaction.options.getUser('opponent', true);
     const cardCode = interaction.options.getString('card', true).trim();
+    const equipmentInput = interaction.options.getString('equipment');
+    const equipment = parseEquipmentInput(equipmentInput);
     const wager = interaction.options.getInteger('wager') ?? 0;
     if (opponent.bot) {
       await interaction.reply({ embeds: [errorEmbed(fr ? 'Impossible de défier un bot.' : "You can't challenge a bot.")], flags: MessageFlags.Ephemeral });
       return;
     }
-    const res = await openCardChallenge(interaction.user.id, interaction.user.username, opponent.id, cardCode, wager);
+    const res = await openCardChallenge(interaction.user.id, interaction.user.username, opponent.id, cardCode, equipment, wager);
     if (!res.ok || !res.challengeId || !res.challengerCard) {
       const msg = res.error === 'self_challenge' ? (fr ? 'Tu ne peux pas te défier toi-même.' : "You can't challenge yourself.")
         : res.error === 'bad_wager' ? (fr ? 'Mise 0-10000 PULSE.' : 'Wager 0-10000 PULSE.')
-        : res.error === 'not_owned' ? (fr ? 'Tu ne possèdes pas cette carte.' : 'You do not own this card.')
+        : res.error === 'not_owned' ? (fr ? 'Tu ne possèdes pas cette carte à ce niveau.' : 'You do not own that card at that level.')
         : res.error === 'pending_challenge' ? (fr ? 'Un défi est déjà en attente entre vous.' : 'A challenge is already pending between you two.')
         : res.error === 'card_not_found' ? (fr ? 'Code de carte inconnu.' : 'Unknown card code.')
+        : res.error === 'not_a_character' ? (fr ? 'Ta carte champion doit être un personnage.' : 'Your champion must be a character card.')
+        : res.error === 'not_an_equipment' ? (fr ? "L'équipement fourni n'est pas une carte équipement." : 'Provided equipment is not an equipment card.')
+        : res.error === 'too_many_equipment' ? (fr ? `Maximum 6 équipements.` : `Max 6 equipment items.`)
+        : res.error === 'slot_conflict' ? (fr ? 'Un seul équipement par slot (arme, bouclier, sort…).' : 'One equipment per slot (weapon, shield, spell…).')
         : (fr ? 'Défi impossible.' : 'Cannot challenge.');
       await interaction.reply({ embeds: [errorEmbed(msg)], flags: MessageFlags.Ephemeral });
       return;
     }
     const cc = res.challengerCard;
+    const eqList = res.challengerEquip ?? [];
+    const stats = effectiveStats(cc, eqList);
     const rst = RARITY_STYLE[cc.rarity];
+    const equipLine = eqList.length
+      ? `\n${fr ? '🎽 Équipement' : '🎽 Equipment'} : ${eqList.map(e => `${e.card.emoji} ${e.card.name}${e.level > 1 ? ` \`lv${e.level}\`` : ''}`).join(' · ')}`
+      : '';
     const embed = pulseEmbed(fr ? '🎴 Duel de cartes !' : '🎴 Card duel!').setDescription(
       (fr
-        ? `<@${opponent.id}> tu es défié·e par <@${interaction.user.id}> !\n\nSa carte : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_\n⚔️ ATK ${cc.attack} · 🛡️ DEF ${cc.defense} · 💨 SPD ${cc.speed}\n\n💰 Mise : **${wager} PULSE** chacun · Pot : **${wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ta carte champion. Expire dans 3 min._`
-        : `<@${opponent.id}> you've been challenged by <@${interaction.user.id}>!\n\nTheir card: ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_\n⚔️ ATK ${cc.attack} · 🛡️ DEF ${cc.defense} · 💨 SPD ${cc.speed}\n\n💰 Wager: **${wager} PULSE** each · Pot: **${wager * 2} PULSE**\n\n_Tap **Accept** to pick your champion. Expires in 3 min._`)
+        ? `<@${opponent.id}> tu es défié·e par <@${interaction.user.id}> !\n\nSon champion : ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_${equipLine}\n⚔️ ATK ${stats.attack} · 🛡️ DEF ${stats.defense} · 💨 SPD ${stats.speed}\n\n💰 Mise : **${wager} PULSE** chacun · Pot : **${wager * 2} PULSE**\n\n_Clique **Accepter** pour choisir ton champion et jusqu'à 6 équipements (1 par slot). Expire dans 3 min._`
+        : `<@${opponent.id}> you've been challenged by <@${interaction.user.id}>!\n\nTheir champion: ${rst.emoji} ${cc.emoji} **${cc.name}** _(${cc.rarity})_${equipLine}\n⚔️ ATK ${stats.attack} · 🛡️ DEF ${stats.defense} · 💨 SPD ${stats.speed}\n\n💰 Wager: **${wager} PULSE** each · Pot: **${wager * 2} PULSE**\n\n_Tap **Accept** to pick your champion and up to 6 equipment (1 per slot). Expires in 3 min._`)
     );
     const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder().setCustomId(`tcgpvp:accept:${res.challengeId}`).setLabel(fr ? 'Accepter' : 'Accept').setEmoji('⚔️').setStyle(ButtonStyle.Success),
@@ -316,12 +330,17 @@ export async function handleCardChallengeInteraction(interaction: import('discor
       }
       const modal = new ModalBuilder()
         .setCustomId(`tcgpvp:pickmodal:${challengeId}`)
-        .setTitle(fr ? 'Choisis ta carte champion' : 'Pick your champion')
+        .setTitle(fr ? 'Choisis ton champion' : 'Pick your champion')
         .addComponents(
           new ActionRowBuilder<TextInputBuilder>().addComponents(
             new TextInputBuilder().setCustomId('code')
-              .setLabel(fr ? 'Code de ta carte (ex. l_solar_phoenix)' : 'Your card code (e.g. l_solar_phoenix)')
-              .setStyle(TextInputStyle.Short).setRequired(true)));
+              .setLabel(fr ? 'Personnage (ex. l_solar_phoenix)' : 'Character (e.g. l_solar_phoenix)')
+              .setStyle(TextInputStyle.Short).setRequired(true)),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder().setCustomId('equip')
+              .setLabel(fr ? 'Équipement (max 6, 1/slot, `code:niveau`)' : 'Equipment (max 6, 1/slot, `code:level`)')
+              .setStyle(TextInputStyle.Short).setRequired(false)
+              .setPlaceholder(fr ? 'ex. e_flame_saber, e_iron_shield:2' : 'e.g. e_flame_saber, e_iron_shield:2')));
       await (interaction as ButtonInteraction).showModal(modal);
       return;
     }
@@ -329,30 +348,40 @@ export async function handleCardChallengeInteraction(interaction: import('discor
 
   if (interaction.isModalSubmit() && interaction.customId.startsWith('tcgpvp:pickmodal:')) {
     const challengeId = interaction.customId.split(':')[2];
-    const code = (interaction as ModalSubmitInteraction).fields.getTextInputValue('code').trim();
-    await (interaction as ModalSubmitInteraction).deferUpdate().catch(() => null);
-    const res = await acceptCardChallenge(challengeId, interaction.user.id, code);
+    const modal = interaction as ModalSubmitInteraction;
+    const code = modal.fields.getTextInputValue('code').trim();
+    const equipRaw = modal.fields.getTextInputValue('equip');
+    const equipEntries = parseEquipmentInput(equipRaw);
+    await modal.deferUpdate().catch(() => null);
+    const res = await acceptCardChallenge(challengeId, interaction.user.id, code, equipEntries);
     if (!res.ok || !res.challengerCard || !res.targetCard || !res.turns) {
-      const msg = res.error === 'not_owned' ? (fr ? 'Tu ne possèdes pas cette carte.' : 'You do not own this card.')
+      const msg = res.error === 'not_owned' ? (fr ? 'Tu ne possèdes pas cette carte à ce niveau.' : 'You do not own that card at that level.')
         : res.error === 'card_not_found' ? (fr ? 'Code de carte inconnu.' : 'Unknown card code.')
         : res.error === 'not_found' ? (fr ? 'Défi introuvable.' : 'Challenge not found.')
+        : res.error === 'not_a_character' ? (fr ? 'Ton champion doit être un personnage.' : 'Your champion must be a character card.')
+        : res.error === 'not_an_equipment' ? (fr ? "Un des codes n'est pas un équipement." : 'One of the codes is not equipment.')
+        : res.error === 'too_many_equipment' ? (fr ? 'Maximum 6 équipements.' : 'Max 6 equipment items.')
+        : res.error === 'slot_conflict' ? (fr ? 'Un seul équipement par slot.' : 'One equipment per slot.')
         : (fr ? 'Erreur.' : 'Error.');
-      await (interaction as ModalSubmitInteraction).followUp({ embeds: [errorEmbed(msg)], flags: MessageFlags.Ephemeral });
+      await modal.followUp({ embeds: [errorEmbed(msg)], flags: MessageFlags.Ephemeral });
       return;
     }
     const cc = res.challengerCard; const tc = res.targetCard;
+    const cEq = res.challengerEquip ?? []; const tEq = res.targetEquip ?? [];
     const lines = res.turns.map(t => {
       const won = t.challengerRoll >= t.targetRoll;
       const badge = won ? '🏆' : '💥';
       return `${badge} **${t.stat.toUpperCase()}** — ${cc.emoji} ${t.challengerRoll} vs ${t.targetRoll} ${tc.emoji}`;
     }).join('\n');
     const winner = res.winnerId === interaction.user.id ? tc : cc;
+    const cEqLine = cEq.length ? `\n_${cEq.map(e => `${e.card.emoji} ${e.card.name}${e.level > 1 ? ` lv${e.level}` : ''}`).join(' · ')}_` : '';
+    const tEqLine = tEq.length ? `\n_${tEq.map(e => `${e.card.emoji} ${e.card.name}${e.level > 1 ? ` lv${e.level}` : ''}`).join(' · ')}_` : '';
     const summary = fr
       ? `\n\n🏆 **${winner.name}** l'emporte ${Math.max(res.challengerScore!, res.targetScore!)}–${Math.min(res.challengerScore!, res.targetScore!)} · <@${res.winnerId}> gagne **+${res.pot} PULSE**.`
       : `\n\n🏆 **${winner.name}** wins ${Math.max(res.challengerScore!, res.targetScore!)}–${Math.min(res.challengerScore!, res.targetScore!)} · <@${res.winnerId}> takes **+${res.pot} PULSE**.`;
-    await (interaction as ModalSubmitInteraction).editReply({
+    await modal.editReply({
       embeds: [pulseEmbed(fr ? '🎴 Duel terminé' : '🎴 Duel end').setDescription(
-        `${cc.emoji} **${cc.name}** vs ${tc.emoji} **${tc.name}**\n\n${lines}${summary}`
+        `${cc.emoji} **${cc.name}**${cEqLine}\n\n**vs**\n\n${tc.emoji} **${tc.name}**${tEqLine}\n\n${lines}${summary}`
       )],
       components: [],
     }).catch(() => null);

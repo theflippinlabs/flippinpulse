@@ -3,13 +3,25 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { NEXT_RARITY, RARITY_STYLE, SELL_VALUE, rarityOrder, type Card, type Rarity } from '@/lib/tcgShared';
-import ChallengeDialog from '../ChallengeDialog';
+import {
+  MAX_LEVEL,
+  MERGE_COST_COPIES,
+  NEXT_RARITY,
+  RARITY_STYLE,
+  SELL_VALUE,
+  SLOT_LABEL,
+  rarityOrder,
+  scaledBonuses,
+  type Card,
+  type Rarity,
+} from '@/lib/tcgShared';
+import CardDuelDialog from './CardDuelDialog';
 
 interface Props {
   fr: boolean;
   catalog: Card[];
-  ownedRaw: { id: number; quantity: number }[];
+  // Per-level ownership: cardId → level → quantity
+  ownedLevels: Record<string, Record<string, number>>;
   balance: number;
   packCost: number;
   channels: { channel_id: string; name: string }[];
@@ -21,6 +33,14 @@ const RARITY_FILTERS: (Rarity | 'all')[] = ['all', 'common', 'rare', 'epic', 'le
 function CardTile({ card, quantity, revealed = true, fr }: { card: Card; quantity: number; revealed?: boolean; fr: boolean }) {
   const st = RARITY_STYLE[card.rarity];
   const dim = quantity === 0 ? 'opacity-30 grayscale' : '';
+  const isEquipment = card.card_kind === 'equipment';
+  const statLine = isEquipment
+    ? [
+        card.atk_bonus ? `+${card.atk_bonus}⚔` : null,
+        card.def_bonus ? `+${card.def_bonus}🛡` : null,
+        card.spd_bonus ? `+${card.spd_bonus}💨` : null,
+      ].filter(Boolean).join(' ') || '·'
+    : `${card.attack}/${card.defense}/${card.speed}`;
   return (
     <div className={`relative rounded-xl bg-gradient-to-br from-pulse-card to-black border border-pulse-border ring-1 ${st.ring} ${st.glow} ${dim} ${revealed ? '' : 'animate-pulse'} p-2 flex flex-col items-center`}>
       <div className="text-3xl mb-1">{revealed ? card.emoji : '❓'}</div>
@@ -33,14 +53,19 @@ function CardTile({ card, quantity, revealed = true, fr }: { card: Card; quantit
       {quantity === 0 && (
         <span className="absolute top-1 right-1 text-[9px] px-1 rounded bg-black/60 text-pulse-mute font-mono">?</span>
       )}
+      {revealed && isEquipment && (
+        <span className="absolute top-1 left-1 text-[8px] px-1 rounded bg-purple-500/30 text-purple-100 font-black uppercase tracking-wider">
+          {fr ? 'ÉQUIP' : 'EQP'}
+        </span>
+      )}
       <div className="mt-1 text-[8px] text-pulse-mute font-mono text-center">
-        {revealed ? `${card.attack}/${card.defense}/${card.speed}` : ''}
+        {revealed ? statLine : ''}
       </div>
     </div>
   );
 }
 
-export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBalance, packCost, channels, defaultChannel }: Props) {
+export default function CardsClient({ fr, catalog, ownedLevels, balance: initialBalance, packCost, channels, defaultChannel }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<'all' | Rarity>('all');
@@ -56,14 +81,35 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
   const [fuseResult, setFuseResult] = useState<Card | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
-  const ownedMap = useMemo(() => new Map(ownedRaw.map(r => [r.id, r.quantity])), [ownedRaw]);
+  // Levels map: cardId → (level → quantity). Rebuilt from the plain-object
+  // prop the server component passed us.
+  const levelsMap = useMemo(() => {
+    const m = new Map<number, Map<number, number>>();
+    for (const [cardId, levels] of Object.entries(ownedLevels)) {
+      const inner = new Map<number, number>();
+      for (const [level, qty] of Object.entries(levels)) inner.set(Number(level), qty);
+      m.set(Number(cardId), inner);
+    }
+    return m;
+  }, [ownedLevels]);
+
+  // Aggregate quantity per card across every level.
+  const ownedMap = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const [cardId, levels] of levelsMap) {
+      let total = 0;
+      for (const q of levels.values()) total += q;
+      m.set(cardId, total);
+    }
+    return m;
+  }, [levelsMap]);
 
   const sorted = useMemo(() =>
     [...catalog].sort((a, b) => rarityOrder(a.rarity) - rarityOrder(b.rarity) || a.name.localeCompare(b.name)),
     [catalog]);
   const filtered = filter === 'all' ? sorted : sorted.filter(c => c.rarity === filter);
 
-  const totalUnique = ownedRaw.filter(r => r.quantity > 0).length;
+  const totalUnique = Array.from(ownedMap.values()).filter(q => q > 0).length;
 
   const errorLabel = (code: string) => ({
     insufficient_pulse: fr ? 'PULSE insuffisant.' : 'Not enough PULSE.',
@@ -77,6 +123,17 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
     mixed_rarity: fr ? 'Les 3 cartes doivent être de même rareté.' : 'All 3 cards must share rarity.',
     max_rarity: fr ? 'Les mythiques ne se fusionnent plus.' : 'Mythics cannot fuse further.',
     not_enough_copies: fr ? 'Copies insuffisantes.' : 'Not enough copies.',
+    not_a_character: fr ? 'Ton champion doit être un personnage.' : 'Your champion must be a character card.',
+    not_an_equipment: fr ? "L'objet choisi n'est pas un équipement." : 'That card is not an equipment.',
+    too_many_equipment: fr ? `Maximum 6 équipements.` : `Max 6 equipment items.`,
+    bad_equipment: fr ? "Équipement invalide." : 'Invalid equipment.',
+    bad_card: fr ? 'Choisis un personnage.' : 'Pick a character.',
+    bad_opponent: fr ? 'Adversaire invalide.' : 'Invalid opponent.',
+    self_challenge: fr ? 'Tu ne peux pas te défier toi-même.' : "You can't challenge yourself.",
+    no_channel: fr ? 'Choisis un salon.' : 'Pick a channel.',
+    slot_conflict: fr ? 'Un seul équipement par slot (arme, bouclier, sort…).' : 'One equipment per slot (weapon, shield, spell…).',
+    bad_level: fr ? 'Niveau invalide.' : 'Invalid level.',
+    upgrade_failed: fr ? 'Fusion impossible.' : 'Upgrade failed.',
   }[code] ?? code);
 
   async function sellSelected(qty: number) {
@@ -90,6 +147,22 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
     if (!res.ok) { setError(errorLabel(data.error ?? 'error')); return; }
     setBalance(data.newBalance);
     setFlash(fr ? `💰 Vendu ${data.sold}× pour +${data.pulseEarned} PULSE.` : `💰 Sold ${data.sold}× for +${data.pulseEarned} PULSE.`);
+    setSelected(null);
+    startTransition(() => router.refresh());
+  }
+
+  async function upgradeEquipmentSelected(fromLevel: number) {
+    if (!selected) return;
+    setError(null); setFlash(null);
+    const res = await fetch('/api/cards/upgrade-equipment', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cardId: selected.id, level: fromLevel }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(errorLabel(data.error ?? 'error')); return; }
+    setFlash(fr
+      ? `✨ ${MERGE_COST_COPIES}× lv${fromLevel} fusionnés → 1× lv${data.toLevel}.`
+      : `✨ Merged ${MERGE_COST_COPIES}× lv${fromLevel} → 1× lv${data.toLevel}.`);
     setSelected(null);
     startTransition(() => router.refresh());
   }
@@ -283,58 +356,112 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
         })}
       </div>
 
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setSelected(null)}
-        >
-          <div className={`max-w-xs w-full rounded-2xl p-6 bg-gradient-to-br from-pulse-card to-black border ring-1 ${RARITY_STYLE[selected.rarity].ring} ${RARITY_STYLE[selected.rarity].glow}`}>
-            <div className="text-6xl text-center mb-2">{selected.emoji}</div>
-            <div className={`text-lg font-bold text-center ${RARITY_STYLE[selected.rarity].color}`}>{selected.name}</div>
-            <div className="text-xs text-center text-pulse-mute mt-1 uppercase tracking-wider">{RARITY_STYLE[selected.rarity].label[fr ? 'fr' : 'en']}</div>
-            <p className="italic text-sm text-center text-pulse-mute mt-3">"{selected.flavor}"</p>
-            <div className="mt-4 grid grid-cols-3 gap-1 text-center text-xs">
-              <div><div className="text-lg font-mono">{selected.attack}</div><div className="text-pulse-mute">⚔️ ATK</div></div>
-              <div><div className="text-lg font-mono">{selected.defense}</div><div className="text-pulse-mute">🛡️ DEF</div></div>
-              <div><div className="text-lg font-mono">{selected.speed}</div><div className="text-pulse-mute">💨 SPD</div></div>
-            </div>
-            <div className="mt-4 text-center text-xs text-pulse-mute">
-              {ownedMap.get(selected.id) ? (fr ? `Tu en possèdes ×${ownedMap.get(selected.id)}` : `You own ×${ownedMap.get(selected.id)}`) : (fr ? 'Pas encore possédée' : 'Not owned yet')}
-            </div>
-            {(() => {
-              const owned = ownedMap.get(selected.id) ?? 0;
-              const spareOne = owned > 1;
-              const spareAll = Math.max(0, owned - 1);
-              const unitValue = SELL_VALUE[selected.rarity];
-              if (spareOne) {
-                return (
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); sellSelected(1); }}
-                      className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 py-2 text-xs font-semibold"
-                    >
-                      {fr ? `💰 Vendre 1 (+${unitValue})` : `💰 Sell 1 (+${unitValue})`}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); sellSelected(spareAll); }}
-                      className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 py-2 text-xs font-semibold"
-                    >
-                      {fr ? `💰 Vendre ×${spareAll} (+${unitValue * spareAll})` : `💰 Sell ×${spareAll} (+${unitValue * spareAll})`}
-                    </button>
+      {selected && (() => {
+        const isEquipment = selected.card_kind === 'equipment';
+        const perLevel = levelsMap.get(selected.id) ?? new Map<number, number>();
+        const totalOwned = Array.from(perLevel.values()).reduce((s, v) => s + v, 0);
+        const spareAll = Math.max(0, totalOwned - 1);
+        const unitValue = SELL_VALUE[selected.rarity];
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setSelected(null)}
+          >
+            <div className={`max-w-xs w-full rounded-2xl p-6 bg-gradient-to-br from-pulse-card to-black border ring-1 ${RARITY_STYLE[selected.rarity].ring} ${RARITY_STYLE[selected.rarity].glow}`}>
+              <div className="text-6xl text-center mb-2">{selected.emoji}</div>
+              <div className={`text-lg font-bold text-center ${RARITY_STYLE[selected.rarity].color}`}>{selected.name}</div>
+              <div className="text-xs text-center text-pulse-mute mt-1 uppercase tracking-wider">
+                {RARITY_STYLE[selected.rarity].label[fr ? 'fr' : 'en']}
+                {isEquipment && selected.equipment_slot ? ` · ${SLOT_LABEL[selected.equipment_slot][fr ? 'fr' : 'en']}` : ''}
+              </div>
+              <p className="italic text-sm text-center text-pulse-mute mt-3">&quot;{selected.flavor}&quot;</p>
+
+              {isEquipment ? (
+                <div className="mt-4">
+                  <div className="text-[10px] uppercase tracking-wider text-pulse-mute mb-1 text-center">
+                    {fr ? 'Bonus par niveau' : 'Bonus per level'}
                   </div>
-                );
-              }
-              return null;
-            })()}
-            <button
-              onClick={(e) => { e.stopPropagation(); setSelected(null); }}
-              className="mt-4 w-full rounded-xl bg-pulse-card border border-pulse-border py-2 text-sm"
-            >
-              {fr ? 'Fermer' : 'Close'}
-            </button>
+                  <div className="grid grid-cols-5 gap-1 text-center text-[10px] font-mono">
+                    {[1, 2, 3, 4, 5].map(lvl => {
+                      const b = scaledBonuses(selected, lvl);
+                      const qty = perLevel.get(lvl) ?? 0;
+                      return (
+                        <div key={lvl} className={`rounded border ${qty > 0 ? 'border-pulse-gold/40 bg-pulse-gold/5' : 'border-pulse-border bg-black/40'} p-1`}>
+                          <div className="text-pulse-gold font-bold">lv{lvl}</div>
+                          <div className="text-pulse-mute">
+                            {b.atk ? `+${b.atk}⚔` : ''}
+                            {b.def ? ` +${b.def}🛡` : ''}
+                            {b.spd ? ` +${b.spd}💨` : ''}
+                          </div>
+                          <div className="text-pulse-mute">×{qty}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-3 gap-1 text-center text-xs">
+                  <div><div className="text-lg font-mono">{selected.attack}</div><div className="text-pulse-mute">⚔️ ATK</div></div>
+                  <div><div className="text-lg font-mono">{selected.defense}</div><div className="text-pulse-mute">🛡️ DEF</div></div>
+                  <div><div className="text-lg font-mono">{selected.speed}</div><div className="text-pulse-mute">💨 SPD</div></div>
+                </div>
+              )}
+
+              <div className="mt-4 text-center text-xs text-pulse-mute">
+                {totalOwned > 0
+                  ? (fr ? `Tu en possèdes ×${totalOwned}` : `You own ×${totalOwned}`)
+                  : (fr ? 'Pas encore possédée' : 'Not owned yet')}
+              </div>
+
+              {/* Upgrade actions per level for equipment */}
+              {isEquipment && totalOwned > 0 && (
+                <div className="mt-3 space-y-1">
+                  {[1, 2, 3, 4].map(lvl => {
+                    const qty = perLevel.get(lvl) ?? 0;
+                    if (qty < MERGE_COST_COPIES || lvl >= MAX_LEVEL) return null;
+                    return (
+                      <button
+                        key={lvl}
+                        onClick={(e) => { e.stopPropagation(); upgradeEquipmentSelected(lvl); }}
+                        className="w-full rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-100 py-2 text-xs font-semibold"
+                      >
+                        {fr
+                          ? `✨ Fusionner ${MERGE_COST_COPIES}× lv${lvl} → 1× lv${lvl + 1}`
+                          : `✨ Merge ${MERGE_COST_COPIES}× lv${lvl} → 1× lv${lvl + 1}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sell actions (unchanged) */}
+              {totalOwned > 1 && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); sellSelected(1); }}
+                    className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 py-2 text-xs font-semibold"
+                  >
+                    {fr ? `💰 Vendre 1 (+${unitValue})` : `💰 Sell 1 (+${unitValue})`}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); sellSelected(spareAll); }}
+                    className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 py-2 text-xs font-semibold"
+                  >
+                    {fr ? `💰 Vendre ×${spareAll} (+${unitValue * spareAll})` : `💰 Sell ×${spareAll} (+${unitValue * spareAll})`}
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelected(null); }}
+                className="mt-4 w-full rounded-xl bg-pulse-card border border-pulse-border py-2 text-sm"
+              >
+                {fr ? 'Fermer' : 'Close'}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {showRules && (
         <div
@@ -376,8 +503,26 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
                 <div className="text-pulse-gold font-bold mb-1">⚔️ {fr ? 'Défier un membre' : 'Challenge a member'}</div>
                 <p className="text-pulse-mute">
                   {fr
-                    ? 'Sur Discord : `/cards challenge opponent:@toi card:code wager:100`. Ta carte affronte la sienne sur ATK / DEF / SPD → gagnant sur 2 rounds prend le pot (2× la mise).'
-                    : 'On Discord: `/cards challenge opponent:@you card:code wager:100`. Your card fights theirs on ATK / DEF / SPD → best of 3 takes the pot (2× wager).'}
+                    ? 'Bouton **⚔️ Défier** ci-dessus. Choisis un **personnage** champion, puis jusqu\'à **6 équipements** — un par slot (arme, bouclier, sort, casque, bottes, amulette). Les stats effectives (base + bonus scalés par niveau) s\'affrontent sur ATK / DEF / SPD → gagnant sur 2 rounds prend le pot (2× la mise).'
+                    : 'Use the **⚔️ Duel** button above. Pick a **character** champion, then up to **6 equipment items** — one per slot (weapon, shield, spell, helmet, boots, amulet). Effective stats (base + level-scaled bonuses) clash on ATK / DEF / SPD → best of 3 takes the pot (2× wager).'}
+                </p>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">🎽 {fr ? 'Personnages, équipements & slots' : 'Characters, equipment & slots'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? 'Deux familles : **Personnages** (attaquent, ATK/DEF/SPD) et **Équipements** (s\'attachent à un personnage, un par slot). 6 slots : arme, bouclier, sort, casque, bottes, amulette. Un équipement ne combat PAS seul.'
+                    : 'Two families: **Characters** (attack, ATK/DEF/SPD) and **Equipment** (attach to a character, one per slot). 6 slots: weapon, shield, spell, helmet, boots, amulet. Equipment cannot fight alone.'}
+                </p>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">✨ {fr ? 'Améliorer un équipement' : 'Upgrade an equipment'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? `Ouvre la fiche d'un équipement en tapant dessus. **${MERGE_COST_COPIES} copies au même niveau** → **1 copie au niveau supérieur** (bonus × niveau). Niveau max : **${MAX_LEVEL}**. Un équipement lv5 est un tueur.`
+                    : `Tap an equipment card to open its sheet. **${MERGE_COST_COPIES} copies at the same level** → **1 copy at the next level** (bonus × level). Max level: **${MAX_LEVEL}**. A lv5 equipment is devastating.`}
                 </p>
               </section>
 
@@ -427,23 +572,22 @@ export default function CardsClient({ fr, catalog, ownedRaw, balance: initialBal
         </div>
       )}
 
-      <ChallengeDialog
+      <CardDuelDialog
         open={challengeOpen}
         onClose={() => setChallengeOpen(false)}
-        title={fr ? 'Duel de cartes' : 'Card duel'}
         fr={fr}
         channels={channels}
         defaultChannel={defaultChannel}
-        extraLabel={fr ? 'Code de ta carte' : 'Your card code'}
-        extraPlaceholder="l_solar_phoenix"
-        onSubmit={async ({ opponentId, wager, channelId, extra, opponentName }) => {
+        catalog={catalog}
+        ownedLevels={levelsMap}
+        onSubmit={async ({ opponentId, wager, channelId, characterCardId, equipment, opponentName }) => {
           setError(null); setFlash(null);
           const res = await fetch('/api/cards/challenge', {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ opponentId, wager, channelId, cardCode: extra }),
+            body: JSON.stringify({ opponentId, wager, channelId, characterCardId, equipment }),
           });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? 'error');
+          if (!res.ok) throw new Error(errorLabel(data.error ?? 'error'));
           setFlash(fr ? `⚔️ Défi envoyé à ${opponentName}. Il apparaît sur Discord.` : `⚔️ Challenge sent to ${opponentName}. Check Discord.`);
         }}
       />
