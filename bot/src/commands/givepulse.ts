@@ -21,6 +21,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const locale = await getUserLocale(interaction.user.id);
   const en = locale === 'en';
 
+  // Recheck at execution time — setDefaultMemberPermissions is editable by
+  // the Lord in Server Settings → Integrations, so trusting only the slash
+  // command bit is not enough for an economy-mutating command.
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Admins only.' : 'Réservé aux admins.')] });
+    return;
+  }
+
   const target = interaction.options.getUser('user', true);
   const amount = interaction.options.getInteger('amount', true);
   const reason = interaction.options.getString('reason') ?? (en ? 'Admin grant' : 'Don admin');

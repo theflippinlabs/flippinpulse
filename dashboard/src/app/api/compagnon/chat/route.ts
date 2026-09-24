@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { appendMessage, buildSystem, getCompanion, loadHistory } from '@/lib/aiCompanion';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-5-20250929';
+// Keep the companion budget humane — a healthy conversation is ~10 msgs a
+// minute at worst. 60/hour lets someone daily-drive theirs without ever
+// hitting the limit while still capping a runaway loop.
+const COMPANION_RATE_LIMIT = { max: 60, windowMs: 60 * 60 * 1000 };
 
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return NextResponse.json({ error: 'ai_not_configured' }, { status: 503 });
+
+  const rl = checkRateLimit(`ai:compagnon:${session.id}`, COMPANION_RATE_LIMIT.max, COMPANION_RATE_LIMIT.windowMs);
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'rate_limited', retryAfterMs: rl.retryAfterMs }, { status: 429 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const text = String(body.message ?? '').slice(0, 2000);

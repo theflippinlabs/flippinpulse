@@ -6,6 +6,7 @@ import {
   EmbedBuilder,
   Message,
   MessageActionRowComponentBuilder,
+  PermissionFlagsBits,
   TextChannel,
 } from 'discord.js';
 import { spendPulse } from './economy.js';
@@ -330,11 +331,16 @@ export async function handleChickenButton(interaction: ButtonInteraction): Promi
   }
 
   if (action === 'start') {
+    // The button label says "(Lord)" — enforce it. Without this check any
+    // joiner could skip the lobby window and lock others out of joining.
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      await interaction.reply({ content: '⛔ Only a Lord can skip the lobby wait.', ephemeral: true });
+      return;
+    }
     if (race.phase !== 'lobby') {
       await interaction.reply({ content: 'Not in lobby anymore.', ephemeral: true });
       return;
     }
-    // Skip the wait — start immediately.
     race.starts_at = Date.now();
     await interaction.reply({ content: '▶️ Starting the race now.', ephemeral: true });
     await transitionToRunning(race);

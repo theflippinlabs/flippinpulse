@@ -48,6 +48,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const locale = await getUserLocale(interaction.user.id);
   const en = locale === 'en';
 
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Admins only.' : 'Réservé aux admins.')] });
+    return;
+  }
+
   const setting = interaction.options.getString('setting', true);
   const value = interaction.options.getNumber('value', true);
   const knob = KNOBS[setting];

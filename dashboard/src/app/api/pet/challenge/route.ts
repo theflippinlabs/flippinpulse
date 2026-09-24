@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { assertChannelAllowed } from '@/lib/guardChannel';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
   if (!/^\d{15,20}$/.test(opponentId)) return NextResponse.json({ error: 'bad_opponent' }, { status: 400 });
   if (opponentId === session.id) return NextResponse.json({ error: 'self_challenge' }, { status: 400 });
   if (!channelId) return NextResponse.json({ error: 'no_channel' }, { status: 400 });
+  const guard = await assertChannelAllowed(channelId);
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: 400 });
   const { error } = await supabase.from('dashboard_commands').insert({
     command: 'pet_challenge',
     payload_json: { challenger_id: session.id, opponent_id: opponentId, wager, channel_id: channelId },

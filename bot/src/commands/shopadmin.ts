@@ -49,6 +49,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const locale = await getUserLocale(interaction.user.id);
   const en = locale === 'en';
+
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Admins only.' : 'Réservé aux admins.')] });
+    return;
+  }
+
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'add') {

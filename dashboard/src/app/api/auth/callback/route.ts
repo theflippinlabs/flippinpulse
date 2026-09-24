@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { timingSafeEqual } from 'node:crypto';
 import { isAdmin, setSessionCookie } from '@/lib/auth';
+
+const STATE_COOKIE = 'novarys_oauth_state';
 
 interface DiscordTokenResponse {
   access_token: string;
@@ -16,9 +20,31 @@ interface DiscordUser {
   avatar: string | null;
 }
 
+function clearStateCookie(): void {
+  cookies().set({ name: STATE_COOKIE, value: '', maxAge: 0, path: '/' });
+}
+
+function verifyState(param: string | null): boolean {
+  const stored = cookies().get(STATE_COOKIE)?.value;
+  if (!stored || !param) return false;
+  const a = Buffer.from(stored);
+  const b = Buffer.from(param);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code');
-  if (!code) return NextResponse.redirect(new URL('/?error=missing_code', req.url));
+  const state = req.nextUrl.searchParams.get('state');
+  if (!code) {
+    clearStateCookie();
+    return NextResponse.redirect(new URL('/?error=missing_code', req.url));
+  }
+  if (!verifyState(state)) {
+    // State mismatch → potential CSRF / session fixation. Refuse.
+    clearStateCookie();
+    return NextResponse.redirect(new URL('/?error=state_mismatch', req.url));
+  }
+  clearStateCookie();
 
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
@@ -54,6 +80,5 @@ export async function GET(req: NextRequest) {
     avatar: user.avatar,
     iat: Date.now(),
   });
-  // Lords land on the command deck; regular members land on their app.
   return NextResponse.redirect(new URL(isAdmin(user.id) ? '/dashboard' : '/app', req.url));
 }
