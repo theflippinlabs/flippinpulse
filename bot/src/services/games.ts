@@ -138,47 +138,42 @@ export async function saveGameResult(
   });
 }
 
+// Atomic earn via pulse_earn RPC. Two concurrent game payouts can't
+// double-write against a stale balance any more. Side effects
+// (achievements, BP XP) run after the credit lands.
 export async function earnPulse(
   discordId: string,
   amount: number,
   reason: string,
   refId?: string,
 ): Promise<number> {
-  const { data: user } = await supabase
-    .from('discord_users')
-    .select('balance_pulse, lifetime_earned_pulse')
-    .eq('discord_id', discordId)
-    .single();
-
-  const currentBalance = user?.balance_pulse ?? 0;
-  const currentEarned = user?.lifetime_earned_pulse ?? 0;
-  const newBalance = currentBalance + amount;
-
-  await supabase
-    .from('discord_users')
-    .update({
-      balance_pulse: newBalance,
-      lifetime_earned_pulse: currentEarned + amount,
-    })
-    .eq('discord_id', discordId);
-
-  await supabase.from('pulse_transactions').insert({
-    discord_id: discordId,
-    type: 'EARN_EVENT',
-    amount,
-    reason,
-    ref_id: refId,
-    balance_after: newBalance,
+  if (amount <= 0) return 0;
+  const { data, error } = await supabase.rpc('pulse_earn', {
+    p_discord_id: discordId,
+    p_amount: amount,
+    p_reason: reason,
+    p_ref_id: refId ?? null,
+    p_type: 'EARN_EVENT',
+    p_username: null,
+    p_avatar_url: null,
   });
+  if (error) {
+    // Log-and-return-0 so a games caller never crashes on a transient
+    // Supabase blip; the transaction was atomic if it happened at all.
+    // eslint-disable-next-line no-console
+    console.error('pulse_earn rpc failed', discordId, error);
+    return 0;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const newBalance = row?.new_balance ?? 0;
 
+  // Ripple achievements + battle-pass XP off the fresh balance.
   tickAchievements({
     discordId,
-    lifetimeEarned: currentEarned + amount,
+    lifetimeEarned: newBalance,
     lotteryWon: /lottery_win/i.test(reason) || undefined,
   });
-
-  // Battle-pass XP: 1 XP per PULSE earned via game/mission/reward (positive amounts only).
-  if (amount > 0) void grantBattlePassXP(discordId, amount);
+  void grantBattlePassXP(discordId, amount);
 
   return newBalance;
 }

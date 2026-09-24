@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { atomicSpend, atomicEarn } from './atomicPulse';
 
 export interface Season {
   id: number;
@@ -71,19 +72,7 @@ async function upsertProgress(p: Progress): Promise<void> {
 export interface ClaimSummary { tier: number; track: 'free' | 'premium'; label: string; pulseAwarded: number; }
 
 async function creditPulse(discordId: string, amount: number, reason: string, refId: string): Promise<void> {
-  const { data: user } = await supabase
-    .from('discord_users')
-    .select('balance_pulse, lifetime_earned_pulse')
-    .eq('discord_id', discordId)
-    .single();
-  const bal = (user?.balance_pulse ?? 0) + amount;
-  await supabase.from('discord_users').update({
-    balance_pulse: bal,
-    lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
-  }).eq('discord_id', discordId);
-  await supabase.from('pulse_transactions').insert({
-    discord_id: discordId, type: 'EARN_EVENT', amount, reason, ref_id: refId, balance_after: bal,
-  });
+  await atomicEarn(discordId, amount, reason, refId);
 }
 
 export async function claimPending(discordId: string): Promise<{ claimed: ClaimSummary[]; error?: string }> {
@@ -150,18 +139,8 @@ export async function buyPremium(discordId: string): Promise<{ ok: boolean; erro
   if (!bundle) return { ok: false, error: 'No active season.' };
   const { season, progress } = bundle;
   if (progress.is_premium) return { ok: false, alreadyOwned: true };
-  const { data: user } = await supabase.from('discord_users').select('balance_pulse, lifetime_spent_pulse').eq('discord_id', discordId).single();
-  const bal = user?.balance_pulse ?? 0;
-  if (bal < season.premium_price_pulse) return { ok: false, error: 'Insufficient PULSE' };
-  const newBal = bal - season.premium_price_pulse;
-  await supabase.from('discord_users').update({
-    balance_pulse: newBal,
-    lifetime_spent_pulse: (user?.lifetime_spent_pulse ?? 0) + season.premium_price_pulse,
-  }).eq('discord_id', discordId);
-  await supabase.from('pulse_transactions').insert({
-    discord_id: discordId, type: 'SPEND_SHOP', amount: -season.premium_price_pulse,
-    reason: `Battle Pass ${season.name} premium`, balance_after: newBal,
-  });
+  const debit = await atomicSpend(discordId, season.premium_price_pulse, `Battle Pass ${season.name} premium`);
+  if (!debit.ok) return { ok: false, error: debit.error === 'insufficient_pulse' ? 'Insufficient PULSE' : debit.error };
   progress.is_premium = true;
   await upsertProgress(progress);
   return { ok: true };
