@@ -10,56 +10,35 @@ export async function getBalance(discordId: string): Promise<number> {
   return (data as { balance_pulse?: number } | null)?.balance_pulse ?? 0;
 }
 
-// Apply a bet: deduct bet from balance, credit payout. Returns new balance.
-// Records the transaction line for auditability.
+// Apply a bet atomically via the pulse_settle_bet Postgres function. One
+// UPDATE with `balance_pulse >= bet` guard collapses the whole flow into
+// a single write — two concurrent HTTP bets on the same account cannot
+// both succeed on a stale read (previous JS implementation was race-y).
 export async function settleBet(
   discordId: string,
   gameKey: string,
   bet: number,
   payout: number,
 ): Promise<{ ok: true; newBalance: number } | { ok: false; error: string; balance: number }> {
-  const { data: user } = await supabase
-    .from('discord_users')
-    .select('balance_pulse, lifetime_earned_pulse, lifetime_spent_pulse')
-    .eq('discord_id', discordId)
-    .maybeSingle();
-
-  if (!user) return { ok: false, error: 'Member not tracked yet — send a message in Discord first.', balance: 0 };
-
-  const cur = (user as { balance_pulse?: number }).balance_pulse ?? 0;
-  if (cur < bet) return { ok: false, error: 'Not enough PULSE.', balance: cur };
-
-  const newBalance = cur - bet + payout;
-  const lifetimeSpent = ((user as { lifetime_spent_pulse?: number }).lifetime_spent_pulse ?? 0) + bet;
-  const lifetimeEarned = ((user as { lifetime_earned_pulse?: number }).lifetime_earned_pulse ?? 0) + payout;
-
-  await supabase.from('discord_users').update({
-    balance_pulse: newBalance,
-    lifetime_spent_pulse: lifetimeSpent,
-    lifetime_earned_pulse: lifetimeEarned,
-  }).eq('discord_id', discordId);
-
-  // Debit + credit as two lines for a clean transaction history.
-  if (bet > 0) {
-    await supabase.from('pulse_transactions').insert({
-      discord_id: discordId,
-      type: 'SPEND_SHOP',
-      amount: -bet,
-      reason: `Dashboard play: ${gameKey}`,
-      balance_after: cur - bet,
-    });
+  const { data, error } = await supabase.rpc('pulse_settle_bet', {
+    p_discord_id: discordId,
+    p_game_key: gameKey,
+    p_bet: Math.max(0, Math.floor(bet)),
+    p_payout: Math.max(0, Math.floor(payout)),
+  });
+  if (error) {
+    return { ok: false, error: error.message, balance: 0 };
   }
-  if (payout > 0) {
-    await supabase.from('pulse_transactions').insert({
-      discord_id: discordId,
-      type: 'EARN_EVENT',
-      amount: payout,
-      reason: `Dashboard win: ${gameKey}`,
-      balance_after: newBalance,
-    });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.ok) {
+    const err = row?.err;
+    const msg = err === 'insufficient_pulse' ? 'Not enough PULSE.'
+      : err === 'user_not_found' ? 'Member not tracked yet — send a message in Discord first.'
+      : err === 'bad_amount' ? 'Invalid bet.'
+      : (err ?? 'settle_failed');
+    return { ok: false, error: msg, balance: row?.new_balance ?? 0 };
   }
-
-  return { ok: true, newBalance };
+  return { ok: true, newBalance: row.new_balance };
 }
 
 export function pickWeighted<T>(items: T[], weights: number[]): T {

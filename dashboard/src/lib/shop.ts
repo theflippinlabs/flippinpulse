@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { atomicSpend, atomicEarn } from './atomicPulse';
 
 export type ShopCategory = 'role' | 'perk' | 'ticket' | 'cosmetic' | 'irl';
 
@@ -75,51 +76,29 @@ export async function purchase(
     }
   }
 
-  const { data: user } = await supabase
-    .from('discord_users').select('balance_pulse, lifetime_spent_pulse').eq('discord_id', discordId).maybeSingle();
-  if (!user) return { ok: false, error: 'Envoie un message dans Discord au moins une fois avant d\'acheter.' };
-  const cur = (user as { balance_pulse?: number }).balance_pulse ?? 0;
-  if (cur < item.price_pulse) return { ok: false, error: 'Pas assez de PULSE.' };
-
-  let balanceAfter = cur - item.price_pulse;
-  let lifetimeSpent = ((user as { lifetime_spent_pulse?: number }).lifetime_spent_pulse ?? 0) + item.price_pulse;
+  // Atomic debit — refuses if balance < price without a check-then-update
+  // window a concurrent request could exploit.
+  const debit = await atomicSpend(discordId, item.price_pulse, `Shop: ${item.name}`, item.id);
+  if (!debit.ok) {
+    return { ok: false,
+      error: debit.error === 'insufficient_pulse' ? 'Pas assez de PULSE.'
+        : debit.error === 'user_not_found' ? 'Envoie un message dans Discord au moins une fois avant d\'acheter.'
+        : 'Achat impossible.',
+    };
+  }
+  let balanceAfter = debit.newBalance;
   let mysteryReward: number | undefined;
 
-  await supabase.from('pulse_transactions').insert({
-    discord_id: discordId,
-    type: 'SPEND_SHOP',
-    amount: -item.price_pulse,
-    reason: `Shop: ${item.name}`,
-    ref_id: item.id,
-    balance_after: balanceAfter,
-  });
-
-  // Mystery box: roll a random amount inside [min, max] and credit it back.
-  // Purely self-managed — no admin approval, no bot handler needed.
   const mystery = item.metadata_json?.mystery;
   if (mystery && mystery.min <= mystery.max && mystery.min >= 0) {
     const roll = Math.floor(mystery.min + Math.random() * (mystery.max - mystery.min + 1));
-    mysteryReward = roll;
-    balanceAfter += roll;
-    await supabase.from('pulse_transactions').insert({
-      discord_id: discordId,
-      type: 'EARN_EVENT',
-      amount: roll,
-      reason: `Mystery box: ${item.name}`,
-      ref_id: item.id,
-      balance_after: balanceAfter,
-    });
+    if (roll > 0) {
+      mysteryReward = roll;
+      balanceAfter = await atomicEarn(discordId, roll, `Mystery box: ${item.name}`, item.id);
+    } else {
+      mysteryReward = 0;
+    }
   }
-
-  const lifetimeEarned = mysteryReward
-    ? ((user as { lifetime_earned_pulse?: number }).lifetime_earned_pulse ?? 0) + mysteryReward
-    : undefined;
-
-  await supabase.from('discord_users').update({
-    balance_pulse: balanceAfter,
-    lifetime_spent_pulse: lifetimeSpent,
-    ...(lifetimeEarned !== undefined ? { lifetime_earned_pulse: lifetimeEarned } : {}),
-  }).eq('discord_id', discordId);
 
   if (item.stock_remaining !== null) {
     await supabase.from('shop_items').update({ stock_remaining: item.stock_remaining - 1 }).eq('id', item.id);

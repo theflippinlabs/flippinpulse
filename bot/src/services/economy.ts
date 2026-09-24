@@ -7,44 +7,37 @@ interface SpendResult {
   error?: string;
 }
 
+// Atomic spend via the pulse_spend Postgres function. One UPDATE with a
+// WHERE balance_pulse >= amount guard means two concurrent spends on the
+// same account cannot both succeed on a stale read.
 export async function spendPulse(
   discordId: string,
   amount: number,
   reason: string,
   refId?: string
 ): Promise<SpendResult> {
-  const { data: user } = await supabase
-    .from('discord_users')
-    .select('balance_pulse, lifetime_spent_pulse')
-    .eq('discord_id', discordId)
-    .single();
-
-  if (!user) return { success: false, newBalance: 0, error: 'User not found' };
-  if (user.balance_pulse < amount) {
-    return { success: false, newBalance: user.balance_pulse, error: 'Insufficient PULSE' };
-  }
-
-  const newBalance = user.balance_pulse - amount;
-
-  await supabase
-    .from('discord_users')
-    .update({
-      balance_pulse: newBalance,
-      lifetime_spent_pulse: (user.lifetime_spent_pulse ?? 0) + amount,
-    })
-    .eq('discord_id', discordId);
-
-  await supabase.from('pulse_transactions').insert({
-    discord_id: discordId,
-    type: 'SPEND_SHOP',
-    amount: -amount,
-    reason,
-    ref_id: refId,
-    balance_after: newBalance,
+  const { data, error } = await supabase.rpc('pulse_spend', {
+    p_discord_id: discordId,
+    p_amount: amount,
+    p_reason: reason,
+    p_ref_id: refId ?? null,
   });
-
+  if (error) {
+    log('ERROR', `pulse_spend rpc failed for ${discordId}`, error);
+    return { success: false, newBalance: 0, error: error.message };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.ok) {
+    return {
+      success: false,
+      newBalance: row?.new_balance ?? 0,
+      error: row?.err === 'insufficient_pulse' ? 'Insufficient PULSE'
+        : row?.err === 'user_not_found' ? 'User not found'
+        : (row?.err ?? 'spend_failed'),
+    };
+  }
   log('INFO', `PULSE spend: ${discordId} -${amount} (${reason})`);
-  return { success: true, newBalance };
+  return { success: true, newBalance: row.new_balance };
 }
 
 export async function grantPulse(
@@ -162,6 +155,8 @@ export async function setPulse(
   return { success: true, newBalance: amount };
 }
 
+// Atomic earn — inserts the row if missing (upsert semantics inside the
+// RPC) and adds to the balance in one write.
 export async function creditPulse(
   discordId: string,
   username: string,
@@ -170,32 +165,21 @@ export async function creditPulse(
   reason: string
 ): Promise<number> {
   if (amount <= 0) return 0;
-
-  const { data: user } = await supabase
-    .from('discord_users')
-    .select('balance_pulse, lifetime_earned_pulse')
-    .eq('discord_id', discordId)
-    .single();
-
-  const newBalance = (user?.balance_pulse ?? 0) + amount;
-
-  await supabase.from('discord_users').upsert({
-    discord_id: discordId,
-    username,
-    avatar_url: avatarUrl,
-    balance_pulse: newBalance,
-    lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
-  }, { onConflict: 'discord_id' });
-
-  await supabase.from('pulse_transactions').insert({
-    discord_id: discordId,
-    type: 'EARN_EVENT',
-    amount,
-    reason,
-    balance_after: newBalance,
+  const { data, error } = await supabase.rpc('pulse_earn', {
+    p_discord_id: discordId,
+    p_amount: amount,
+    p_reason: reason,
+    p_ref_id: null,
+    p_type: 'EARN_EVENT',
+    p_username: username,
+    p_avatar_url: avatarUrl,
   });
-
-  return newBalance;
+  if (error) {
+    log('ERROR', `pulse_earn (credit) rpc failed for ${discordId}`, error);
+    return 0;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return row?.new_balance ?? 0;
 }
 
 export async function getBalance(discordId: string): Promise<{

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { Card, Rarity } from './tcgShared';
 import { PACK_COST, PACK_SIZE, NEXT_RARITY, SELL_VALUE, MAX_LEVEL, MERGE_COST_COPIES } from './tcgShared';
+import { atomicSpend, atomicEarn } from './atomicPulse';
 
 export { PACK_COST, PACK_SIZE, RARITY_STYLE, rarityOrder, SELL_VALUE, NEXT_RARITY, MAX_LEVEL, MERGE_COST_COPIES } from './tcgShared';
 export type { Card, Rarity, EquipmentSlot } from './tcgShared';
@@ -60,12 +61,11 @@ function pickRarity(): Rarity {
 export async function openPack(discordId: string): Promise<{ ok: boolean; error?: string; pulled?: { card: Card; isNew: boolean }[]; newBalance?: number }> {
   const catalog = await loadCatalog();
   if (!catalog.length) return { ok: false, error: 'catalog_empty' };
-  const { data: user } = await supabase.from('discord_users').select('balance_pulse, lifetime_spent_pulse').eq('discord_id', discordId).single();
-  if (!user) return { ok: false, error: 'user_not_found' };
-  if (user.balance_pulse < PACK_COST) return { ok: false, error: 'insufficient_pulse' };
-  const nb = user.balance_pulse - PACK_COST;
-  await supabase.from('discord_users').update({ balance_pulse: nb, lifetime_spent_pulse: (user.lifetime_spent_pulse ?? 0) + PACK_COST }).eq('discord_id', discordId);
-  await supabase.from('pulse_transactions').insert({ discord_id: discordId, type: 'SPEND_SHOP', amount: -PACK_COST, reason: 'TCG pack', balance_after: nb });
+  // Atomic debit — refuses if balance < PACK_COST without ever leaking a
+  // "check then update" window a concurrent request could exploit.
+  const debit = await atomicSpend(discordId, PACK_COST, 'TCG pack');
+  if (!debit.ok) return { ok: false, error: debit.error ?? 'insufficient_pulse' };
+  const nb = debit.newBalance;
 
   const pulls: { card: Card; isNew: boolean }[] = [];
   for (let i = 0; i < PACK_SIZE; i++) {
@@ -109,11 +109,7 @@ export async function openPack(discordId: string): Promise<{ ok: boolean; error?
 export interface SellResult { ok: boolean; error?: string; sold?: number; pulseEarned?: number; newBalance?: number; }
 
 async function credit(discordId: string, amount: number, reason: string): Promise<number> {
-  const { data: user } = await supabase.from('discord_users').select('balance_pulse, lifetime_earned_pulse').eq('discord_id', discordId).single();
-  const bal = (user?.balance_pulse ?? 0) + amount;
-  await supabase.from('discord_users').update({ balance_pulse: bal, lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount }).eq('discord_id', discordId);
-  await supabase.from('pulse_transactions').insert({ discord_id: discordId, type: 'EARN_EVENT', amount, reason, balance_after: bal });
-  return bal;
+  return atomicEarn(discordId, amount, reason);
 }
 
 // Sells lowest-level copies first so upgraded equipment stays safe. The

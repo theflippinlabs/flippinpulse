@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { ADOPTION_COST, FEED_COST, TRAIN_COST, SPECIES, type Pet, type SpeciesKey } from './petsShared';
+import { atomicSpend, atomicEarn } from './atomicPulse';
 
 export { ADOPTION_COST, FEED_COST, TRAIN_COST, SPECIES } from './petsShared';
 export type { Pet, SpeciesKey } from './petsShared';
@@ -31,20 +32,12 @@ export async function getActivePet(discordId: string): Promise<Pet | null> {
 }
 
 async function debit(discordId: string, amount: number, reason: string): Promise<{ ok: boolean; error?: string }> {
-  const { data: u } = await supabase.from('discord_users').select('balance_pulse, lifetime_spent_pulse').eq('discord_id', discordId).single();
-  if (!u) return { ok: false, error: 'user_not_found' };
-  if (u.balance_pulse < amount) return { ok: false, error: 'insufficient_pulse' };
-  const nb = u.balance_pulse - amount;
-  await supabase.from('discord_users').update({ balance_pulse: nb, lifetime_spent_pulse: (u.lifetime_spent_pulse ?? 0) + amount }).eq('discord_id', discordId);
-  await supabase.from('pulse_transactions').insert({ discord_id: discordId, type: 'SPEND_SHOP', amount: -amount, reason, balance_after: nb });
-  return { ok: true };
+  const r = await atomicSpend(discordId, amount, reason);
+  return { ok: r.ok, error: r.error };
 }
 
 async function credit(discordId: string, amount: number, reason: string): Promise<void> {
-  const { data: u } = await supabase.from('discord_users').select('balance_pulse, lifetime_earned_pulse').eq('discord_id', discordId).single();
-  const bal = (u?.balance_pulse ?? 0) + amount;
-  await supabase.from('discord_users').update({ balance_pulse: bal, lifetime_earned_pulse: (u?.lifetime_earned_pulse ?? 0) + amount }).eq('discord_id', discordId);
-  await supabase.from('pulse_transactions').insert({ discord_id: discordId, type: 'EARN_EVENT', amount, reason, balance_after: bal });
+  await atomicEarn(discordId, amount, reason);
 }
 
 function gainXP(p: Pet, xp: number): Pet {
