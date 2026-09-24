@@ -4,6 +4,7 @@ import { settleBet } from '@/lib/play';
 import { verifyGameToken } from '@/lib/gameToken';
 import { supabase } from '@/lib/supabase';
 import { chickenAnnounce, pickLocale } from '@/lib/gameAnnounce';
+import { assertChannelAllowed } from '@/lib/guardChannel';
 
 function multiplierAt(elapsedMs: number): number {
   const t = elapsedMs / 1000;
@@ -46,15 +47,18 @@ export async function POST(req: NextRequest) {
   if (!settled.ok) return NextResponse.json({ error: settled.error }, { status: 500 });
 
   if (body.share && body.channel_id && cashed_mult >= 3) {
-    const { title, message } = chickenAnnounce(pickLocale(body), {
-      userId: session.id, multi: cashed_mult, bet: payload.bet, payout,
-    });
-    await supabase.from('dashboard_commands').insert({
-      command: 'announce',
-      payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
-      status: 'pending',
-      created_by: session.id,
-    });
+    const guard = await assertChannelAllowed(String(body.channel_id));
+    if (guard.ok) {
+      const { title, message } = chickenAnnounce(pickLocale(body), {
+        userId: session.id, multi: cashed_mult, bet: payload.bet, payout,
+      });
+      await supabase.from('dashboard_commands').insert({
+        command: 'announce',
+        payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
+        status: 'pending',
+        created_by: session.id,
+      });
+    }
   }
 
   return NextResponse.json({

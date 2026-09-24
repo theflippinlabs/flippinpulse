@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, isAdmin } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Anthropic Messages API endpoint. We call it directly with fetch to avoid
 // pulling in the SDK — the dashboard bundle already ships a lot.
@@ -51,6 +52,15 @@ const SYSTEMS: Record<string, string> = {
 
 interface Message { role: 'user' | 'assistant'; content: string }
 
+// Kinds that drive admin-only tooling (announce composer, tournament creator,
+// mission author). Non-Lords must never trigger them — those calls burn the
+// shared Anthropic budget on features they cannot use.
+const ADMIN_ONLY_KINDS = new Set(['announce', 'tournament', 'mission', 'free']);
+// Cost-facing rate limits — tight enough that a scripted client can't drain
+// the key. Members using Novus get a separate, roomier budget below.
+const ADMIN_RATE_LIMIT = { max: 30, windowMs: 60 * 60 * 1000 };   // 30 / hour
+const MEMBER_RATE_LIMIT = { max: 20, windowMs: 60 * 60 * 1000 };  // 20 / hour
+
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) {
@@ -68,6 +78,23 @@ export async function POST(req: NextRequest) {
   let kind = typeof body.kind === 'string' && SYSTEMS[body.kind] ? body.kind : 'free';
   // Novus honors the caller's locale so it answers in the same language.
   if (kind === 'novus' && body.locale === 'en') kind = 'novus_en';
+
+  // Gate the admin tools BEHIND the Lord check so an arbitrary member can't
+  // burn the API key writing "announcements" for themselves.
+  if (ADMIN_ONLY_KINDS.has(kind) && !isAdmin(session.id)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
+
+  const rl = isAdmin(session.id)
+    ? checkRateLimit(`ai:write:${session.id}`, ADMIN_RATE_LIMIT.max, ADMIN_RATE_LIMIT.windowMs)
+    : checkRateLimit(`ai:write:${session.id}`, MEMBER_RATE_LIMIT.max, MEMBER_RATE_LIMIT.windowMs);
+  if (!rl.ok) {
+    return NextResponse.json({
+      error: 'rate_limited',
+      retryAfterMs: rl.retryAfterMs,
+    }, { status: 429 });
+  }
+
   const raw = Array.isArray(body.messages) ? body.messages : [];
 
   const messages: Message[] = [];

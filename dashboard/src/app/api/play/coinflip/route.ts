@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { settleBet } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
 import { coinflipAnnounce, pickLocale } from '@/lib/gameAnnounce';
+import { assertChannelAllowed } from '@/lib/guardChannel';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -21,13 +22,16 @@ export async function POST(req: NextRequest) {
   if (!settled.ok) return NextResponse.json({ error: settled.error, balance: settled.balance }, { status: 400 });
 
   if (body.share && body.channel_id && won && bet >= 100) {
-    const { title, message } = coinflipAnnounce(pickLocale(body), { userId: session.id, outcome, payout });
-    await supabase.from('dashboard_commands').insert({
-      command: 'announce',
-      payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
-      status: 'pending',
-      created_by: session.id,
-    });
+    const guard = await assertChannelAllowed(String(body.channel_id));
+    if (guard.ok) {
+      const { title, message } = coinflipAnnounce(pickLocale(body), { userId: session.id, outcome, payout });
+      await supabase.from('dashboard_commands').insert({
+        command: 'announce',
+        payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
+        status: 'pending',
+        created_by: session.id,
+      });
+    }
   }
 
   return NextResponse.json({ outcome, choice, won, bet, payout, newBalance: settled.newBalance });

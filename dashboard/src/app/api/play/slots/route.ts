@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { pickWeighted, settleBet, getBalance } from '@/lib/play';
 import { supabase } from '@/lib/supabase';
 import { slotsAnnounce, pickLocale } from '@/lib/gameAnnounce';
+import { assertChannelAllowed } from '@/lib/guardChannel';
 
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
 const WEIGHTS = [30, 25, 20, 15, 6, 3, 1];
@@ -47,16 +48,19 @@ export async function POST(req: NextRequest) {
   // Only announce real wins (net gain of at least 5× the bet).
   const net = payout - bet;
   if (body.share && body.channel_id && net >= bet * 5) {
-    const multiplier = payout / bet;
-    const { title, message } = slotsAnnounce(pickLocale(body), {
-      userId: session.id, multi: multiplier, net, reels,
-    });
-    await supabase.from('dashboard_commands').insert({
-      command: 'announce',
-      payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
-      status: 'pending',
-      created_by: session.id,
-    });
+    const guard = await assertChannelAllowed(String(body.channel_id));
+    if (guard.ok) {
+      const multiplier = payout / bet;
+      const { title, message } = slotsAnnounce(pickLocale(body), {
+        userId: session.id, multi: multiplier, net, reels,
+      });
+      await supabase.from('dashboard_commands').insert({
+        command: 'announce',
+        payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
+        status: 'pending',
+        created_by: session.id,
+      });
+    }
   }
 
   return NextResponse.json({

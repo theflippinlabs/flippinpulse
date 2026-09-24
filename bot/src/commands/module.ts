@@ -51,6 +51,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const locale = await getUserLocale(interaction.user.id);
   const en = locale === 'en';
 
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    await interaction.editReply({ embeds: [errorEmbed(en ? 'Admins only.' : 'Réservé aux admins.')] });
+    return;
+  }
+
   const feature = interaction.options.getString('feature', true);
   const enabled = interaction.options.getBoolean('enabled', true);
   const mod = MODULES[feature];
