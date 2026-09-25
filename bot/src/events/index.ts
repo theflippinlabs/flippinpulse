@@ -4,6 +4,7 @@ import { handleMessageReactionAdd } from './messageReactionAdd.js';
 import { handleMessageReactionRemove } from './messageReactionRemove.js';
 import { handleVoiceStateUpdate } from './voiceStateUpdate.js';
 import { handleGuildMemberAdd } from './guildMemberAdd.js';
+import { handleGuildCreate } from './guildCreate.js';
 import { handleInteractionCreate } from './interactionCreate.js';
 
 export function registerEvents(client: Client): void {
@@ -16,5 +17,6 @@ export function registerEvents(client: Client): void {
   });
   client.on(Events.VoiceStateUpdate, handleVoiceStateUpdate);
   client.on(Events.GuildMemberAdd, handleGuildMemberAdd);
+  client.on(Events.GuildCreate, handleGuildCreate);
   client.on(Events.InteractionCreate, handleInteractionCreate);
 }

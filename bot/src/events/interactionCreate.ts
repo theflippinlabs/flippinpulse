@@ -21,6 +21,7 @@ import { handlePetInteraction } from '../commands/pet.js';
 import { handleCardChallengeInteraction } from '../commands/cards.js';
 import { handleMarriageInteraction } from '../commands/marriage.js';
 import { handleEventInteraction } from '../commands/event.js';
+import { handleSetupInteraction } from '../commands/setup.js';
 import { seedLocaleFromDiscord } from '../i18n.js';
 import { log } from '../utils/logger.js';
 
@@ -66,6 +67,18 @@ export async function handleInteractionCreate(interaction: Interaction): Promise
       await handlePanelInteraction(interaction);
     } catch (err) {
       log('ERROR', 'Panel interaction handler crashed', err);
+    }
+    return;
+  }
+
+  if (
+    (interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu() || interaction.isModalSubmit())
+    && interaction.customId.startsWith('setup:')
+  ) {
+    try {
+      await handleSetupInteraction(interaction);
+    } catch (err) {
+      log('ERROR', 'Setup interaction handler crashed', err);
     }
     return;
   }

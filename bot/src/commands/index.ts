@@ -72,6 +72,8 @@ import * as hunt from './hunt.js';
 import * as saga from './saga.js';
 import * as sagaadmin from './sagaadmin.js';
 import * as stream from './stream.js';
+import * as setup from './setup.js';
+import * as billing from './billing.js';
 
 export interface Command {
   data: SharedSlashCommand;
@@ -89,7 +91,7 @@ const commandList: Command[] = [
   quizadmin, autoquiz, welcome, rankup, modlog, panel,
   jeux, hub, setupaccueil, jail, achievements, tournoi, cosmetics, chicken, automod, charts, music,
   language, catchup, compagnon, poker, battlepass, pet, cards, gift, birthday,
-  marriage, bank, event, guild, hunt, saga, sagaadmin, stream,
+  marriage, bank, event, guild, hunt, saga, sagaadmin, stream, setup, billing,
 ];
 
 export const commands = new Map<string, Command>();
