@@ -35,7 +35,7 @@ async function localeIsFR(userId: string): Promise<boolean> {
   return (await getUserLocale(userId)) === 'fr';
 }
 
-// ---- Nav ----
+// ---- Nav (3 rows covering every major feature) ----
 function navRows(): Row[] {
   return [
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
@@ -46,9 +46,18 @@ function navRows(): Row[] {
       new ButtonBuilder().setCustomId('hub:shop').setLabel('Boutique').setEmoji('🎁').setStyle(ButtonStyle.Secondary),
     ),
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-      new ButtonBuilder().setCustomId('hub:lottery').setLabel('Loterie').setEmoji('🎫').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('hub:battlepass').setLabel('Battle Pass').setEmoji('🎫').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('hub:pet').setLabel('Compagnon').setEmoji('🐾').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('hub:cards').setLabel('Cartes').setEmoji('🎴').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('hub:ia').setLabel('IA Perso').setEmoji('💫').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('hub:guild').setLabel('Guilde').setEmoji('🏰').setStyle(ButtonStyle.Secondary),
+    ),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('hub:lottery').setLabel('Loterie').setEmoji('🎰').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('hub:leaderboard').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('hub:daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('hub:hunt').setLabel('Chasse').setEmoji('🗺️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('hub:saga').setLabel('Saga').setEmoji('📖').setStyle(ButtonStyle.Secondary),
     ),
   ];
 }
@@ -181,16 +190,19 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
   const line = (name: string, emoji: string, desc: string) => `${emoji} ${mention(name, ids)} — ${desc}`;
   const description = [
     fr ? '**⚡ Lance en 1 tap** (mise via fenêtre)' : '**⚡ One-tap play** (bet via window)',
-    fr ? '_Utilise les boutons ci-dessous pour les jeux solo._' : '_Use the buttons below for solo games._',
     '',
-    fr ? '**🎯 Solo**' : '**🎯 Solo**',
-    line('higherlower', '🎲', fr ? 'Plus ou Moins' : 'Higher or Lower'),
-    line('crash', '💥', fr ? 'Cash out avant le crash' : 'Cash out before the crash'),
+    fr ? '**🎯 Solo (mise)**' : '**🎯 Solo (bet)**',
     line('slots', '🎰', fr ? 'Machine à sous' : 'Slot machine'),
-    line('roulette', '🎡', fr ? 'Roulette européenne' : 'European roulette'),
     line('blackjack', '🃏', fr ? 'Face au croupier' : 'Vs the dealer'),
+    line('crash', '💥', fr ? 'Cash out avant le crash' : 'Cash out before the crash'),
     line('wheel', '🎡', fr ? 'Roue Gacha (jusqu\'à ×25)' : 'Gacha wheel (up to ×25)'),
-    line('quiz', '🧠', fr ? 'Quiz solo' : 'Solo quiz'),
+    line('roulette', '🎡', fr ? 'Roulette européenne' : 'European roulette'),
+    line('higherlower', '🎲', fr ? 'Plus ou Moins' : 'Higher or Lower'),
+    line('chicken', '🐔', fr ? 'Chicken Race (multi)' : 'Chicken Race (multi)'),
+    '',
+    fr ? '**🃏 Cartes & Poker**' : '**🃏 Cards & Poker**',
+    line('poker', '♠️', fr ? 'Poker Texas Hold\'em multi' : 'Poker Texas Hold\'em multi'),
+    line('cards', '🎴', fr ? 'Trading Card Game (packs, duels, fusion)' : 'Trading Card Game (packs, duels, fuse)'),
     '',
     fr ? '**⚔️ 1v1**' : '**⚔️ 1v1**',
     line('duel', '⚔️', fr ? 'Défie un joueur' : 'Challenge a player'),
@@ -198,12 +210,14 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
     line('typingrace', '⌨️', fr ? 'Course de frappe' : 'Typing race'),
     '',
     fr ? '**🏟️ Multijoueur (lobby)**' : '**🏟️ Multiplayer (lobby)**',
-    line('battleroyale', '🏆', fr ? 'Le dernier survivant rafle la cagnotte' : 'Last one standing takes the pot'),
+    line('battleroyale', '🏆', fr ? 'Dernier survivant rafle la cagnotte' : 'Last one standing takes the pot'),
     line('diceroyale', '🎲', fr ? 'Le plus haut score gagne' : 'Highest roll wins'),
+    line('tournoi', '🏟️', fr ? 'Tournois PvP à élimination' : 'Single-elim PvP tournaments'),
     '',
-    fr ? '**🎁 Autres**' : '**🎁 Others**',
-    line('treasure', '💰', fr ? 'Chasse au trésor' : 'Treasure hunt'),
-    line('lottery', '🎫', fr ? 'Loterie' : 'Lottery'),
+    fr ? '**🧠 Quiz & Trésor**' : '**🧠 Quiz & Treasure**',
+    line('quiz', '🧠', fr ? 'Quiz solo' : 'Solo quiz'),
+    line('treasure', '💰', fr ? 'Treasure Drop (spawn aléatoire)' : 'Treasure Drop (random spawn)'),
+    line('hunt', '🗺️', fr ? 'Chasse au trésor (énigmes)' : 'Treasure hunt (riddles)'),
   ].join('\n');
   const quickRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ButtonBuilder().setCustomId('hub:play:slots').setLabel('Slots').setEmoji('🎰').setStyle(ButtonStyle.Success),
@@ -215,6 +229,213 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
   return {
     embeds: [pulseEmbed(fr ? '🎮 Salle des jeux' : '🎮 Games Room').setDescription(description)],
     components: [quickRow, ...navRows()],
+  };
+}
+
+// ---- New: Battle Pass, Pet, TCG, IA companion, Guilde, Hunt, Saga views ----
+async function renderBattlePass(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: season } = await supabase
+    .from('battle_pass_seasons').select('*').eq('is_active', true).order('id', { ascending: false }).limit(1).maybeSingle();
+  if (!season) {
+    return {
+      embeds: [pulseEmbed(fr ? '🎫 Battle Pass' : '🎫 Battle Pass').setDescription(
+        fr ? `Aucune saison active pour le moment.\nOuvre ${mention('battlepass', ids)} pour vérifier plus tard.` : `No active season right now.\nUse ${mention('battlepass', ids)} to check later.`
+      )],
+      components: navRows(),
+    };
+  }
+  const { data: progress } = await supabase
+    .from('battle_pass_progress').select('xp, is_premium, claimed_free, claimed_premium').eq('discord_id', discordId).eq('season_id', season.id).maybeSingle();
+  const xp = progress?.xp ?? 0;
+  const tier = Math.min(season.tier_count, Math.floor(xp / season.xp_per_tier));
+  const nextTierXp = (tier + 1) * season.xp_per_tier;
+  const bar = tier < season.tier_count ? progressBar(xp, nextTierXp) : `\`${'▓'.repeat(12)}\` ${fr ? 'MAX' : 'MAX'}`;
+  const claimedFree = (progress?.claimed_free ?? []).length;
+  const claimedPrem = (progress?.claimed_premium ?? []).length;
+  const premium = progress?.is_premium ? '💎 Premium actif' : '⚪ Piste gratuite';
+  return {
+    embeds: [pulseEmbed(fr ? `🎫 ${season.name}` : `🎫 ${season.name}`).setDescription(
+      [
+        `${season.emoji} **Saison :** ${season.name}`,
+        `🏆 **Palier :** ${tier}/${season.tier_count}`,
+        `${bar}${tier < season.tier_count ? ` → ${fr ? 'palier' : 'tier'} ${tier + 1}` : ''}`,
+        `${premium}`,
+        `${fr ? '🎁 Récompenses réclamées' : '🎁 Rewards claimed'} : ${claimedFree} ${fr ? 'gratuites' : 'free'} · ${claimedPrem} ${fr ? 'premium' : 'premium'}`,
+        '',
+        fr ? `Ouvre ${mention('battlepass', ids)} pour réclamer, voir les paliers, ou passer premium (${season.premium_price_pulse} PULSE).` : `Use ${mention('battlepass', ids)} to claim, view tiers, or go premium (${season.premium_price_pulse} PULSE).`,
+      ].join('\n'),
+    )],
+    components: navRows(),
+  };
+}
+
+async function renderPet(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: pet } = await supabase
+    .from('pets').select('*').eq('discord_id', discordId).eq('is_active', true).limit(1).maybeSingle();
+  if (!pet) {
+    return {
+      embeds: [pulseEmbed(fr ? '🐾 Compagnon' : '🐾 Pet').setDescription(
+        fr
+          ? `Tu n'as pas encore de compagnon.\n\n➡️ Adopte-en un avec ${mention('pet', ids)} \`adopt\`.\n_Coûte 500 PULSE. Nourris, entraîne, fais évoluer et défie d'autres compagnons._`
+          : `You don't have a pet yet.\n\n➡️ Adopt one with ${mention('pet', ids)} \`adopt\`.\n_Costs 500 PULSE. Feed, train, evolve, battle other pets._`
+      )],
+      components: navRows(),
+    };
+  }
+  return {
+    embeds: [pulseEmbed(`${pet.emoji} ${pet.name}`).setDescription(
+      [
+        `📊 **${fr ? 'Niveau' : 'Level'} :** ${pet.level}   **XP :** ${pet.xp}/100`,
+        `❤️ **${fr ? 'Santé' : 'Health'} :** ${pet.health}/100`,
+        `🍖 **${fr ? 'Faim' : 'Hunger'} :** ${pet.hunger}/100${pet.hunger < 30 ? ' ⚠️' : ''}`,
+        `😊 **${fr ? 'Bonheur' : 'Happiness'} :** ${pet.happiness}/100`,
+        `⚡ **${fr ? 'Énergie' : 'Energy'} :** ${pet.energy}/100`,
+        `🏆 **W/L :** ${pet.wins}/${pet.losses}`,
+        '',
+        fr
+          ? `Actions : ${mention('pet', ids)} \`feed\` · \`play\` · \`train\` · \`battle\` · \`skin\``
+          : `Actions: ${mention('pet', ids)} \`feed\` · \`play\` · \`train\` · \`battle\` · \`skin\``,
+      ].join('\n'),
+    )],
+    components: navRows(),
+  };
+}
+
+async function renderCards(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: catalog } = await supabase.from('tcg_cards').select('id, rarity').eq('is_active', true);
+  const { data: owned } = await supabase.from('tcg_collection').select('card_id, quantity').eq('discord_id', discordId);
+  const totalCatalog = catalog?.length ?? 0;
+  const ownedIds = new Set((owned ?? []).map(r => r.card_id));
+  const totalUnique = ownedIds.size;
+  const totalCopies = (owned ?? []).reduce((s, r) => s + (r.quantity as number), 0);
+  return {
+    embeds: [pulseEmbed(fr ? '🎴 Collection de cartes' : '🎴 Card collection').setDescription(
+      [
+        `📦 **${fr ? 'Uniques' : 'Unique'} :** ${totalUnique} / ${totalCatalog}`,
+        `📚 **${fr ? 'Total possédées' : 'Total owned'} :** ${totalCopies}`,
+        '',
+        fr
+          ? `Actions : ${mention('cards', ids)} \`open\` (100 PULSE) · \`collection\` · \`challenge\` · \`fuse\` · \`sell\``
+          : `Actions: ${mention('cards', ids)} \`open\` (100 PULSE) · \`collection\` · \`challenge\` · \`fuse\` · \`sell\``,
+        '',
+        fr ? '_Personnages combattent, équipements les boostent (arme/bouclier/sort…)._' : '_Characters fight, equipment boosts them (weapon/shield/spell…)._',
+      ].join('\n'),
+    )],
+    components: navRows(),
+  };
+}
+
+async function renderIACompanion(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: comp } = await supabase.from('ai_companions').select('*').eq('discord_id', discordId).maybeSingle();
+  const setup = Boolean(comp && comp.is_active);
+  return {
+    embeds: [pulseEmbed(fr ? '💫 IA personnelle' : '💫 Personal AI').setDescription(
+      setup
+        ? [
+          `${comp!.emoji} **${comp!.name}** — ${comp!.persona}`,
+          `${fr ? '🎭 Ton' : '🎭 Tone'} : ${comp!.tone}`,
+          `${fr ? '🌍 Langue' : '🌍 Language'} : ${comp!.language}`,
+          '',
+          fr ? `Parle-lui : ${mention('compagnon', ids)} \`chat\` — sa mémoire persiste.` : `Chat with them: ${mention('compagnon', ids)} \`chat\` — memory persists.`,
+        ].join('\n')
+        : [
+          fr ? 'Tu n\'as pas encore créé ta compagne IA.' : 'You haven\'t created your AI companion yet.',
+          '',
+          fr ? `➡️ Configure-la avec ${mention('compagnon', ids)} \`setup\`.` : `➡️ Set it up with ${mention('compagnon', ids)} \`setup\`.`,
+          fr ? '_Elle apprend ta personnalité, garde le contexte, et papote avec toi en privé._' : '_It learns your personality, remembers context, chats privately._',
+        ].join('\n'),
+    )],
+    components: navRows(),
+  };
+}
+
+async function renderGuild(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: mine } = await supabase.from('guild_members').select('guild_id, role, xp_contributed').eq('discord_id', discordId).maybeSingle();
+  if (!mine) {
+    return {
+      embeds: [pulseEmbed(fr ? '🏰 Guildes' : '🏰 Guilds').setDescription(
+        fr
+          ? `Tu n'es dans aucune guilde.\n\n➡️ Cherche-en une : ${mention('guild', ids)} \`list\`\n➡️ Ou crée la tienne : ${mention('guild', ids)} \`create\` _(2000 PULSE)_`
+          : `You are not in a guild.\n\n➡️ Browse: ${mention('guild', ids)} \`list\`\n➡️ Or create your own: ${mention('guild', ids)} \`create\` _(2000 PULSE)_`
+      )],
+      components: navRows(),
+    };
+  }
+  const { data: g } = await supabase.from('guilds').select('*').eq('id', mine.guild_id).maybeSingle();
+  return {
+    embeds: [pulseEmbed(g ? `${g.emoji} ${g.name} [${g.tag}]` : (fr ? '🏰 Ta guilde' : '🏰 Your guild')).setDescription(
+      [
+        g ? `_${g.motto || (fr ? 'Sans devise.' : 'No motto.')}_` : '',
+        `👤 **${fr ? 'Ton rôle' : 'Your role'} :** ${mine.role}`,
+        `💠 **XP contribué :** ${mine.xp_contributed}`,
+        g ? `🏆 **XP total guilde :** ${g.total_xp}` : '',
+        '',
+        fr ? `${mention('guild', ids)} \`view\` · \`leave\` · \`donate\`` : `${mention('guild', ids)} \`view\` · \`leave\` · \`donate\``,
+      ].filter(Boolean).join('\n'),
+    )],
+    components: navRows(),
+  };
+}
+
+async function renderHunt(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: active } = await supabase
+    .from('treasure_hunts').select('id, clue, reward_pulse, channel_id')
+    .eq('status', 'active').order('starts_at', { ascending: false }).limit(3);
+  const lines = (active ?? []).map(h =>
+    `🗺️ _"${(h.clue as string).slice(0, 100)}"_ · **${h.reward_pulse}** PULSE`
+  );
+  return {
+    embeds: [pulseEmbed(fr ? '🗺️ Chasses au trésor' : '🗺️ Treasure hunts').setDescription(
+      lines.length
+        ? [
+          fr ? `**${lines.length}** énigme(s) en cours :` : `**${lines.length}** active riddle(s):`,
+          '',
+          lines.join('\n'),
+          '',
+          fr ? `Tape ${mention('hunt', ids)} \`solve\` avec ta réponse.` : `Answer with ${mention('hunt', ids)} \`solve\`.`,
+        ].join('\n')
+        : fr
+          ? `Aucune chasse active. Reviens plus tard ou lance-en une avec ${mention('hunt', ids)} \`create\`.`
+          : `No active hunt. Come back later or start one with ${mention('hunt', ids)} \`create\`.`,
+    )],
+    components: navRows(),
+  };
+}
+
+async function renderSaga(interaction: Interaction, discordId: string): Promise<{ embeds: ReturnType<typeof pulseEmbed>[]; components: Row[] }> {
+  const fr = await localeIsFR(discordId);
+  const ids = await loadCmdIds(interaction);
+  const { data: running } = await supabase
+    .from('sagas').select('id, title, reward_pulse')
+    .eq('status', 'running').order('starts_at', { ascending: false }).limit(3);
+  const lines = (running ?? []).map(s => `📖 **${s.title}** — ${s.reward_pulse} PULSE`);
+  return {
+    embeds: [pulseEmbed(fr ? '📖 Sagas' : '📖 Sagas').setDescription(
+      lines.length
+        ? [
+          fr ? `**${lines.length}** saga(s) en cours :` : `**${lines.length}** running saga(s):`,
+          '',
+          lines.join('\n'),
+          '',
+          fr ? `Explore un chapitre : ${mention('saga', ids)} \`view\` — puis \`solve\` pour avancer.` : `Explore a chapter: ${mention('saga', ids)} \`view\` — then \`solve\` to progress.`,
+        ].join('\n')
+        : fr
+          ? `Aucune saga active. Un Lord doit en lancer une avec ${mention('sagaadmin', ids)}.`
+          : `No active saga. A Lord starts one with ${mention('sagaadmin', ids)}.`,
+    )],
+    components: navRows(),
   };
 }
 
@@ -466,6 +687,13 @@ export async function handleHubInteraction(interaction: Interaction): Promise<vo
     if (id === 'hub:lottery') return respond(interaction, await renderLottery(interaction, uid));
     if (id === 'hub:leaderboard') return respond(interaction, await renderLeaderboard(interaction));
     if (id === 'hub:daily')   return respond(interaction, await claimDaily(interaction, uid));
+    if (id === 'hub:battlepass') return respond(interaction, await renderBattlePass(interaction, uid));
+    if (id === 'hub:pet')     return respond(interaction, await renderPet(interaction, uid));
+    if (id === 'hub:cards')   return respond(interaction, await renderCards(interaction, uid));
+    if (id === 'hub:ia')      return respond(interaction, await renderIACompanion(interaction, uid));
+    if (id === 'hub:guild')   return respond(interaction, await renderGuild(interaction, uid));
+    if (id === 'hub:hunt')    return respond(interaction, await renderHunt(interaction, uid));
+    if (id === 'hub:saga')    return respond(interaction, await renderSaga(interaction, uid));
 
     if (id.startsWith('hub:lb:')) {
       const kind = id.split(':')[2] as 'week' | 'month' | 'total';
