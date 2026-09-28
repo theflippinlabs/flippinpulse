@@ -2,6 +2,7 @@ import { Client, EmbedBuilder } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { getRawSetting } from './settings.js';
 import { enqueuePush } from './pushQueue.js';
+import { guildCan } from './plan.js';
 import { log } from '../utils/logger.js';
 
 /**
@@ -219,6 +220,7 @@ export async function postManualLive(
   url: string,
   title: string,
 ): Promise<ManualLiveResult> {
+  if (!await guildCan(null, 'streaming_alerts')) return { ok: false, error: 'plan_required' };
   const last = manualLiveCooldowns.get(discordId);
   if (last && Date.now() - last < MANUAL_COOLDOWN_MS) {
     const wait = Math.ceil((MANUAL_COOLDOWN_MS - (Date.now() - last)) / 60_000);
@@ -254,6 +256,7 @@ export async function postManualLive(
 
 // ---- Sweep ----
 export async function runStreamAlertsSweep(client: Client): Promise<void> {
+  if (!await guildCan(null, 'streaming_alerts')) return;
   const { data } = await supabase.from('stream_links').select('*');
   const links = (data ?? []) as StreamLink[];
   if (!links.length) return;

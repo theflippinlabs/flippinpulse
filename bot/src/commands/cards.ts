@@ -15,6 +15,7 @@ import {
 } from 'discord.js';
 import { successEmbed, errorEmbed, pulseEmbed } from '../utils/embeds.js';
 import { getUserLocale } from '../i18n.js';
+import { requirePlan } from '../services/planGate.js';
 import {
   FUSE_COST_MULT,
   PACK_COST,
@@ -77,6 +78,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s.setName('help').setDescription('How the card game works / Comment le jeu fonctionne'));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!await requirePlan(interaction, 'trading_cards', 'Pro')) return;
   const locale = await getUserLocale(interaction.user.id);
   const fr = locale === 'fr';
   const sub = interaction.options.getSubcommand();

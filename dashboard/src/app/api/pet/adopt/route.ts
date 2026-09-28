@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { adoptPet, type SpeciesKey } from '@/lib/pets';
+import { requirePlan } from '@/lib/planGate';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requirePlan('pets');
+  if (!gate.ok) return gate.response;
   const body = await req.json().catch(() => ({}));
   const species = String(body.species ?? '') as SpeciesKey;
   const name = String(body.name ?? '');

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { purchase } from '@/lib/shop';
+import { requirePlan } from '@/lib/planGate';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+  const gate = await requirePlan('shop');
+  if (!gate.ok) return gate.response;
   const body = await req.json().catch(() => ({}));
   const itemId = typeof body.item_id === 'string' ? body.item_id : '';
   if (!itemId) return NextResponse.json({ error: 'item_id required' }, { status: 400 });

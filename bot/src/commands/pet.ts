@@ -10,6 +10,7 @@ import {
 } from 'discord.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { getUserLocale } from '../i18n.js';
+import { requirePlan } from '../services/planGate.js';
 import {
   SPECIES,
   acceptChallenge,
@@ -86,6 +87,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s.setName('retire').setDescription('Retire your pet / Retraite pour ton compagnon'));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!await requirePlan(interaction, 'pets', 'Pro')) return;
   const locale = await getUserLocale(interaction.user.id);
   const fr = locale === 'fr';
   const sub = interaction.options.getSubcommand();

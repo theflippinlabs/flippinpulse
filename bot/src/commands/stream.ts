@@ -73,6 +73,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const fr = locale === 'fr';
   const sub = interaction.options.getSubcommand();
 
+  // Gate the live-facing subcommands behind the plan; leave admin config
+  // (`config`) and read-only helpers (`me`, `list`) available so a Lord on a
+  // lower plan can still see what's linked.
+  if (sub === 'link' || sub === 'golive' || sub === 'unlink') {
+    const { requirePlan } = await import('../services/planGate.js');
+    if (!await requirePlan(interaction, 'streaming_alerts', 'Pro')) return;
+  }
+
   if (sub === 'link') {
     const platform = interaction.options.getString('platform', true) as 'twitch' | 'youtube' | 'x';
     const raw = interaction.options.getString('handle', true);
