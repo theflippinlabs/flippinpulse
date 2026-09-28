@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { appendMessage, buildSystem, getCompanion, loadHistory } from '@/lib/aiCompanion';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { requirePlan } from '@/lib/planGate';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-5-20250929';
@@ -13,6 +14,8 @@ const COMPANION_RATE_LIMIT = { max: 60, windowMs: 60 * 60 * 1000 };
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requirePlan('ai_companion');
+  if (!gate.ok) return gate.response;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return NextResponse.json({ error: 'ai_not_configured' }, { status: 503 });
 

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { upgradeEquipment } from '@/lib/tcg';
+import { requirePlan } from '@/lib/planGate';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requirePlan('trading_cards');
+  if (!gate.ok) return gate.response;
   const body = await req.json().catch(() => ({}));
   const cardId = Math.floor(Number(body.cardId));
   const level = Math.floor(Number(body.level));

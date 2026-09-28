@@ -12,6 +12,7 @@ import {
 } from 'discord.js';
 import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { getUserLocale } from '../i18n.js';
+import { requirePlan } from '../services/planGate.js';
 import {
   buyPremium,
   claimPending,
@@ -114,6 +115,7 @@ function renderTiers(season: Season, tiers: Tier[], p: Progress, fr: boolean): {
 }
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!await requirePlan(interaction, 'battle_pass', 'Starter')) return;
   const locale = await getUserLocale(interaction.user.id);
   const fr = locale === 'fr';
   const season = await getActiveSeason();

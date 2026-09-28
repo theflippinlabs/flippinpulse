@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MAX_EQUIPMENT_SLOTS, MAX_LEVEL } from '@/lib/tcgShared';
 import { assertChannelAllowed } from '@/lib/guardChannel';
+import { requirePlan } from '@/lib/planGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,8 @@ interface EquipInput { cardId: number; level: number; }
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requirePlan('trading_cards');
+  if (!gate.ok) return gate.response;
 
   const body = await req.json().catch(() => ({}));
   const opponentId = String(body.opponentId ?? '');

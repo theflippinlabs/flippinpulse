@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { upsertCompanion, type AICompanion } from '@/lib/aiCompanion';
+import { requirePlan } from '@/lib/planGate';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requirePlan('ai_companion');
+  if (!gate.ok) return gate.response;
   const body = await req.json().catch(() => ({}));
   const patch: Partial<AICompanion> = {};
   if (typeof body.name === 'string') patch.name = body.name.trim().slice(0, 40);

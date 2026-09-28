@@ -9,6 +9,7 @@ import { pulseEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { getUserLocale } from '../i18n.js';
 import { supabase } from '../supabase.js';
 import type { Saga } from '../services/sagas.js';
+import { requirePlan } from '../services/planGate.js';
 
 export const data = new SlashCommandBuilder()
   .setName('saga')
@@ -23,6 +24,7 @@ export const data = new SlashCommandBuilder()
     .addIntegerOption(o => o.setName('id').setDescription('Saga id').setRequired(true)));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!await requirePlan(interaction, 'sagas', 'Pro')) return;
   const locale = await getUserLocale(interaction.user.id);
   const fr = locale === 'fr';
   const sub = interaction.options.getSubcommand();

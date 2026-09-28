@@ -2,6 +2,7 @@ import { Client } from 'discord.js';
 import { supabase } from '../supabase.js';
 import { aiChat, hasAI } from './ai.js';
 import { getWelcomeConfig } from './settings.js';
+import { guildCan } from './plan.js';
 import { log } from '../utils/logger.js';
 
 // The weekly cadence is 7 days from the last successful report. The report
@@ -72,6 +73,7 @@ async function generateReport(): Promise<string> {
 }
 
 export async function runWeeklyAnalyticsSweep(client: Client): Promise<void> {
+  if (!await guildCan(null, 'weekly_analytics')) return;
   const weekStart = currentWeekStart().toISOString();
   const { data: existing } = await supabase.from('weekly_analytics').select('*').eq('week_starts_at', weekStart).maybeSingle();
   if (existing && (existing as { delivered_to_lord?: boolean }).delivered_to_lord) return;

@@ -13,6 +13,7 @@ import {
   getCompanion,
   upsertCompanion,
 } from '../services/aiCompanion.js';
+import { requirePlan } from '../services/planGate.js';
 
 const DEFAULT_PERSONAS: Record<string, { fr: string; en: string }> = {
   friendly:  { fr: 'chaleureux et bienveillant, comme un ami proche', en: 'warm and caring, like a close friend' },
@@ -48,6 +49,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s.setName('delete').setDescription('Delete your companion / Supprimer ton compagnon'));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!await requirePlan(interaction, 'ai_companion', 'Pro')) return;
   const locale = await getUserLocale(interaction.user.id);
   const en = locale === 'en';
 

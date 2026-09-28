@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { assertChannelAllowed } from '@/lib/guardChannel';
+import { requirePlan } from '@/lib/planGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requirePlan('pets');
+  if (!gate.ok) return gate.response;
   const body = await req.json().catch(() => ({}));
   const opponentId = String(body.opponentId ?? '');
   const wager = Math.max(0, Math.min(10_000, Math.floor(Number(body.wager ?? 0))));
