@@ -45,21 +45,23 @@ export default async function AppHub() {
   // the home tiles for content that is NOT reachable from that nav.
   const tiles: Tile[] = [
     { href: '/app/battlepass',       emoji: '🎫', title: fr ? 'Battle Pass'   : 'Battle Pass', hint: fr ? 'Saison en cours'   : 'Current season' },
-    { href: '/app/pet',              emoji: '🐾', title: fr ? 'Compagnon'     : 'Pet',         hint: fr ? 'Nourris, entraîne' : 'Feed, train'      },
+    { href: '/app/pet',              emoji: '🐾', title: fr ? 'Mon Familier'  : 'My Pet',      hint: fr ? 'Nourris, entraîne' : 'Feed, train'      },
     { href: '/app/cards',            emoji: '🎴', title: fr ? 'Cartes'        : 'Cards',       hint: fr ? 'Collection & packs': 'Collection & packs' },
     { href: '/app/compagnon',        emoji: '💫', title: fr ? 'Compagnon IA'  : 'AI Companion',hint: fr ? 'Ton IA perso'      : 'Your personal AI'  },
     { href: '/app/tournaments',      emoji: '🏟️', title: t('home.tiles.tournaments.title'), hint: `${s.activeTournois} ${t('home.tiles.tournaments.hint_active')}` },
     { href: '/app/lottery',          emoji: '🎰', title: t('home.tiles.lottery.title'),     hint: `${fmt(s.lotteryPot)} ${t('home.tiles.lottery.hint_pot')}` },
     { href: '/app/missions',         emoji: '🎯', title: t('home.tiles.missions.title'),    hint: `${s.activeMissions} ${t('home.tiles.missions.hint_active')}` },
     { href: '/app/giveaways',        emoji: '🎉', title: t('home.tiles.giveaways.title'),   hint: `${s.activeGiveaways} ${t('home.tiles.giveaways.hint_active')}` },
-    { href: '/app/features?f=sagas',    emoji: '📖', title: fr ? 'Sagas'           : 'Sagas',           hint: `${s.activeSagas} ${fr ? 'en cours' : 'running'}` },
-    { href: '/app/features?f=hunt',     emoji: '🗺️', title: fr ? 'Chasses au trésor' : 'Treasure hunts', hint: `${s.activeHunts} ${fr ? 'énigmes' : 'riddles'}` },
-    { href: '/app/features?f=guilds',   emoji: '🏰', title: fr ? 'Guildes'         : 'Guilds',          hint: fr ? 'Rejoins ou crée'  : 'Join or create'    },
-    { href: '/app/features?f=events',   emoji: '📅', title: fr ? 'Calendrier'      : 'Calendar',        hint: `${s.upcomingEvents} ${fr ? 'à venir' : 'upcoming'}` },
-    { href: '/app/features?f=marriage', emoji: '💒', title: fr ? 'Mariages'        : 'Marriages',       hint: fr ? '500 PULSE la bague': 'Ring: 500 PULSE'    },
-    { href: '/app/features?f=bank',     emoji: '🏦', title: fr ? 'Banque & prêts'  : 'Bank & loans',    hint: fr ? '1%/sem sur épargne': '1%/wk on savings'   },
-    { href: '/app/features?f=birthday', emoji: '🎂', title: fr ? 'Anniversaires'   : 'Birthdays',       hint: fr ? '+500 PULSE le jour J' : '+500 PULSE on D-day' },
-    { href: '/app/features?f=stream',   emoji: '🎥', title: fr ? 'Streams'         : 'Streams',         hint: fr ? 'Twitch/YouTube/X'   : 'Twitch/YouTube/X'   },
+    { href: '/app/features?f=sagas',        emoji: '📖', title: fr ? 'Sagas'           : 'Sagas',           hint: `${s.activeSagas} ${fr ? 'en cours' : 'running'}` },
+    { href: '/app/features?f=hunt',         emoji: '🗺️', title: fr ? 'Chasses au trésor' : 'Treasure hunts', hint: `${s.activeHunts} ${fr ? 'énigmes' : 'riddles'}` },
+    { href: '/app/features?f=guilds',       emoji: '🏰', title: fr ? 'Guildes'         : 'Guilds',          hint: fr ? 'Rejoins ou crée'  : 'Join or create'    },
+    { href: '/app/features?f=events',       emoji: '📅', title: fr ? 'Calendrier'      : 'Calendar',        hint: `${s.upcomingEvents} ${fr ? 'à venir' : 'upcoming'}` },
+    { href: '/app/features?f=marriage',     emoji: '💒', title: fr ? 'Mariages'        : 'Marriages',       hint: fr ? '500 PULSE la bague': 'Ring: 500 PULSE'    },
+    { href: '/app/features?f=bank',         emoji: '🏦', title: fr ? 'Banque & prêts'  : 'Bank & loans',    hint: fr ? '1%/sem sur épargne': '1%/wk on savings'   },
+    { href: '/app/features?f=birthday',     emoji: '🎂', title: fr ? 'Anniversaires'   : 'Birthdays',       hint: fr ? '+500 PULSE le jour J' : '+500 PULSE on D-day' },
+    { href: '/app/features?f=stream',       emoji: '🎥', title: fr ? 'Streams'         : 'Streams',         hint: fr ? 'Twitch/YouTube/X'   : 'Twitch/YouTube/X'   },
+    { href: '/app/features?f=gift',         emoji: '🎁', title: fr ? 'Cadeaux'         : 'Gifts',           hint: fr ? 'Envoie du PULSE'    : 'Send PULSE'         },
+    { href: '/app/features?f=achievements', emoji: '🏅', title: fr ? 'Succès'          : 'Achievements',    hint: fr ? 'Badges & profil'    : 'Badges & profile'   },
   ];
 
   return (

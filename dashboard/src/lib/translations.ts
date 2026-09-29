@@ -47,7 +47,7 @@ export const translations = {
       points_total: 'pts total',
       this_week: 'cette semaine',
       tiles: {
-        play: { title: 'Jouer',      hint: 'Slots · Coin · Roulette · BJ' },
+        play: { title: 'Jouer',      hint: '16 jeux · web + Discord' },
         shop: { title: 'Boutique',   hint: 'Dépense ton PULSE' },
         tournaments: { title: 'Tournois',   hint_active: 'en cours' },
         lottery: { title: 'Loterie',    hint_pot: 'au pot' },
@@ -288,7 +288,7 @@ export const translations = {
       points_total: 'total pts',
       this_week: 'this week',
       tiles: {
-        play: { title: 'Play',        hint: 'Slots · Coin · Roulette · BJ' },
+        play: { title: 'Play',        hint: '16 games · web + Discord' },
         shop: { title: 'Shop',        hint: 'Spend your PULSE' },
         tournaments: { title: 'Tournaments', hint_active: 'active' },
         lottery: { title: 'Lottery',     hint_pot: 'in the pot' },

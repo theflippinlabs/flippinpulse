@@ -43,6 +43,7 @@ const PVP: GameEntry[] = [
 ];
 
 const MULTI: GameEntry[] = [
+  { name: 'poker',        emoji: '♠️', desc_fr: 'Poker Texas Hold\'em — table multijoueur en direct',          desc_en: 'Texas Hold\'em Poker — live multiplayer table' },
   { name: 'chicken',      emoji: '🐔', desc_fr: 'Chicken Race — cash out avant que la poule s\'envole !',      desc_en: 'Chicken Race — cash out before the chicken flies!' },
   { name: 'battleroyale', emoji: '🏆', desc_fr: 'Battle Royale — le dernier survivant rafle la cagnotte',      desc_en: 'Battle Royale — last one standing takes the pot' },
   { name: 'diceroyale',   emoji: '🎲', desc_fr: 'Dé Royale — le plus haut score gagne',                        desc_en: 'Dice Royale — highest score wins' },

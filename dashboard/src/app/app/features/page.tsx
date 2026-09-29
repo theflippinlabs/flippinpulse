@@ -6,7 +6,9 @@ import { getLocale } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-type Feature = 'sagas' | 'hunt' | 'guilds' | 'events' | 'marriage' | 'bank' | 'birthday' | 'stream';
+type Feature =
+  | 'sagas' | 'hunt' | 'guilds' | 'events' | 'marriage' | 'bank' | 'birthday' | 'stream'
+  | 'poker' | 'quiz' | 'duel' | 'party' | 'gift' | 'achievements';
 
 interface FeatureContent {
   emoji: string;
@@ -128,6 +130,87 @@ const CONTENT: Record<Feature, FeatureContent> = {
       { fr: '/stream golive url: title: — annoncer manuellement', en: '/stream golive url: title: — announce manually' },
       { fr: '/stream me — voir tes liens', en: '/stream me — see your links' },
       { fr: '/stream list — tous les streamers du serveur', en: '/stream list — every streamer on the server' },
+    ],
+  },
+  poker: {
+    emoji: '♠️',
+    title: { fr: 'Poker Texas Hold\'em', en: 'Texas Hold\'em Poker' },
+    intro: {
+      fr: 'Table multijoueur en direct dans un salon Discord. Deux cartes privées en DM, cinq cartes communes, blindes, tours d\'enchères et showdown. La cave se règle en PULSE.',
+      en: 'Live multiplayer table in a Discord channel. Two hole cards via DM, five community cards, blinds, betting rounds and showdown. Buy-in paid in PULSE.',
+    },
+    commands: [
+      { fr: '/poker start buyin: — ouvre une table (min 20 PULSE)', en: '/poker start buyin: — open a table (min 20 PULSE)' },
+      { fr: 'Boutons "Rejoindre" sous l\'annonce — s\'asseoir à la table', en: '"Join" buttons under the announcement — take a seat' },
+      { fr: '/poker leave — quitter la table', en: '/poker leave — leave the table' },
+    ],
+    tips: {
+      fr: 'Le bot t\'envoie tes cartes en DM au début de chaque main — active tes DMs du serveur.',
+      en: 'The bot DMs your hole cards at the start of each hand — enable server DMs.',
+    },
+  },
+  quiz: {
+    emoji: '🧠',
+    title: { fr: 'Quiz culture générale', en: 'Trivia quiz' },
+    intro: {
+      fr: 'Réponds à des questions pour gagner du PULSE. Le bot peut aussi lancer un quiz auto à intervalles réguliers.',
+      en: 'Answer questions to earn PULSE. The bot can also run auto-quizzes on a schedule.',
+    },
+    commands: [
+      { fr: '/quiz — lance une question solo', en: '/quiz — pull a solo question' },
+      { fr: '/autoquiz — active le quiz automatique (Lord)', en: '/autoquiz — enable the auto quiz (Lord)' },
+    ],
+  },
+  duel: {
+    emoji: '⚔️',
+    title: { fr: 'Duels 1v1', en: '1v1 duels' },
+    intro: {
+      fr: 'Défie un autre membre en direct. Trois formats disponibles selon ton humeur.',
+      en: 'Challenge another member live. Three formats depending on the vibe.',
+    },
+    commands: [
+      { fr: '/duel @user amount: — pile ou face avec mise', en: '/duel @user amount: — coin-flip duel with a bet' },
+      { fr: '/rps @user amount: — pierre-feuille-ciseaux 1v1', en: '/rps @user amount: — rock-paper-scissors 1v1' },
+      { fr: '/typingrace amount: — course de frappe (jusqu\'à 6 joueurs)', en: '/typingrace amount: — typing race (up to 6 players)' },
+    ],
+  },
+  party: {
+    emoji: '🎉',
+    title: { fr: 'Party games', en: 'Party games' },
+    intro: {
+      fr: 'Jeux multijoueur qui s\'ouvrent en lobby dans un salon. Cave commune, un seul gagnant, adrénaline garantie.',
+      en: 'Multiplayer games opened as a lobby in a channel. Shared pot, one winner, pure adrenaline.',
+    },
+    commands: [
+      { fr: '/chicken bet: — chicken race, cash out avant l\'envol', en: '/chicken bet: — chicken race, cash out before takeoff' },
+      { fr: '/crash bet: — cash out avant le crash du multiplicateur', en: '/crash bet: — cash out before the multiplier crashes' },
+      { fr: '/wheel bet: — roue gacha jusqu\'à ×25', en: '/wheel bet: — gacha wheel up to ×25' },
+      { fr: '/battleroyale amount: — le dernier survivant rafle la cagnotte', en: '/battleroyale amount: — last one standing takes the pot' },
+      { fr: '/diceroyale amount: — le meilleur lancer gagne', en: '/diceroyale amount: — highest roll wins' },
+    ],
+  },
+  gift: {
+    emoji: '🎁',
+    title: { fr: 'Cadeaux entre membres', en: 'Member gifts' },
+    intro: {
+      fr: 'Envoie du PULSE à un autre membre pour lui faire plaisir. Anti-abus intégré.',
+      en: 'Send PULSE to another member as a friendly gift. Anti-abuse guardrails built in.',
+    },
+    commands: [
+      { fr: '/gift @user amount: note: — envoie un cadeau', en: '/gift @user amount: note: — send a gift' },
+    ],
+  },
+  achievements: {
+    emoji: '🏅',
+    title: { fr: 'Succès & Badges', en: 'Achievements & badges' },
+    intro: {
+      fr: 'Chaque action clé (premier message, premier duel gagné, jackpot slots…) débloque un succès permanent affiché sur ton profil.',
+      en: 'Every key action (first message, first duel win, slot jackpot…) unlocks a permanent achievement pinned to your profile.',
+    },
+    commands: [
+      { fr: '/achievements — voir tes succès', en: '/achievements — view your achievements' },
+      { fr: '/achievements user: — voir ceux d\'un autre membre', en: '/achievements user: — see another member\'s' },
+      { fr: '/profile — carte complète avec badges', en: '/profile — full member card with badges' },
     ],
   },
 };
