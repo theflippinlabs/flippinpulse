@@ -26,33 +26,41 @@ function mention(name: string, ids: Map<string, string>): string {
 
 interface GameEntry { name: string; emoji: string; desc_fr: string; desc_en: string; }
 
-const SOLO: GameEntry[] = [
-  { name: 'higherlower', emoji: '🎲', desc_fr: 'Plus ou Moins — encaisse avant de te tromper',            desc_en: 'Higher/Lower — cash out before you miss' },
-  { name: 'crash',       emoji: '💥', desc_fr: 'Cash out avant que le multiplicateur s\'effondre',        desc_en: 'Cash out before the multiplier crashes' },
-  { name: 'slots',       emoji: '🎰', desc_fr: 'Machine à sous — 7s alignés = jackpot',                   desc_en: 'Slot machine — three 7s = jackpot' },
-  { name: 'roulette',    emoji: '🎡', desc_fr: 'Roulette européenne — rouge, noir, numéro',               desc_en: 'European roulette — red, black, number' },
-  { name: 'blackjack',   emoji: '🃏', desc_fr: 'Face au croupier — vise 21 sans dépasser',                desc_en: 'Beat the dealer — aim for 21 without busting' },
-  { name: 'wheel',       emoji: '🎡', desc_fr: 'Roue Gacha — jusqu\'à ×25',                              desc_en: 'Gacha wheel — up to ×25' },
-  { name: 'quiz',        emoji: '🧠', desc_fr: 'Quiz solo — réponds bien pour gagner des PULSE',          desc_en: 'Solo quiz — answer well to earn PULSE' },
+// Star of the room — the multi-player headliners live at the top so they
+// never disappear at the bottom of a long embed.
+const FLAGSHIP: GameEntry[] = [
+  { name: 'poker',       emoji: '♠️', desc_fr: 'Poker Texas Hold\'em — table multijoueur en direct',       desc_en: 'Texas Hold\'em Poker — live multiplayer table' },
+  { name: 'cards',       emoji: '🎴', desc_fr: 'Trading Cards — packs, duels, fusion',                    desc_en: 'Trading Cards — packs, duels, fuse' },
+];
+
+const CASINO: GameEntry[] = [
+  { name: 'slots',       emoji: '🎰', desc_fr: 'Machine à sous — jackpot ×50',                            desc_en: 'Slot machine — up to ×50 jackpot' },
+  { name: 'blackjack',   emoji: '🃏', desc_fr: 'Blackjack — face au croupier',                            desc_en: 'Blackjack — vs the dealer' },
+  { name: 'roulette',    emoji: '🎡', desc_fr: 'Roulette européenne',                                     desc_en: 'European roulette' },
+  { name: 'crash',       emoji: '💥', desc_fr: 'Crash — cash out avant l\'explosion',                    desc_en: 'Crash — cash out before it blows' },
+  { name: 'wheel',       emoji: '🎯', desc_fr: 'Roue Gacha (mise) — jusqu\'à ×25',                       desc_en: 'Gacha wheel (bet) — up to ×25' },
+  { name: 'higherlower', emoji: '🎲', desc_fr: 'Plus ou Moins — encaisse avant l\'erreur',              desc_en: 'Higher/Lower — cash out before you miss' },
+];
+
+const LOBBY: GameEntry[] = [
+  { name: 'chicken',      emoji: '🐔', desc_fr: 'Chicken Race — cash out avant l\'envol',                desc_en: 'Chicken Race — cash out before takeoff' },
+  { name: 'battleroyale', emoji: '🏆', desc_fr: 'Battle Royale — dernier debout rafle la cagnotte',      desc_en: 'Battle Royale — last standing takes the pot' },
+  { name: 'diceroyale',   emoji: '🎲', desc_fr: 'Dé Royale — meilleur lancer gagne',                     desc_en: 'Dice Royale — highest roll wins' },
+  { name: 'tournoi',      emoji: '🏟️', desc_fr: 'Tournois PvP à élimination',                            desc_en: 'Single-elim PvP tournaments' },
 ];
 
 const PVP: GameEntry[] = [
-  { name: 'duel',       emoji: '⚔️', desc_fr: 'Défie un joueur (coinflip ou dés)',        desc_en: 'Challenge a player (coin flip or dice)' },
-  { name: 'rps',        emoji: '✊', desc_fr: 'Pierre-Feuille-Ciseaux 1v1',               desc_en: 'Rock-Paper-Scissors 1v1' },
-  { name: 'typingrace', emoji: '⌨️', desc_fr: 'Course de frappe — le plus rapide gagne', desc_en: 'Typing race — fastest wins' },
+  { name: 'duel',       emoji: '⚔️', desc_fr: 'Duel — défie un joueur (pile ou face)',   desc_en: 'Duel — challenge a player (coin flip)' },
+  { name: 'rps',        emoji: '✊', desc_fr: 'Pierre-Feuille-Ciseaux 1v1',              desc_en: 'Rock-Paper-Scissors 1v1' },
+  { name: 'typingrace', emoji: '⌨️', desc_fr: 'Course de frappe (jusqu\'à 6 joueurs)', desc_en: 'Typing race (up to 6 players)' },
 ];
 
-const MULTI: GameEntry[] = [
-  { name: 'poker',        emoji: '♠️', desc_fr: 'Poker Texas Hold\'em — table multijoueur en direct',          desc_en: 'Texas Hold\'em Poker — live multiplayer table' },
-  { name: 'chicken',      emoji: '🐔', desc_fr: 'Chicken Race — cash out avant que la poule s\'envole !',      desc_en: 'Chicken Race — cash out before the chicken flies!' },
-  { name: 'battleroyale', emoji: '🏆', desc_fr: 'Battle Royale — le dernier survivant rafle la cagnotte',      desc_en: 'Battle Royale — last one standing takes the pot' },
-  { name: 'diceroyale',   emoji: '🎲', desc_fr: 'Dé Royale — le plus haut score gagne',                        desc_en: 'Dice Royale — highest score wins' },
-];
-
-const OTHER: GameEntry[] = [
-  { name: 'treasure', emoji: '💰', desc_fr: 'Chasse au trésor — ouvre des coffres',                    desc_en: 'Treasure hunt — open chests' },
-  { name: 'lottery',  emoji: '🎫', desc_fr: 'Loterie — achète des tickets pour le jackpot',            desc_en: 'Lottery — buy tickets for the jackpot' },
-  { name: 'music',    emoji: '🎵', desc_fr: 'Partage une chanson — Spotify / Apple Music / Deezer',   desc_en: 'Share a song — Spotify / Apple Music / Deezer' },
+const REWARDS: GameEntry[] = [
+  { name: 'quiz',     emoji: '🧠', desc_fr: 'Quiz solo — culture générale',            desc_en: 'Trivia quiz — general knowledge' },
+  { name: 'hunt',     emoji: '🗺️', desc_fr: 'Chasse au trésor — énigmes d\'un Lord', desc_en: 'Treasure hunt — riddles from a Lord' },
+  { name: 'treasure', emoji: '💰', desc_fr: 'Coffres surprise (spawn aléatoire)',      desc_en: 'Surprise chests (random spawn)' },
+  { name: 'lottery',  emoji: '🎫', desc_fr: 'Loterie serveur — jackpot en PULSE',     desc_en: 'Server lottery — PULSE jackpot' },
+  { name: 'music',    emoji: '🎵', desc_fr: 'Partage une chanson (Spotify/Apple/Deezer)', desc_en: 'Share a song (Spotify/Apple/Deezer)' },
 ];
 
 function renderSection(title: string, entries: GameEntry[], ids: Map<string, string>, locale: Locale): string {
@@ -74,13 +82,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     en ? 'Tap a game to run its command — add your bet and send! 🎮'
        : 'Tape sur un jeu pour lancer sa commande — ajoute ta mise et envoie ! 🎮',
     '',
-    renderSection(en ? '🎯 Solo' : '🎯 Solo', SOLO, ids, locale),
+    renderSection(en ? '⭐ Star of the room' : '⭐ Star du salon', FLAGSHIP, ids, locale),
     '',
-    renderSection(en ? '⚔️ 1v1 / Duel' : '⚔️ 1v1 / Duel', PVP, ids, locale),
+    renderSection(en ? '🎰 Solo casino (instant bet)' : '🎰 Casino solo (mise instantanée)', CASINO, ids, locale),
     '',
-    renderSection(en ? '🏟️ Multiplayer (lobby)' : '🏟️ Multijoueur (lobby)', MULTI, ids, locale),
+    renderSection(en ? '🏟️ Multiplayer (open lobby)' : '🏟️ Multijoueur (lobby ouvert)', LOBBY, ids, locale),
     '',
-    renderSection(en ? '🎁 Other' : '🎁 Autres', OTHER, ids, locale),
+    renderSection(en ? '⚔️ 1v1 duels' : '⚔️ Duels 1v1', PVP, ids, locale),
+    '',
+    renderSection(en ? '🧠 Riddles & loot' : '🧠 Énigmes & butin', REWARDS, ids, locale),
+    '',
+    en ? '**🎁 Raffles** _(hosted by a Lord)_' : '**🎁 Tirages au sort** _(organisés par un Lord)_',
+    en
+      ? `${mention('giveaway', ids)} — hit **Enter** when an announcement drops. Only a Lord can start one.`
+      : `${mention('giveaway', ids)} — clique sur **Entrer** quand une annonce s'affiche. Un Lord seul peut en lancer une.`,
     '',
     en
       ? `💡 Tip: ${mention('balance', ids)} for your balance · ${mention('leaderboard', ids)} for the ranking.`
