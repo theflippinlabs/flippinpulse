@@ -151,22 +151,22 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
   return (
     <main className="min-h-screen text-pulse-text">
       {/* NAV */}
-      <header className="sticky top-0 z-40 border-b border-pulse-border bg-black/70 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold tracking-wider">
-            <span className="text-pulse-gold text-xl">⚡</span>
-            <span>NOVARYS <span className="text-pulse-gold">//</span> PULSE</span>
+      <header className="sticky top-0 z-40 border-b border-pulse-border bg-black/80 backdrop-blur pt-safe">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-bold tracking-wider text-sm sm:text-base truncate">
+            <span className="text-pulse-gold text-lg sm:text-xl shrink-0">⚡</span>
+            <span className="truncate">NOVARYS <span className="text-pulse-gold">//</span> PULSE</span>
           </div>
           <nav className="hidden sm:flex items-center gap-6 text-sm text-pulse-mute">
             <a href="#features" className="hover:text-pulse-gold">{c.navFeatures}</a>
             <a href="#pricing" className="hover:text-pulse-gold">{c.navPricing}</a>
             <a href="#faq" className="hover:text-pulse-gold">{c.navFaq}</a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <LanguageSwitch current={locale} />
             <a
               href="/api/auth/login"
-              className="text-sm px-4 py-2 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90"
+              className="text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90"
             >
               {c.signIn}
             </a>
