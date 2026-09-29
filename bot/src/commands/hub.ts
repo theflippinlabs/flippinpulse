@@ -188,47 +188,59 @@ async function renderJeux(interaction: Interaction): Promise<{ embeds: ReturnTyp
   const fr = await localeIsFR(interaction.user.id);
   const ids = await loadCmdIds(interaction);
   const line = (name: string, emoji: string, desc: string) => `${emoji} ${mention(name, ids)} — ${desc}`;
+
+  // Sections ordered by "hero first, then quick casino, then social, then rewards".
+  // Poker sits alone at the top so it never gets lost in a long list.
   const description = [
-    fr ? '**⚡ Lance en 1 tap** (mise via fenêtre)' : '**⚡ One-tap play** (bet via window)',
+    fr
+      ? '⭐ **Star du salon**'
+      : '⭐ **Star of the room**',
+    line('poker', '♠️', fr ? 'Poker Texas Hold\'em — table multijoueur en direct' : 'Texas Hold\'em Poker — live multiplayer table'),
+    line('cards', '🎴', fr ? 'Trading Cards — packs, duels, fusion' : 'Trading Cards — packs, duels, fusion'),
     '',
-    fr ? '**🎯 Solo (mise)**' : '**🎯 Solo (bet)**',
-    line('slots', '🎰', fr ? 'Machine à sous' : 'Slot machine'),
-    line('blackjack', '🃏', fr ? 'Face au croupier' : 'Vs the dealer'),
-    line('crash', '💥', fr ? 'Cash out avant le crash' : 'Cash out before the crash'),
-    line('wheel', '🎡', fr ? 'Roue Gacha (jusqu\'à ×25)' : 'Gacha wheel (up to ×25)'),
-    line('roulette', '🎡', fr ? 'Roulette européenne' : 'European roulette'),
-    line('higherlower', '🎲', fr ? 'Plus ou Moins' : 'Higher or Lower'),
-    line('chicken', '🐔', fr ? 'Chicken Race (multi)' : 'Chicken Race (multi)'),
+    fr ? '**🎰 Casino solo** (mise instantanée)' : '**🎰 Solo casino** (instant bet)',
+    line('slots',       '🎰', fr ? 'Machine à sous — jackpot ×50'  : 'Slot machine — up to ×50 jackpot'),
+    line('blackjack',   '🃏', fr ? 'Blackjack — face au croupier'   : 'Blackjack — vs the dealer'),
+    line('roulette',    '🎡', fr ? 'Roulette européenne'             : 'European roulette'),
+    line('crash',       '💥', fr ? 'Crash — cash out avant l\'explosion' : 'Crash — cash out before it blows'),
+    line('wheel',       '🎯', fr ? 'Roue Gacha (mise) — jusqu\'à ×25' : 'Gacha wheel (bet) — up to ×25'),
+    line('higherlower', '🎲', fr ? 'Plus ou Moins'                   : 'Higher or Lower'),
     '',
-    fr ? '**🃏 Cartes & Poker**' : '**🃏 Cards & Poker**',
-    line('poker', '♠️', fr ? 'Poker Texas Hold\'em multi' : 'Poker Texas Hold\'em multi'),
-    line('cards', '🎴', fr ? 'Trading Card Game (packs, duels, fusion)' : 'Trading Card Game (packs, duels, fuse)'),
+    fr ? '**🏟️ Multijoueur (lobby ouvert)**' : '**🏟️ Multiplayer (open lobby)**',
+    line('chicken',      '🐔', fr ? 'Chicken Race — cash out avant l\'envol' : 'Chicken Race — cash out before takeoff'),
+    line('battleroyale', '🏆', fr ? 'Battle Royale — dernier debout rafle la cagnotte' : 'Battle Royale — last standing takes the pot'),
+    line('diceroyale',   '🎲', fr ? 'Dé Royale — meilleur lancer gagne' : 'Dice Royale — highest roll wins'),
+    line('tournoi',      '🏟️', fr ? 'Tournois PvP à élimination'      : 'Single-elim PvP tournaments'),
     '',
-    fr ? '**⚔️ 1v1**' : '**⚔️ 1v1**',
-    line('duel', '⚔️', fr ? 'Défie un joueur' : 'Challenge a player'),
-    line('rps', '✊', fr ? 'Pierre-Feuille-Ciseaux' : 'Rock-Paper-Scissors'),
-    line('typingrace', '⌨️', fr ? 'Course de frappe' : 'Typing race'),
+    fr ? '**⚔️ Duels 1v1**' : '**⚔️ 1v1 duels**',
+    line('duel',       '⚔️', fr ? 'Défie un joueur (pile ou face)' : 'Challenge a player (coin flip)'),
+    line('rps',        '✊', fr ? 'Pierre-Feuille-Ciseaux'         : 'Rock-Paper-Scissors'),
+    line('typingrace', '⌨️', fr ? 'Course de frappe (jusqu\'à 6)' : 'Typing race (up to 6)'),
     '',
-    fr ? '**🏟️ Multijoueur (lobby)**' : '**🏟️ Multiplayer (lobby)**',
-    line('battleroyale', '🏆', fr ? 'Dernier survivant rafle la cagnotte' : 'Last one standing takes the pot'),
-    line('diceroyale', '🎲', fr ? 'Le plus haut score gagne' : 'Highest roll wins'),
-    line('tournoi', '🏟️', fr ? 'Tournois PvP à élimination' : 'Single-elim PvP tournaments'),
+    fr ? '**🧠 Énigmes & butin**' : '**🧠 Riddles & loot**',
+    line('quiz',     '🧠', fr ? 'Quiz solo — culture générale'      : 'Trivia quiz — general knowledge'),
+    line('hunt',     '🗺️', fr ? 'Chasse au trésor — énigmes d\'un Lord' : 'Treasure hunt — riddles from a Lord'),
+    line('treasure', '💰', fr ? 'Coffres surprise (spawn aléatoire)' : 'Surprise chests (random spawn)'),
+    line('lottery',  '🎫', fr ? 'Loterie serveur — jackpot en PULSE' : 'Server lottery — PULSE jackpot'),
     '',
-    fr ? '**🧠 Quiz & Trésor**' : '**🧠 Quiz & Treasure**',
-    line('quiz', '🧠', fr ? 'Quiz solo' : 'Solo quiz'),
-    line('treasure', '💰', fr ? 'Treasure Drop (spawn aléatoire)' : 'Treasure Drop (random spawn)'),
-    line('hunt', '🗺️', fr ? 'Chasse au trésor (énigmes)' : 'Treasure hunt (riddles)'),
+    fr ? '**🎁 Tirages au sort** _(organisés par un Lord)_' : '**🎁 Raffles** _(hosted by a Lord)_',
+    fr
+      ? `${mention('giveaway', ids)} — clique sur **Entrer** quand une annonce s\'affiche. Un Lord seul peut en lancer une.`
+      : `${mention('giveaway', ids)} — hit **Enter** when an announcement drops. Only a Lord can start one.`,
   ].join('\n');
-  const quickRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+
+  // Two rows of quick-play buttons: solo casino games that can run inline.
+  // Row 1 = the crowd-pleasers; row 2 = the wild ones.
+  const quickRow1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ButtonBuilder().setCustomId('hub:play:slots').setLabel('Slots').setEmoji('🎰').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('hub:play:blackjack').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('hub:play:crash').setLabel('Crash').setEmoji('💥').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('hub:play:wheel').setLabel('Wheel').setEmoji('🎡').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('hub:play:wheel').setLabel(fr ? 'Roue' : 'Wheel').setEmoji('🎯').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('hub:play:higherlower').setLabel('H/L').setEmoji('🎲').setStyle(ButtonStyle.Success),
   );
   return {
     embeds: [pulseEmbed(fr ? '🎮 Salle des jeux' : '🎮 Games Room').setDescription(description)],
-    components: [quickRow, ...navRows()],
+    components: [quickRow1, ...navRows()],
   };
 }
 
