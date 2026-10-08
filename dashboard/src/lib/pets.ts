@@ -75,7 +75,15 @@ export async function retirePet(discordId: string): Promise<{ ok: boolean; refun
   return { ok: true, refund };
 }
 
-export async function actionOnPet(discordId: string, action: 'feed' | 'play' | 'train'): Promise<{ ok: boolean; pet?: Pet; leveledUp?: boolean; error?: string; cost?: number }> {
+export interface PetDelta {
+  hunger?: number;
+  happiness?: number;
+  energy?: number;
+  health?: number;
+  xp?: number;
+}
+
+export async function actionOnPet(discordId: string, action: 'feed' | 'play' | 'train'): Promise<{ ok: boolean; pet?: Pet; leveledUp?: boolean; error?: string; cost?: number; delta?: PetDelta }> {
   const p = await getActivePet(discordId);
   if (!p) return { ok: false, error: 'no_pet' };
   const prevLevel = p.level;
@@ -86,14 +94,16 @@ export async function actionOnPet(discordId: string, action: 'feed' | 'play' | '
     if (!d.ok) return { ok: false, error: d.error };
     const next = gainXP({ ...p, hunger: Math.min(100, p.hunger + 30), happiness: Math.min(100, p.happiness + 5), last_fed_at: new Date().toISOString() }, 5);
     await supabase.from('pets').update({ hunger: next.hunger, happiness: next.happiness, xp: next.xp, level: next.level, health: next.health, last_fed_at: next.last_fed_at }).eq('id', p.id);
-    return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: FEED_COST };
+    return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: FEED_COST,
+      delta: { hunger: next.hunger - p.hunger, happiness: next.happiness - p.happiness, xp: 5 } };
   }
   if (action === 'play') {
     if (cooldownRemaining(p.last_played_at, 60) > 0) return { ok: false, error: 'cooldown' };
     if (p.energy < 20) return { ok: false, error: 'too_tired' };
     const next = gainXP({ ...p, happiness: Math.min(100, p.happiness + 25), energy: Math.max(0, p.energy - 15), last_played_at: new Date().toISOString() }, 8);
     await supabase.from('pets').update({ happiness: next.happiness, energy: next.energy, xp: next.xp, level: next.level, health: next.health, last_played_at: next.last_played_at }).eq('id', p.id);
-    return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: 0 };
+    return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: 0,
+      delta: { happiness: next.happiness - p.happiness, energy: next.energy - p.energy, xp: 8 } };
   }
   if (action === 'train') {
     if (cooldownRemaining(p.last_trained_at, 120) > 0) return { ok: false, error: 'cooldown' };
@@ -102,7 +112,8 @@ export async function actionOnPet(discordId: string, action: 'feed' | 'play' | '
     if (!d.ok) return { ok: false, error: d.error };
     const next = gainXP({ ...p, energy: Math.max(0, p.energy - 20), last_trained_at: new Date().toISOString() }, 30);
     await supabase.from('pets').update({ energy: next.energy, xp: next.xp, level: next.level, health: next.health, last_trained_at: next.last_trained_at }).eq('id', p.id);
-    return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: TRAIN_COST };
+    return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: TRAIN_COST,
+      delta: { energy: next.energy - p.energy, xp: 30 } };
   }
   return { ok: false, error: 'unknown_action' };
 }

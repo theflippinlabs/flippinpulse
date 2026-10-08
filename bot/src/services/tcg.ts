@@ -565,6 +565,28 @@ export async function acceptCardChallenge(
   const winnerId = challengerScore > targetScore ? c.challengerId : c.targetId;
   const pot = c.wager * 2;
   if (pot > 0) await earnPulse(winnerId, pot, `TCG duel win vs opponent`, `tcg_pvp:${id}`);
+
+  // Persist the resolved duel so the dashboard arena history can display it
+  // alongside pet battles — fire-and-forget, a failure here never blocks the
+  // response to the player.
+  void supabase.from('tcg_battles').insert({
+    attacker_id: c.challengerId,
+    defender_id: c.targetId,
+    winner_id: winnerId,
+    attacker_card: challengerCard.code,
+    defender_card: targetLoadout.character.code,
+    pulse_wagered: c.wager,
+    log_json: {
+      turns,
+      challenger_score: challengerScore,
+      target_score: targetScore,
+      challenger_stats: cStats,
+      target_stats: tStats,
+      challenger_equip: challengerEquip.map(e => ({ code: e.card.code, level: e.level })),
+      target_equip: targetLoadout.equipment.map(e => ({ code: e.card.code, level: e.level })),
+    },
+  }).then(({ error }) => { if (error) log('ERROR', 'tcg_battles insert failed', error); }, () => null);
+
   return {
     ok: true,
     challengerCard, challengerEquip, challengerStats: cStats,

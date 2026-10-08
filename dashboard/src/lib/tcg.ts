@@ -6,6 +6,27 @@ import { atomicSpend, atomicEarn } from './atomicPulse';
 export { PACK_COST, PACK_SIZE, RARITY_STYLE, rarityOrder, SELL_VALUE, NEXT_RARITY, MAX_LEVEL, MERGE_COST_COPIES } from './tcgShared';
 export type { Card, Rarity, EquipmentSlot } from './tcgShared';
 
+export interface CardBattleRow {
+  id: number;
+  attacker_id: string;
+  defender_id: string;
+  winner_id: string | null;
+  attacker_card: string;
+  defender_card: string | null;
+  pulse_wagered: number;
+  created_at: string;
+}
+
+export async function getRecentCardBattles(discordId: string, limit = 10): Promise<CardBattleRow[]> {
+  const { data } = await supabase
+    .from('tcg_battles')
+    .select('id, attacker_id, defender_id, winner_id, attacker_card, defender_card, pulse_wagered, created_at')
+    .or(`attacker_id.eq.${discordId},defender_id.eq.${discordId}`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return (data ?? []) as CardBattleRow[];
+}
+
 const WEIGHTS: Record<Rarity, number> = {
   common: 680, rare: 230, epic: 70, legendary: 18, mythic: 2,
 };

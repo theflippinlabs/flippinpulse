@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   EQUIPMENT_SLOTS,
-  MAX_EQUIPMENT_SLOTS,
   RARITY_STYLE,
   SLOT_LABEL,
   effectiveStats,
@@ -14,7 +13,12 @@ import {
   type EquippedItem,
 } from '@/lib/tcgShared';
 
-interface Member { discord_id: string; username: string; avatar_url: string | null; }
+interface Member {
+  discord_id: string;
+  username: string;
+  avatar_url: string | null;
+  cards?: { unique: number; total: number };
+}
 
 interface Props {
   open: boolean;
@@ -33,11 +37,12 @@ interface Props {
   catalog: Card[];
   // (cardId → (level → quantity))
   ownedLevels: Map<number, Map<number, number>>;
+  unlockedSlots: EquipmentSlot[];
   maxWager?: number;
 }
 
 export default function CardDuelDialog({
-  open, onClose, onSubmit, fr, channels, defaultChannel, catalog, ownedLevels, maxWager = 10_000,
+  open, onClose, onSubmit, fr, channels, defaultChannel, catalog, ownedLevels, unlockedSlots, maxWager = 10_000,
 }: Props) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Member[]>([]);
@@ -46,7 +51,7 @@ export default function CardDuelDialog({
   const [channelId, setChannelId] = useState(defaultChannel);
   const [character, setCharacter] = useState<Card | null>(null);
   const [loadout, setLoadout] = useState<Map<EquipmentSlot, EquippedItem>>(new Map());
-  const [activeSlot, setActiveSlot] = useState<EquipmentSlot>('weapon');
+  const [activeSlot, setActiveSlot] = useState<EquipmentSlot>(unlockedSlots[0] ?? 'weapon');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,15 +59,15 @@ export default function CardDuelDialog({
     if (!open) {
       setQ(''); setResults([]); setPicked(null); setWager(0);
       setChannelId(defaultChannel); setCharacter(null); setLoadout(new Map());
-      setActiveSlot('weapon'); setError(null);
+      setActiveSlot(unlockedSlots[0] ?? 'weapon'); setError(null);
     }
-  }, [open, defaultChannel]);
+  }, [open, defaultChannel, unlockedSlots]);
 
   useEffect(() => {
     if (!open) return;
     if (q.trim().length < 2) { setResults([]); return; }
     const h = setTimeout(async () => {
-      const res = await fetch(`/api/members/search?q=${encodeURIComponent(q.trim())}`);
+      const res = await fetch(`/api/members/search?with=cards&q=${encodeURIComponent(q.trim())}`);
       const data = await res.json();
       setResults(data.results ?? []);
     }, 200);
@@ -171,19 +176,33 @@ export default function CardDuelDialog({
                 placeholder={fr ? 'Tape un pseudo…' : 'Type a username…'}
                 className="w-full mt-1 rounded-lg bg-black border border-pulse-border px-3 py-2 text-sm"
               />
+              {q.trim().length >= 2 && results.length === 0 && (
+                <p className="mt-2 text-[11px] text-pulse-mute italic">
+                  {fr ? 'Aucun joueur avec des cartes dans sa collection.' : 'No player with cards in their collection.'}
+                </p>
+              )}
               {results.length > 0 && (
-                <ul className="mt-1 rounded-lg bg-black/60 border border-pulse-border divide-y divide-pulse-border/60 max-h-40 overflow-y-auto">
+                <ul className="mt-1 rounded-lg bg-black/60 border border-pulse-border divide-y divide-pulse-border/60 max-h-56 overflow-y-auto">
                   {results.map(m => (
                     <li
                       key={m.discord_id}
                       onClick={() => setPicked(m)}
-                      className="cursor-pointer px-3 py-2 hover:bg-pulse-gold/10 flex items-center gap-2 text-sm"
+                      className="cursor-pointer px-3 py-2 hover:bg-pulse-gold/10"
                     >
-                      {m.avatar_url
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
-                        : <div className="w-6 h-6 rounded-full bg-pulse-border" />}
-                      <span>{m.username}</span>
+                      <div className="flex items-center gap-2 text-sm">
+                        {m.avatar_url
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
+                          : <div className="w-6 h-6 rounded-full bg-pulse-border" />}
+                        <span className="font-semibold">{m.username}</span>
+                      </div>
+                      {m.cards && (
+                        <div className="pl-8 mt-0.5 text-[11px] text-pulse-mute">
+                          {fr
+                            ? `🎴 ${m.cards.unique} cartes uniques · ${m.cards.total} au total`
+                            : `🎴 ${m.cards.unique} unique cards · ${m.cards.total} total`}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -236,7 +255,7 @@ export default function CardDuelDialog({
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs text-pulse-mute uppercase tracking-wider">
               {fr ? 'Équipement' : 'Equipment'}{' '}
-              <span className="text-pulse-mute/70">({loadout.size}/{MAX_EQUIPMENT_SLOTS})</span>
+              <span className="text-pulse-mute/70">({loadout.size}/{unlockedSlots.length})</span>
             </label>
           </div>
 
@@ -244,19 +263,22 @@ export default function CardDuelDialog({
             {EQUIPMENT_SLOTS.map(slot => {
               const equipped = loadout.get(slot);
               const isActive = activeSlot === slot;
+              const isUnlocked = unlockedSlots.includes(slot);
               const label = SLOT_LABEL[slot];
               return (
                 <button
                   key={slot}
-                  onClick={() => setActiveSlot(slot)}
+                  onClick={() => isUnlocked && setActiveSlot(slot)}
+                  disabled={!isUnlocked}
                   className={`h-14 rounded-lg border flex flex-col items-center justify-center gap-0.5 ${
-                    isActive ? 'border-pulse-gold bg-pulse-gold/10' :
-                    equipped ? 'border-emerald-500/40 bg-emerald-500/5' :
-                    'border-pulse-border bg-pulse-card'
+                    !isUnlocked ? 'border-pulse-border/40 bg-black/40 opacity-50 cursor-not-allowed' :
+                    isActive    ? 'border-pulse-gold bg-pulse-gold/10' :
+                    equipped    ? 'border-emerald-500/40 bg-emerald-500/5' :
+                                  'border-pulse-border bg-pulse-card'
                   }`}
-                  title={label[fr ? 'fr' : 'en']}
+                  title={isUnlocked ? label[fr ? 'fr' : 'en'] : (fr ? 'Slot verrouillé — débloque-le sur /app/cards' : 'Locked slot — unlock it on /app/cards')}
                 >
-                  <span className="text-base leading-none">{equipped?.card.emoji ?? label.icon}</span>
+                  <span className="text-base leading-none">{!isUnlocked ? '🔒' : (equipped?.card.emoji ?? label.icon)}</span>
                   <span className="text-[7px] uppercase tracking-wider text-pulse-mute">
                     {label[fr ? 'fr' : 'en']}
                     {equipped && equipped.level > 1 ? ` lv${equipped.level}` : ''}

@@ -57,6 +57,20 @@ export const MERGE_COST_COPIES = 3;
 // out at EQUIPMENT_SLOTS.length items.
 export const MAX_EQUIPMENT_SLOTS = EQUIPMENT_SLOTS.length;
 
+// Base slots a fresh account owns; the rest must be unlocked.
+export const BASE_UNLOCKED_SLOTS: EquipmentSlot[] = ['weapon', 'shield', 'spell'];
+
+// PULSE cost to unlock each extra slot. Order matters: cheapest first,
+// so the "next slot" shop button has a predictable next price.
+export const SLOT_UNLOCK_COST: Record<EquipmentSlot, number> = {
+  weapon: 0,   // included
+  shield: 0,   // included
+  spell:  0,   // included
+  helmet: 500,
+  boots:  1200,
+  amulet: 3000,
+};
+
 export const RARITY_STYLE: Record<Rarity, { color: string; ring: string; glow: string; label: { fr: string; en: string } }> = {
   common:    { color: 'text-gray-300',   ring: 'ring-gray-500/40',    glow: 'shadow-none',                                           label: { fr: 'Commune',    en: 'Common'    } },
   rare:      { color: 'text-blue-300',   ring: 'ring-blue-400/60',    glow: 'shadow-[0_0_18px_rgba(59,130,246,.35)]',                label: { fr: 'Rare',       en: 'Rare'      } },

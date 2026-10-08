@@ -1,7 +1,8 @@
 import { getSession } from '@/lib/auth';
-import { loadCatalog, loadCollectionLevels, PACK_COST } from '@/lib/tcg';
+import { loadCatalog, loadCollectionLevels, getRecentCardBattles, PACK_COST } from '@/lib/tcg';
 import { getLocale } from '@/lib/i18n';
 import { loadChannels, pickDefaultShareChannel } from '@/lib/channels';
+import { getUnlockedSlots } from '@/lib/tcgSlots';
 import CardsClient from './CardsClient';
 import { supabase } from '@/lib/supabase';
 
@@ -10,11 +11,13 @@ export const dynamic = 'force-dynamic';
 export default async function CardsPage() {
   const session = getSession()!;
   const locale = getLocale();
-  const [catalog, levels, userRow, channels] = await Promise.all([
+  const [catalog, levels, userRow, channels, unlockedSlots, battles] = await Promise.all([
     loadCatalog(),
     loadCollectionLevels(session.id),
     supabase.from('discord_users').select('balance_pulse').eq('discord_id', session.id).maybeSingle(),
     loadChannels(),
+    getUnlockedSlots(session.id),
+    getRecentCardBattles(session.id, 10),
   ]);
   const balance = (userRow.data?.balance_pulse ?? 0) as number;
   // Serialize the per-level map as a plain object so it can cross the RSC
@@ -34,6 +37,9 @@ export default async function CardsPage() {
       packCost={PACK_COST}
       channels={publicChannels.map(c => ({ channel_id: c.channel_id, name: c.name }))}
       defaultChannel={pickDefaultShareChannel(publicChannels)}
+      unlockedSlots={unlockedSlots}
+      myDiscordId={session.id}
+      battles={battles}
     />
   );
 }
