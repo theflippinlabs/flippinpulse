@@ -4,17 +4,22 @@ import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  BASE_UNLOCKED_SLOTS,
+  EQUIPMENT_SLOTS,
   MAX_LEVEL,
   MERGE_COST_COPIES,
   NEXT_RARITY,
   RARITY_STYLE,
   SELL_VALUE,
   SLOT_LABEL,
+  SLOT_UNLOCK_COST,
   rarityOrder,
   scaledBonuses,
   type Card,
+  type EquipmentSlot,
   type Rarity,
 } from '@/lib/tcgShared';
+import type { CardBattleRow } from '@/lib/tcg';
 import CardDuelDialog from './CardDuelDialog';
 
 interface Props {
@@ -26,6 +31,9 @@ interface Props {
   packCost: number;
   channels: { channel_id: string; name: string }[];
   defaultChannel: string;
+  unlockedSlots: EquipmentSlot[];
+  myDiscordId: string;
+  battles: CardBattleRow[];
 }
 
 const RARITY_FILTERS: (Rarity | 'all')[] = ['all', 'common', 'rare', 'epic', 'legendary', 'mythic'];
@@ -65,7 +73,7 @@ function CardTile({ card, quantity, revealed = true, fr }: { card: Card; quantit
   );
 }
 
-export default function CardsClient({ fr, catalog, ownedLevels, balance: initialBalance, packCost, channels, defaultChannel }: Props) {
+export default function CardsClient({ fr, catalog, ownedLevels, balance: initialBalance, packCost, channels, defaultChannel, unlockedSlots: initialUnlocked, myDiscordId, battles }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<'all' | Rarity>('all');
@@ -80,6 +88,27 @@ export default function CardsClient({ fr, catalog, ownedLevels, balance: initial
   const [fuseSelection, setFuseSelection] = useState<number[]>([]);
   const [fuseResult, setFuseResult] = useState<Card | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [unlockedSlots, setUnlockedSlots] = useState<EquipmentSlot[]>(initialUnlocked);
+
+  const lockedSlots = EQUIPMENT_SLOTS.filter(s => !unlockedSlots.includes(s) && !BASE_UNLOCKED_SLOTS.includes(s));
+  const nextSlotToBuy = lockedSlots[0] ?? null;
+
+  async function buyNextSlot() {
+    if (!nextSlotToBuy) return;
+    setError(null); setFlash(null);
+    const res = await fetch('/api/cards/slot', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slot: nextSlotToBuy }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(errorLabel(data.error ?? 'error')); return; }
+    setUnlockedSlots(data.unlocked ?? [...unlockedSlots, nextSlotToBuy]);
+    setBalance(b => Math.max(0, b - (data.cost ?? 0)));
+    setFlash(fr
+      ? `🔓 Slot ${SLOT_LABEL[nextSlotToBuy].fr} débloqué pour ${data.cost} PULSE.`
+      : `🔓 ${SLOT_LABEL[nextSlotToBuy].en} slot unlocked for ${data.cost} PULSE.`);
+    startTransition(() => router.refresh());
+  }
 
   // Levels map: cardId → (level → quantity). Rebuilt from the plain-object
   // prop the server component passed us.
@@ -132,6 +161,9 @@ export default function CardsClient({ fr, catalog, ownedLevels, balance: initial
     self_challenge: fr ? 'Tu ne peux pas te défier toi-même.' : "You can't challenge yourself.",
     no_channel: fr ? 'Choisis un salon.' : 'Pick a channel.',
     slot_conflict: fr ? 'Un seul équipement par slot (arme, bouclier, sort…).' : 'One equipment per slot (weapon, shield, spell…).',
+    slot_locked: fr ? 'Ce slot d\'équipement n\'est pas débloqué.' : 'That equipment slot is not unlocked.',
+    bad_slot: fr ? 'Slot inconnu.' : 'Unknown slot.',
+    already_unlocked: fr ? 'Déjà débloqué.' : 'Already unlocked.',
     bad_level: fr ? 'Niveau invalide.' : 'Invalid level.',
     upgrade_failed: fr ? 'Fusion impossible.' : 'Upgrade failed.',
   }[code] ?? code);
@@ -298,6 +330,63 @@ export default function CardsClient({ fr, catalog, ownedLevels, balance: initial
       {flash && <div className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">{flash}</div>}
       {error && <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm">{error}</div>}
 
+      {/* Loadout — visual explainer: 1 character + up to 6 equipment slots */}
+      <section className="mb-4 rounded-2xl border border-pulse-border bg-pulse-card p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm uppercase tracking-wider text-pulse-mute">
+            {fr ? 'Ta loadout' : 'Your loadout'}
+          </h2>
+          <span className="text-[11px] text-pulse-mute">{unlockedSlots.length}/{EQUIPMENT_SLOTS.length} slots</span>
+        </div>
+        <p className="text-[11px] text-pulse-mute mb-3 leading-relaxed">
+          {fr
+            ? 'Un combat = 1 personnage champion + jusqu\'à 6 équipements (1 par slot). Chaque équipement booste ATK / DEF / SPD. Niveau d\'un équip = bonus × niveau.'
+            : 'A fight = 1 champion character + up to 6 equipment items (1 per slot). Each equipment boosts ATK / DEF / SPD. Equipment bonus = base × level.'}
+        </p>
+        <div className="grid grid-cols-7 gap-1.5 items-center">
+          <div className="col-span-1 aspect-square rounded-xl bg-gradient-to-br from-pulse-gold/20 to-pulse-gold/5 border border-pulse-gold/40 flex flex-col items-center justify-center">
+            <div className="text-2xl">🦸</div>
+            <div className="text-[8px] uppercase tracking-wider text-pulse-gold mt-0.5">
+              {fr ? 'Perso' : 'Hero'}
+            </div>
+          </div>
+          <div className="col-span-6 grid grid-cols-6 gap-1.5">
+            {EQUIPMENT_SLOTS.map(slot => {
+              const isUnlocked = unlockedSlots.includes(slot);
+              const label = SLOT_LABEL[slot];
+              return (
+                <div
+                  key={slot}
+                  className={`aspect-square rounded-lg border flex flex-col items-center justify-center ${
+                    isUnlocked
+                      ? 'bg-pulse-card border-pulse-border'
+                      : 'bg-black/40 border-pulse-border/40 opacity-60'
+                  }`}
+                  title={label[fr ? 'fr' : 'en']}
+                >
+                  <div className="text-lg leading-none">{isUnlocked ? label.icon : '🔒'}</div>
+                  <div className="text-[7px] uppercase tracking-wider text-pulse-mute mt-0.5">
+                    {label[fr ? 'fr' : 'en']}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {nextSlotToBuy && (
+          <button
+            onClick={buyNextSlot}
+            disabled={isPending || balance < SLOT_UNLOCK_COST[nextSlotToBuy]}
+            className="mt-3 w-full rounded-xl bg-pulse-gold/15 border border-pulse-gold/40 py-2 text-xs font-semibold disabled:opacity-60"
+          >
+            {fr
+              ? `🔓 Débloquer le slot ${SLOT_LABEL[nextSlotToBuy].fr} ${SLOT_LABEL[nextSlotToBuy].icon} — ${SLOT_UNLOCK_COST[nextSlotToBuy]} PULSE`
+              : `🔓 Unlock the ${SLOT_LABEL[nextSlotToBuy].en} ${SLOT_LABEL[nextSlotToBuy].icon} slot — ${SLOT_UNLOCK_COST[nextSlotToBuy]} PULSE`}
+          </button>
+        )}
+      </section>
+
       {opening && (
         <div className="mb-6 rounded-2xl bg-gradient-to-br from-purple-900/50 to-black border border-purple-500/40 p-4">
           <div className="text-sm mb-3">{fr ? '✨ Contenu du booster' : '✨ Pack contents'}</div>
@@ -313,6 +402,45 @@ export default function CardsClient({ fr, catalog, ownedLevels, balance: initial
           </div>
         </div>
       )}
+
+      {/* Arena — recent card duels for this player */}
+      <section className="mb-4">
+        <h2 className="text-sm uppercase tracking-wider text-pulse-mute mb-2">
+          {fr ? 'Arène — derniers duels' : 'Arena — recent duels'}
+        </h2>
+        {battles.length === 0 ? (
+          <p className="text-pulse-mute italic text-sm">
+            {fr ? 'Pas encore de duel. Clique sur ⚔️ Défier ci-dessus pour entrer dans l\'arène !' : 'No duels yet. Hit ⚔️ Duel above to enter the arena!'}
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {battles.map(b => {
+              const won = b.winner_id === myDiscordId;
+              const tie = b.winner_id === null;
+              const asAttacker = b.attacker_id === myDiscordId;
+              const myCode = asAttacker ? b.attacker_card : b.defender_card;
+              const foeCode = asAttacker ? b.defender_card : b.attacker_card;
+              return (
+                <li key={b.id} className="rounded-xl bg-pulse-card border border-pulse-border px-3 py-2 text-sm flex items-center gap-2">
+                  <span>{tie ? '🤝' : won ? '🏆' : '💥'}</span>
+                  <span className="flex-1 truncate">
+                    {tie
+                      ? (fr ? 'Égalité' : 'Tie')
+                      : won
+                        ? (fr ? `Victoire · ${myCode ?? '?'} vs ${foeCode ?? '?'}` : `Win · ${myCode ?? '?'} vs ${foeCode ?? '?'}`)
+                        : (fr ? `Défaite · ${myCode ?? '?'} vs ${foeCode ?? '?'}` : `Loss · ${myCode ?? '?'} vs ${foeCode ?? '?'}`)}
+                  </span>
+                  {b.pulse_wagered > 0 && !tie && (
+                    <span className={`font-mono text-xs ${won ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {won ? '+' : '-'}{b.pulse_wagered}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <div className="flex gap-1.5 overflow-x-auto mb-3 pb-1">
         {RARITY_FILTERS.map(r => (
@@ -512,8 +640,22 @@ export default function CardsClient({ fr, catalog, ownedLevels, balance: initial
                 <div className="text-pulse-gold font-bold mb-1">🎽 {fr ? 'Personnages, équipements & slots' : 'Characters, equipment & slots'}</div>
                 <p className="text-pulse-mute">
                   {fr
-                    ? 'Deux familles : **Personnages** (attaquent, ATK/DEF/SPD) et **Équipements** (s\'attachent à un personnage, un par slot). 6 slots : arme, bouclier, sort, casque, bottes, amulette. Un équipement ne combat PAS seul.'
-                    : 'Two families: **Characters** (attack, ATK/DEF/SPD) and **Equipment** (attach to a character, one per slot). 6 slots: weapon, shield, spell, helmet, boots, amulet. Equipment cannot fight alone.'}
+                    ? 'Deux familles : **Personnages** (attaquent, ATK/DEF/SPD) et **Équipements** (s\'attachent à un personnage, un par slot). Un équipement ne combat PAS seul.'
+                    : 'Two families: **Characters** (attack, ATK/DEF/SPD) and **Equipment** (attach to a character, one per slot). Equipment cannot fight alone.'}
+                </p>
+                <div className="mt-2 rounded-lg bg-black/40 border border-pulse-border p-2 text-[11px] font-mono text-pulse-mute">
+                  {fr
+                    ? '🦸 Héros ATK 8 + 🗡️ arme lv3 (+6 ATK) + 🛡️ bouclier lv2 (+4 DEF) = ATK 14 / DEF +4'
+                    : '🦸 Hero ATK 8 + 🗡️ weapon lv3 (+6 ATK) + 🛡️ shield lv2 (+4 DEF) = ATK 14 / DEF +4'}
+                </div>
+              </section>
+
+              <section>
+                <div className="text-pulse-gold font-bold mb-1">🔓 {fr ? 'Débloquer plus de slots' : 'Unlock more slots'}</div>
+                <p className="text-pulse-mute">
+                  {fr
+                    ? 'Tu démarres avec 3 slots : 🗡️ arme, 🛡️ bouclier, 🔮 sort. Dépense du PULSE pour agrandir ton sac : ⛑️ casque (500), 👟 bottes (1200), 📿 amulette (3000). Plus de slots = plus de bonus cumulés en duel.'
+                    : 'You start with 3 slots: 🗡️ weapon, 🛡️ shield, 🔮 spell. Spend PULSE to grow your bag: ⛑️ helmet (500), 👟 boots (1200), 📿 amulet (3000). More slots = more stacked bonuses in duels.'}
                 </p>
               </section>
 
@@ -580,6 +722,7 @@ export default function CardsClient({ fr, catalog, ownedLevels, balance: initial
         defaultChannel={defaultChannel}
         catalog={catalog}
         ownedLevels={levelsMap}
+        unlockedSlots={unlockedSlots}
         onSubmit={async ({ opponentId, wager, channelId, characterCardId, equipment, opponentName }) => {
           setError(null); setFlash(null);
           const res = await fetch('/api/cards/challenge', {

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { MAX_EQUIPMENT_SLOTS, MAX_LEVEL } from '@/lib/tcgShared';
+import { MAX_EQUIPMENT_SLOTS, MAX_LEVEL, type EquipmentSlot } from '@/lib/tcgShared';
 import { assertChannelAllowed } from '@/lib/guardChannel';
 import { requirePlan } from '@/lib/planGate';
+import { getUnlockedSlots } from '@/lib/tcgSlots';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
   if (!char) return NextResponse.json({ error: 'bad_card' }, { status: 400 });
   if (char.card_kind !== 'character') return NextResponse.json({ error: 'not_a_character' }, { status: 400 });
 
+  const unlockedSlots = new Set<EquipmentSlot>(await getUnlockedSlots(session.id));
   const slotsUsed = new Set<string>();
   const equipmentEntries: { code: string; level: number }[] = [];
   for (const e of equipment) {
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
     if (!eq) return NextResponse.json({ error: 'bad_equipment' }, { status: 400 });
     if (eq.card_kind !== 'equipment' || !eq.equipment_slot) return NextResponse.json({ error: 'not_an_equipment' }, { status: 400 });
     if (slotsUsed.has(eq.equipment_slot)) return NextResponse.json({ error: 'slot_conflict' }, { status: 400 });
+    if (!unlockedSlots.has(eq.equipment_slot as EquipmentSlot)) return NextResponse.json({ error: 'slot_locked' }, { status: 400 });
     slotsUsed.add(eq.equipment_slot);
     equipmentEntries.push({ code: eq.code, level: e.level });
   }
