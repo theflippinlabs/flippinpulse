@@ -1,9 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { PUBLIC_LOCALE_COOKIE } from '@/lib/publicLocale';
 
 type Locale = 'fr' | 'en';
+
+// Duplicated from lib/publicLocale.ts on purpose — importing it here would
+// pull next/headers into the client bundle and break the Vercel build.
+const PUBLIC_LOCALE_COOKIE = 'novarys_public_locale';
 
 export function LanguageSwitch({ current }: { current: Locale }) {
   const router = useRouter();
