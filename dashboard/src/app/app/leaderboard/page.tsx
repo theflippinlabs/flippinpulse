@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import Link from 'next/link';
 import { getSession, isAdmin } from '@/lib/auth';
 import { t } from '@/lib/i18n';
@@ -18,7 +18,7 @@ interface Row {
 // Lords are excluded from the classement entirely — they can still play and
 // earn PULSE, but they don't compete with the members they moderate.
 async function load(): Promise<Row[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('discord_users')
     .select('discord_id, username, balance_pulse, points_total, points_week, rank_name, avatar_url')
     .order('points_total', { ascending: false })

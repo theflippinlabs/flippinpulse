@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { getBalance } from '@/lib/play';
 import { t } from '@/lib/i18n';
 import LotteryClient from './LotteryClient';
@@ -9,7 +9,7 @@ import LotteryClient from './LotteryClient';
 export const dynamic = 'force-dynamic';
 
 async function loadRound(discordId: string) {
-  const { data: round } = await supabase
+  const { data: round } = await sb()
     .from('lottery_rounds')
     .select('id, ticket_price, pot_pulse, total_tickets, draw_at, status')
     .eq('status', 'active')
@@ -18,7 +18,7 @@ async function loadRound(discordId: string) {
 
   let myTickets = 0;
   if (r) {
-    const { data } = await supabase
+    const { data } = await sb()
       .from('lottery_tickets').select('tickets').eq('round_id', r.id).eq('discord_id', discordId).maybeSingle();
     myTickets = (data as { tickets?: number } | null)?.tickets ?? 0;
   }

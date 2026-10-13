@@ -1,11 +1,11 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 import GamesClient, { type Game } from './GamesClient';
 
 export const dynamic = 'force-dynamic';
 
 async function loadGames(): Promise<Game[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('games_config')
     .select('game_key, is_enabled, config_json')
     .order('game_key', { ascending: true });

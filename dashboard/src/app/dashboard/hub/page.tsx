@@ -1,23 +1,23 @@
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 export const dynamic = 'force-dynamic';
 
 async function loadQuickStats() {
   const [games, tournois, cosmetics, lottery, pulsar, missions, mod, jails, bpSeason, bpProgress, petsCount, cardsInCirc, companionsCount] = await Promise.all([
-    supabase.from('games_config').select('is_enabled'),
-    supabase.from('tournaments').select('*', { count: 'exact', head: true }),
-    supabase.from('user_cosmetics').select('*', { count: 'exact', head: true }),
-    supabase.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
-    supabase.from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle(),
-    supabase.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('settings').select('value_json').eq('key', 'mod_config').maybeSingle(),
-    supabase.from('jailed_members').select('*', { count: 'exact', head: true }),
-    supabase.from('battle_pass_seasons').select('name, ends_at').eq('is_active', true).order('id', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('battle_pass_progress').select('*', { count: 'exact', head: true }),
-    supabase.from('pets').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('tcg_collection').select('quantity'),
-    supabase.from('ai_companions').select('*', { count: 'exact', head: true }).eq('is_active', true),
+    sb().from('games_config').select('is_enabled'),
+    sb().from('tournaments').select('*', { count: 'exact', head: true }),
+    sb().from('user_cosmetics').select('*', { count: 'exact', head: true }),
+    sb().from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
+    sb().from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle(),
+    sb().from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    sb().from('settings').select('value_json').eq('key', 'mod_config').maybeSingle(),
+    sb().from('jailed_members').select('*', { count: 'exact', head: true }),
+    sb().from('battle_pass_seasons').select('name, ends_at').eq('is_active', true).order('id', { ascending: false }).limit(1).maybeSingle(),
+    sb().from('battle_pass_progress').select('*', { count: 'exact', head: true }),
+    sb().from('pets').select('*', { count: 'exact', head: true }).eq('is_active', true),
+    sb().from('tcg_collection').select('quantity'),
+    sb().from('ai_companions').select('*', { count: 'exact', head: true }).eq('is_active', true),
   ]);
   const enabled = (games.data ?? []).filter(g => (g as { is_enabled?: boolean }).is_enabled).length;
   const pulsarCfg = (pulsar.data as { value_json?: { enabled?: boolean } } | null)?.value_json ?? {};

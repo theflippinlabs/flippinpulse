@@ -1,6 +1,6 @@
 import { getSession, isAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import WheelClient, { type MemberOpt } from './WheelClient';
@@ -8,7 +8,7 @@ import WheelClient, { type MemberOpt } from './WheelClient';
 export const dynamic = 'force-dynamic';
 
 async function loadTopMembers(): Promise<MemberOpt[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('discord_users')
     .select('discord_id, username, avatar_url')
     .order('points_total', { ascending: false })

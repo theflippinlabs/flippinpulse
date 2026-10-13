@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import GameDetailClient, { type GameData } from './GameDetailClient';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ const LABELS: Record<string, { name: string; emoji: string }> = {
 };
 
 export default async function GameDetail({ params }: { params: { key: string } }) {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('games_config')
     .select('game_key, is_enabled, config_json')
     .eq('game_key', params.key)

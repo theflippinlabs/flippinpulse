@@ -1,5 +1,5 @@
 import BackLink from '../BackLink';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,13 +42,13 @@ async function loadCharts() {
   const cutoff = new Date(Date.now() - DAYS * MS_DAY).toISOString();
 
   const [messages, gamesPlayed, txAll, gamesByKey, users, orders, jailsAll] = await Promise.all([
-    supabase.from('activity_events').select('created_at').eq('type', 'message').gte('created_at', cutoff).limit(50_000),
-    supabase.from('game_players').select('joined_at').gte('joined_at', cutoff).limit(50_000),
-    supabase.from('pulse_transactions').select('created_at, amount, type, discord_id').gte('created_at', cutoff).limit(50_000),
-    supabase.from('game_sessions').select('game_key, created_at').gte('created_at', cutoff).limit(50_000),
-    supabase.from('discord_users').select('discord_id, username, avatar_url, joined_at, balance_pulse').limit(5000),
-    supabase.from('orders').select('pulse_spent, item_id, created_at').gte('created_at', cutoff).limit(10_000),
-    supabase.from('jailed_members').select('jailed_at').gte('jailed_at', cutoff).limit(10_000),
+    sb().from('activity_events').select('created_at').eq('type', 'message').gte('created_at', cutoff).limit(50_000),
+    sb().from('game_players').select('joined_at').gte('joined_at', cutoff).limit(50_000),
+    sb().from('pulse_transactions').select('created_at, amount, type, discord_id').gte('created_at', cutoff).limit(50_000),
+    sb().from('game_sessions').select('game_key, created_at').gte('created_at', cutoff).limit(50_000),
+    sb().from('discord_users').select('discord_id, username, avatar_url, joined_at, balance_pulse').limit(5000),
+    sb().from('orders').select('pulse_spent, item_id, created_at').gte('created_at', cutoff).limit(10_000),
+    sb().from('jailed_members').select('jailed_at').gte('jailed_at', cutoff).limit(10_000),
   ]);
 
   const msgs = bucketize((messages.data ?? []) as { created_at: string }[]);

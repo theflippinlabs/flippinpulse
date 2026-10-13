@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { t } from '@/lib/i18n';
 import TournamentsClient from './TournamentsClient';
 
@@ -9,13 +9,13 @@ export const dynamic = 'force-dynamic';
 
 async function load(discordId: string) {
   const [tRes, myRes] = await Promise.all([
-    supabase
+    sb()
       .from('tournaments')
       .select('id, title, buy_in, pot_pulse, max_players, status, game_type, created_at')
       .in('status', ['open', 'running', 'completed'])
       .order('created_at', { ascending: false })
       .limit(20),
-    supabase
+    sb()
       .from('tournament_players')
       .select('tournament_id')
       .eq('discord_id', discordId),
@@ -37,7 +37,7 @@ export default async function TournamentsPage() {
   const ids = tournaments.map(x => x.id);
   const counts = new Map<string, number>();
   if (ids.length) {
-    const { data } = await supabase.from('tournament_players').select('tournament_id').in('tournament_id', ids);
+    const { data } = await sb().from('tournament_players').select('tournament_id').in('tournament_id', ids);
     for (const r of (data ?? []) as { tournament_id: string }[]) {
       counts.set(r.tournament_id, (counts.get(r.tournament_id) ?? 0) + 1);
     }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'game_key and patch required' }, { status: 400 });
   }
 
-  const { data: existing } = await supabase
+  const { data: existing } = await sb()
     .from('games_config')
     .select('config_json')
     .eq('game_key', key)
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const current = (existing.config_json as Record<string, unknown>) ?? {};
   const merged = { ...current, ...patch };
 
-  const { error } = await supabase
+  const { error } = await sb()
     .from('games_config')
     .update({ config_json: merged, updated_at: new Date().toISOString() })
     .eq('game_key', key);

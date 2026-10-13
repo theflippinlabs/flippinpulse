@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { getLocale } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -217,9 +217,9 @@ const CONTENT: Record<Feature, FeatureContent> = {
 
 async function activeCounts() {
   const [sagas, hunts, events] = await Promise.all([
-    supabase.from('sagas').select('id', { count: 'exact', head: true }).eq('status', 'running'),
-    supabase.from('treasure_hunts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('server_events').select('id', { count: 'exact', head: true }).eq('status', 'scheduled'),
+    sb().from('sagas').select('id', { count: 'exact', head: true }).eq('status', 'running'),
+    sb().from('treasure_hunts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+    sb().from('server_events').select('id', { count: 'exact', head: true }).eq('status', 'scheduled'),
   ]);
   return {
     sagas: sagas.count ?? 0,

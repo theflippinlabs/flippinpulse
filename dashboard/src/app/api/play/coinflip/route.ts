@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { settleBet } from '@/lib/play';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { coinflipAnnounce, pickLocale } from '@/lib/gameAnnounce';
 import { assertChannelAllowed } from '@/lib/guardChannel';
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const guard = await assertChannelAllowed(String(body.channel_id));
     if (guard.ok) {
       const { title, message } = coinflipAnnounce(pickLocale(body), { userId: session.id, outcome, payout });
-      await supabase.from('dashboard_commands').insert({
+      await sb().from('dashboard_commands').insert({
         command: 'announce',
         payload_json: { channel_id: body.channel_id, title, message, embed: true, ping: null },
         status: 'pending',

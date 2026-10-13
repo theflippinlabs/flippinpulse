@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { assertChannelAllowed } from '@/lib/guardChannel';
 import { requirePlan } from '@/lib/planGate';
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!channelId) return NextResponse.json({ error: 'no_channel' }, { status: 400 });
   const guard = await assertChannelAllowed(channelId);
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: 400 });
-  const { error } = await supabase.from('dashboard_commands').insert({
+  const { error } = await sb().from('dashboard_commands').insert({
     command: 'pet_challenge',
     payload_json: { challenger_id: session.id, opponent_id: opponentId, wager, channel_id: channelId },
     status: 'pending',

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 
 export const dynamic = 'force-dynamic';
@@ -18,9 +18,9 @@ interface OwnRow { discord_id: string; card_id: number; quantity: number; }
 
 async function load() {
   const [{ data: catalog }, { data: collection }, { data: members }] = await Promise.all([
-    supabase.from('tcg_cards').select('*'),
-    supabase.from('tcg_collection').select('discord_id, card_id, quantity'),
-    supabase.from('discord_users').select('discord_id, username'),
+    sb().from('tcg_cards').select('*'),
+    sb().from('tcg_collection').select('discord_id, card_id, quantity'),
+    sb().from('discord_users').select('discord_id, username'),
   ]);
   const cards = (catalog ?? []) as CardRow[];
   const rows = (collection ?? []) as OwnRow[];

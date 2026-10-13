@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 
 export const dynamic = 'force-dynamic';
@@ -18,9 +18,9 @@ interface PetRow {
 
 async function load() {
   const [petsRes, battlesRes, membersRes] = await Promise.all([
-    supabase.from('pets').select('*', { count: 'exact' }).eq('is_active', true).order('level', { ascending: false }).limit(50),
-    supabase.from('pet_battles').select('*', { count: 'exact', head: true }),
-    supabase.from('discord_users').select('discord_id, username'),
+    sb().from('pets').select('*', { count: 'exact' }).eq('is_active', true).order('level', { ascending: false }).limit(50),
+    sb().from('pet_battles').select('*', { count: 'exact', head: true }),
+    sb().from('discord_users').select('discord_id, username'),
   ]);
   const rows = (petsRes.data ?? []) as PetRow[];
   const memberMap = new Map((membersRes.data ?? []).map(m => [m.discord_id, (m as { username: string }).username]));

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 const ALLOWED = new Set([
   'announce', 'grant_pulse', 'revoke_pulse', 'release_jail',
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unknown command' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await sb()
     .from('dashboard_commands')
     .insert({
       command,
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   }
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-  const { data } = await supabase
+  const { data } = await sb()
     .from('dashboard_commands')
     .select('id, command, status, error, processed_at')
     .eq('id', id)

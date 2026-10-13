@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 // Only keys we allow the dashboard to write to.
 const ALLOWED_KEYS = new Set([
@@ -26,11 +26,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Merge with current value.
-  const { data: existing } = await supabase.from('settings').select('value_json').eq('key', key).maybeSingle();
+  const { data: existing } = await sb().from('settings').select('value_json').eq('key', key).maybeSingle();
   const current = (existing?.value_json as Record<string, unknown>) ?? {};
   const merged = { ...current, ...patch };
 
-  const { error } = await supabase.from('settings').upsert({ key, value_json: merged }, { onConflict: 'key' });
+  const { error } = await sb().from('settings').upsert({ key, value_json: merged }, { onConflict: 'key' });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, value: merged });

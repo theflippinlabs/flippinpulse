@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ interface Giveaway {
 }
 
 async function load(): Promise<Giveaway[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('giveaways')
     .select('id, prize, prize_pulse, winners_count, status, end_at, channel_id, message_id')
     .in('status', ['active', 'ended'])

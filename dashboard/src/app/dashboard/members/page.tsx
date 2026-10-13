@@ -1,10 +1,10 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import MembersClient, { type Member } from './MembersClient';
 
 export const dynamic = 'force-dynamic';
 
 async function loadMembers(): Promise<Member[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('discord_users')
     .select('discord_id, username, rank_name, points_total, points_week, points_month, balance_pulse, lifetime_earned_pulse, streak, last_activity_at')
     .order('points_total', { ascending: false })

@@ -4,7 +4,7 @@ import { getLocale } from '@/lib/i18n';
 import { loadChannels, pickDefaultShareChannel } from '@/lib/channels';
 import { getUnlockedSlots } from '@/lib/tcgSlots';
 import CardsClient from './CardsClient';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export default async function CardsPage() {
   const [catalog, levels, userRow, channels, unlockedSlots, battles] = await Promise.all([
     loadCatalog(),
     loadCollectionLevels(session.id),
-    supabase.from('discord_users').select('balance_pulse').eq('discord_id', session.id).maybeSingle(),
+    sb().from('discord_users').select('balance_pulse').eq('discord_id', session.id).maybeSingle(),
     loadChannels(),
     getUnlockedSlots(session.id),
     getRecentCardBattles(session.id, 10),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { MAX_EQUIPMENT_SLOTS, MAX_LEVEL, type EquipmentSlot } from '@/lib/tcgShared';
 import { assertChannelAllowed } from '@/lib/guardChannel';
 import { requirePlan } from '@/lib/planGate';
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   // Resolve every card ID → code so the bot bridge stays on codes end-to-end.
   const allIds = [characterCardId, ...equipment.map(e => e.cardId)];
-  const { data: rows } = await supabase.from('tcg_cards').select('id, code, card_kind, equipment_slot').in('id', allIds);
+  const { data: rows } = await sb().from('tcg_cards').select('id, code, card_kind, equipment_slot').in('id', allIds);
   const byId = new Map((rows ?? []).map(r => [r.id as number, r as { code: string; card_kind: string; equipment_slot: string | null }]));
 
   const char = byId.get(characterCardId);
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     equipmentEntries.push({ code: eq.code, level: e.level });
   }
 
-  const { error } = await supabase.from('dashboard_commands').insert({
+  const { error } = await sb().from('dashboard_commands').insert({
     command: 'card_challenge',
     payload_json: {
       challenger_id: session.id,

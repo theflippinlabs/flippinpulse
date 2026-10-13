@@ -1,16 +1,18 @@
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { scopedSupabase } from '@/lib/guildScopedSupabase';
+import { currentGuildId } from '@/lib/guildContext';
 
 export const dynamic = 'force-dynamic';
 
 async function loadStats() {
+  const sb = scopedSupabase(currentGuildId());
   const [members, pulseInWallets, activeTournois, activeJails, roundPot, achievementsUnlocked] = await Promise.all([
-    supabase.from('discord_users').select('*', { count: 'exact', head: true }),
-    supabase.from('discord_users').select('balance_pulse'),
-    supabase.from('tournaments').select('*', { count: 'exact', head: true }).in('status', ['open', 'running']),
-    supabase.from('jailed_members').select('*', { count: 'exact', head: true }),
-    supabase.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
-    supabase.from('user_achievements').select('*', { count: 'exact', head: true }),
+    sb.from('discord_users').select('*', { count: 'exact', head: true }),
+    sb.from('discord_users').select('balance_pulse'),
+    sb.from('tournaments').select('*', { count: 'exact', head: true }).in('status', ['open', 'running']),
+    sb.from('jailed_members').select('*', { count: 'exact', head: true }),
+    sb.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
+    sb.from('user_achievements').select('*', { count: 'exact', head: true }),
   ]);
 
   const totalPulseInWallets = (pulseInWallets.data ?? []).reduce(
@@ -54,18 +56,19 @@ interface RecentTour {
 }
 
 async function loadRecent() {
+  const sb = scopedSupabase(currentGuildId());
   const [topMembers, recentJails, lastTournois] = await Promise.all([
-    supabase
+    sb
       .from('discord_users')
       .select('discord_id, username, points_total, balance_pulse, rank_name, avatar_url')
       .order('points_total', { ascending: false })
       .limit(10),
-    supabase
+    sb
       .from('jailed_members')
       .select('discord_id, jailed_at, expires_at, reason')
       .order('jailed_at', { ascending: false })
       .limit(3),
-    supabase
+    sb
       .from('tournaments')
       .select('id, title, status, pot_pulse, winner_id, created_at')
       .order('created_at', { ascending: false })

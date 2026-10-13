@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ interface Cosmetic {
 }
 
 async function load(): Promise<Cosmetic[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('user_cosmetics')
     .select('discord_id, title, color_hex, name_color_hex, name_color_expires_at, updated_at')
     .order('updated_at', { ascending: false })

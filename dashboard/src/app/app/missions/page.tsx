@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { t } from '@/lib/i18n';
 import { translations } from '@/lib/translations';
 import { getLocale } from '@/lib/i18n';
@@ -21,7 +21,7 @@ interface Mission {
 }
 
 async function load(): Promise<Mission[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('pulse_challenges')
     .select('id, kind, title, description, metric, goal, reward_pulse, status, end_at')
     .eq('status', 'active')
