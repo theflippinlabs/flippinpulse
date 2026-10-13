@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { tryCurrentGuildId } from './guildContext';
 
 // Thin wrappers around the atomic pulse_spend / pulse_earn Postgres
 // functions. Callers must go through these — never touch discord_users.
@@ -23,6 +24,7 @@ export async function atomicSpend(
     p_reason: reason,
     p_ref_id: refId ?? null,
     p_type: type,
+    p_guild_id: tryCurrentGuildId(),
   });
   if (error) return { ok: false, newBalance: 0, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
@@ -52,6 +54,7 @@ export async function atomicEarn(
     p_type: type,
     p_username: null,
     p_avatar_url: null,
+    p_guild_id: tryCurrentGuildId(),
   });
   if (error) return 0;
   const row = Array.isArray(data) ? data[0] : data;
