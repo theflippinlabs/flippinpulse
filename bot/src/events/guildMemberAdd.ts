@@ -86,10 +86,11 @@ export async function handleGuildMemberAdd(member: GuildMember): Promise<void> {
 
   const { error } = await supabase.from('discord_users').upsert({
     discord_id: member.id,
+    guild_id: member.guild.id,
     username: member.user.username,
     avatar_url: member.user.displayAvatarURL({ size: 128 }),
     joined_at: new Date().toISOString(),
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'discord_id,guild_id' });
 
   if (error) {
     log('ERROR', `Failed to create user for ${member.id}`, error);

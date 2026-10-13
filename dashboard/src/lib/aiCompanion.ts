@@ -23,7 +23,7 @@ export async function getCompanion(discordId: string): Promise<AICompanion | nul
 export async function upsertCompanion(discordId: string, patch: Partial<AICompanion>): Promise<AICompanion | null> {
   const { data } = await sb()
     .from('ai_companions')
-    .upsert({ discord_id: discordId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'discord_id' })
+    .upsert({ discord_id: discordId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'discord_id,guild_id' })
     .select('*').maybeSingle();
   return (data as AICompanion) ?? null;
 }

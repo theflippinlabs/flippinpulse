@@ -1,5 +1,6 @@
 import { Client, Guild, GuildMember } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { config } from '../config.js';
 import { spendPulse } from './economy.js';
 import { log } from '../utils/logger.js';
 
@@ -45,9 +46,10 @@ export async function getCosmetics(discordId: string): Promise<UserCosmetics | n
 async function upsertCosmetics(discordId: string, patch: Partial<UserCosmetics>): Promise<void> {
   const { error } = await supabase.from('user_cosmetics').upsert({
     discord_id: discordId,
+    guild_id: config.GUILD_ID,
     ...patch,
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'discord_id,guild_id' });
   if (error) log('ERROR', `Failed to upsert cosmetics for ${discordId}`, error);
 }
 

@@ -1,5 +1,6 @@
 import { Client } from 'discord.js';
 import { supabase } from '../supabase.js';
+import { config } from '../config.js';
 import { earnPulse } from './games.js';
 import { log } from '../utils/logger.js';
 
@@ -17,8 +18,8 @@ export async function setBirthday(discordId: string, month: number, day: number)
   const maxDay = daysInMonth(month);
   if (day < 1 || day > maxDay) return { ok: false, error: 'invalid_day' };
   const { error } = await supabase.from('member_birthdays').upsert({
-    discord_id: discordId, birth_month: month, birth_day: day,
-  }, { onConflict: 'discord_id' });
+    discord_id: discordId, guild_id: config.GUILD_ID, birth_month: month, birth_day: day,
+  }, { onConflict: 'discord_id,guild_id' });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
