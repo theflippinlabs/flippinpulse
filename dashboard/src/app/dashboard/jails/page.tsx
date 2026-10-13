@@ -1,10 +1,10 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import JailsClient, { type Jail } from './JailsClient';
 
 export const dynamic = 'force-dynamic';
 
 async function loadJails(): Promise<Jail[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('jailed_members')
     .select('discord_id, guild_id, moderator_id, reason, jailed_at, expires_at')
     .order('jailed_at', { ascending: false });

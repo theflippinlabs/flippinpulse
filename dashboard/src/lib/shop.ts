@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { sb } from './guildScopedSupabase';
 import { atomicSpend, atomicEarn } from './atomicPulse';
 
 export type ShopCategory = 'role' | 'perk' | 'ticket' | 'cosmetic' | 'irl';
@@ -42,7 +42,7 @@ export interface Order {
 }
 
 export async function loadItems(includeInactive = false): Promise<ShopItem[]> {
-  const q = supabase
+  const q = sb()
     .from('shop_items')
     .select('id, name, description, category, price_pulse, stock_total, stock_remaining, max_per_user, cooldown_hours, is_active, auto_apply, image_url, metadata_json, created_at, updated_at')
     .order('category', { ascending: true })
@@ -58,7 +58,7 @@ export async function purchase(
   discordId: string,
   itemId: string,
 ): Promise<{ ok: true; newBalance: number; orderStatus: string; mysteryReward?: number } | { ok: false; error: string }> {
-  const { data: itemRaw } = await supabase
+  const { data: itemRaw } = await sb()
     .from('shop_items').select('*').eq('id', itemId).maybeSingle();
   const item = itemRaw as ShopItem | null;
   if (!item) return { ok: false, error: 'Article introuvable.' };
@@ -68,7 +68,7 @@ export async function purchase(
   }
 
   if (item.max_per_user) {
-    const { count } = await supabase
+    const { count } = await sb()
       .from('user_purchases').select('*', { count: 'exact', head: true })
       .eq('discord_id', discordId).eq('item_id', item.id);
     if ((count ?? 0) >= item.max_per_user) {
@@ -101,17 +101,17 @@ export async function purchase(
   }
 
   if (item.stock_remaining !== null) {
-    await supabase.from('shop_items').update({ stock_remaining: item.stock_remaining - 1 }).eq('id', item.id);
+    await sb().from('shop_items').update({ stock_remaining: item.stock_remaining - 1 }).eq('id', item.id);
   }
 
   const orderStatus = item.auto_apply ? 'FULFILLED' : 'PENDING';
-  await supabase.from('orders').insert({
+  await sb().from('orders').insert({
     discord_id: discordId,
     item_id: item.id,
     status: orderStatus,
     pulse_spent: item.price_pulse,
   });
-  await supabase.from('user_purchases').insert({
+  await sb().from('user_purchases').insert({
     discord_id: discordId,
     item_id: item.id,
   });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 const CATEGORIES = new Set(['role', 'perk', 'ticket', 'cosmetic', 'irl']);
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       auto_apply: item.auto_apply !== false,
       image_url: item.image_url ?? null,
     };
-    const { data, error } = await supabase.from('shop_items').insert(row).select('id').single();
+    const { data, error } = await sb().from('shop_items').insert(row).select('id').single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ id: data.id });
   }
@@ -79,14 +79,14 @@ export async function POST(req: NextRequest) {
     if (item.image_url !== undefined) patch.image_url = item.image_url ?? null;
     patch.updated_at = new Date().toISOString();
 
-    const { error } = await supabase.from('shop_items').update(patch).eq('id', item.id);
+    const { error } = await sb().from('shop_items').update(patch).eq('id', item.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'delete') {
     if (!item.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-    const { error } = await supabase.from('shop_items').delete().eq('id', item.id);
+    const { error } = await sb().from('shop_items').delete().eq('id', item.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

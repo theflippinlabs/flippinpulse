@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { sb } from './guildScopedSupabase';
 
 export interface AICompanion {
   discord_id: string;
@@ -16,12 +16,12 @@ export interface Message { role: 'user' | 'assistant'; content: string; }
 const HISTORY_LIMIT = 20;
 
 export async function getCompanion(discordId: string): Promise<AICompanion | null> {
-  const { data } = await supabase.from('ai_companions').select('*').eq('discord_id', discordId).maybeSingle();
+  const { data } = await sb().from('ai_companions').select('*').eq('discord_id', discordId).maybeSingle();
   return (data as AICompanion) ?? null;
 }
 
 export async function upsertCompanion(discordId: string, patch: Partial<AICompanion>): Promise<AICompanion | null> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('ai_companions')
     .upsert({ discord_id: discordId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'discord_id' })
     .select('*').maybeSingle();
@@ -29,18 +29,18 @@ export async function upsertCompanion(discordId: string, patch: Partial<AICompan
 }
 
 export async function loadHistory(discordId: string): Promise<Message[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('ai_companion_messages').select('role, content')
     .eq('discord_id', discordId).order('created_at', { ascending: false }).limit(HISTORY_LIMIT);
   return ((data ?? []) as Message[]).reverse();
 }
 
 export async function appendMessage(discordId: string, role: 'user' | 'assistant', content: string): Promise<void> {
-  await supabase.from('ai_companion_messages').insert({ discord_id: discordId, role, content });
+  await sb().from('ai_companion_messages').insert({ discord_id: discordId, role, content });
 }
 
 export async function clearHistory(discordId: string): Promise<void> {
-  await supabase.from('ai_companion_messages').delete().eq('discord_id', discordId);
+  await sb().from('ai_companion_messages').delete().eq('discord_id', discordId);
 }
 
 export function buildSystem(c: AICompanion, userName: string): string {

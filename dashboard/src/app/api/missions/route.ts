@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 const ALLOWED_KINDS = new Set(['flash', 'riddle', 'daily', 'weekly']);
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!body.kind || !ALLOWED_KINDS.has(body.kind)) {
       return NextResponse.json({ error: 'bad kind' }, { status: 400 });
     }
-    const { error } = await supabase.from('dashboard_commands').insert({
+    const { error } = await sb().from('dashboard_commands').insert({
       command: 'launch_mission',
       payload_json: { kind: body.kind },
       status: 'pending',
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === 'end_all') {
-    const { error } = await supabase.from('dashboard_commands').insert({
+    const { error } = await sb().from('dashboard_commands').insert({
       command: 'end_all_missions',
       payload_json: {},
       status: 'pending',

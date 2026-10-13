@@ -1,11 +1,11 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 import MissionsClient, { type Mission } from './MissionsClient';
 
 export const dynamic = 'force-dynamic';
 
 async function load(): Promise<Mission[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('pulse_challenges')
     .select('id, kind, title, reward, goal, metric, winners_count, expires_at')
     .eq('status', 'active')

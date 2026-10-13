@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { sb } from './guildScopedSupabase';
 import { atomicSpend, atomicEarn } from './atomicPulse';
 
 export interface Season {
@@ -42,7 +42,7 @@ export function tierFromXP(xp: number, season: Season): number {
 }
 
 export async function loadSeasonWithTiersAndProgress(discordId: string) {
-  const { data: season } = await supabase
+  const { data: season } = await sb()
     .from('battle_pass_seasons')
     .select('*')
     .eq('is_active', true)
@@ -51,8 +51,8 @@ export async function loadSeasonWithTiersAndProgress(discordId: string) {
     .maybeSingle();
   if (!season) return null;
   const [{ data: tiers }, { data: prog }] = await Promise.all([
-    supabase.from('battle_pass_tiers').select('*').eq('season_id', season.id).order('tier_number', { ascending: true }),
-    supabase.from('battle_pass_progress').select('*').eq('discord_id', discordId).eq('season_id', season.id).maybeSingle(),
+    sb().from('battle_pass_tiers').select('*').eq('season_id', season.id).order('tier_number', { ascending: true }),
+    sb().from('battle_pass_progress').select('*').eq('discord_id', discordId).eq('season_id', season.id).maybeSingle(),
   ]);
   return {
     season: season as Season,
@@ -64,7 +64,7 @@ export async function loadSeasonWithTiersAndProgress(discordId: string) {
 }
 
 async function upsertProgress(p: Progress): Promise<void> {
-  await supabase
+  await sb()
     .from('battle_pass_progress')
     .upsert({ ...p, updated_at: new Date().toISOString() }, { onConflict: 'discord_id,season_id' });
 }
@@ -115,11 +115,11 @@ async function grantNonPulseOrPulse(
     const cosmeticKey = String(value.key ?? '');
     const label = String(value.label ?? cosmeticKey);
     if (cosmeticKey) {
-      await supabase.from('member_owned_cosmetics').upsert({
+      await sb().from('member_owned_cosmetics').upsert({
         discord_id: discordId, cosmetic_key: cosmeticKey, label, source: 'battle_pass',
       }, { onConflict: 'discord_id,cosmetic_key' });
     }
-    await supabase.from('reward_grants_ledger').insert({
+    await sb().from('reward_grants_ledger').insert({
       discord_id: discordId, source: 'battle_pass', kind: 'cosmetic',
       payload_json: { key: cosmeticKey, label, reason, ref: refId },
     });
@@ -127,7 +127,7 @@ async function grantNonPulseOrPulse(
   }
   // role / shop_item / xp_boost — the web has no Discord client, so we queue
   // the intent in the ledger. The bot process reconciles.
-  await supabase.from('reward_grants_ledger').insert({
+  await sb().from('reward_grants_ledger').insert({
     discord_id: discordId, source: 'battle_pass', kind,
     payload_json: { value, reason, ref: refId, fulfillment: kind === 'shop_item' ? 'pending' : 'web_queued' },
   });

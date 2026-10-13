@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import AutomodForm, { type ModConfig } from './AutomodForm';
@@ -17,7 +17,7 @@ const DEFAULTS: ModConfig = {
 };
 
 async function load(): Promise<ModConfig> {
-  const { data } = await supabase.from('settings').select('value_json').eq('key', 'mod_config').maybeSingle();
+  const { data } = await sb().from('settings').select('value_json').eq('key', 'mod_config').maybeSingle();
   const raw = (data?.value_json as Partial<ModConfig>) ?? {};
   return {
     ...DEFAULTS,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const userAgent = req.headers.get('user-agent') ?? '';
   if (!endpoint || !p256dh || !auth) return NextResponse.json({ error: 'bad_payload' }, { status: 400 });
 
-  const { error } = await supabase.from('push_subscriptions').upsert({
+  const { error } = await sb().from('push_subscriptions').upsert({
     discord_id: session.id,
     endpoint,
     p256dh,

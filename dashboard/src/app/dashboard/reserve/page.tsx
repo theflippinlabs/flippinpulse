@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import ReserveClient, { type MemberOption } from './ReserveClient';
@@ -18,15 +18,15 @@ interface RecentGiveaway {
 async function loadReserveStats() {
   const [totalMinted, totalInWallets, giveaways, memberCount, members] = await Promise.all([
     // Every positive pulse_transactions row is PULSE that entered the economy.
-    supabase.from('pulse_transactions').select('amount').gt('amount', 0),
-    supabase.from('discord_users').select('balance_pulse'),
-    supabase
+    sb().from('pulse_transactions').select('amount').gt('amount', 0),
+    sb().from('discord_users').select('balance_pulse'),
+    sb()
       .from('giveaways')
       .select('id, prize, prize_pulse, winners_count, status, end_at, created_at')
       .order('created_at', { ascending: false })
       .limit(6),
-    supabase.from('discord_users').select('*', { count: 'exact', head: true }),
-    supabase
+    sb().from('discord_users').select('*', { count: 'exact', head: true }),
+    sb()
       .from('discord_users')
       .select('discord_id, username, avatar_url, balance_pulse')
       .order('points_total', { ascending: false })

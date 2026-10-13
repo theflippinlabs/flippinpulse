@@ -48,9 +48,12 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
     const pulseEarned = await applyDailyCap(discordId, rawPulse);
     const newBalance = currentBalance + pulseEarned;
 
-    // Upsert discord_users
+    // Upsert discord_users — carry the guild id so a user with accounts
+    // in several Novarys-equipped servers has one row per server, not a
+    // shared row that leaks balances across them.
     await supabase.from('discord_users').upsert({
       discord_id: discordId,
+      guild_id: guild.id,
       username,
       avatar_url: avatarUrl,
       points_total: newTotal,
@@ -64,6 +67,7 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
     // Insert activity event
     await supabase.from('activity_events').insert({
       discord_id: discordId,
+      guild_id: guild.id,
       type,
       channel_id: channelId,
       points_awarded: points,
@@ -74,6 +78,7 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
       const txType = type === 'voice' ? 'EARN_VOICE' : type === 'event' ? 'EARN_EVENT' : 'EARN_EVENT';
       await supabase.from('pulse_transactions').insert({
         discord_id: discordId,
+        guild_id: guild.id,
         type: txType,
         amount: pulseEarned,
         reason: `${type} activity`,

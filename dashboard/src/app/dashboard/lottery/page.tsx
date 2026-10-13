@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import LotteryActions from './LotteryActions';
@@ -18,9 +18,9 @@ interface Round {
 
 async function load(): Promise<{ current: Round | null; recent: Round[]; announceChannel: string | null }> {
   const [cur, past, cfg] = await Promise.all([
-    supabase.from('lottery_rounds').select('*').eq('status', 'active').maybeSingle(),
-    supabase.from('lottery_rounds').select('*').eq('status', 'drawn').order('created_at', { ascending: false }).limit(20),
-    supabase.from('settings').select('value_json').eq('key', 'lottery_config').maybeSingle(),
+    sb().from('lottery_rounds').select('*').eq('status', 'active').maybeSingle(),
+    sb().from('lottery_rounds').select('*').eq('status', 'drawn').order('created_at', { ascending: false }).limit(20),
+    sb().from('settings').select('value_json').eq('key', 'lottery_config').maybeSingle(),
   ]);
   const conf = (cfg.data?.value_json as { announce_channel_id?: string | null } | null) ?? {};
   return {

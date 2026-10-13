@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { sb } from './guildScopedSupabase';
 import type { Card, Rarity } from './tcgShared';
 import { PACK_COST, PACK_SIZE, NEXT_RARITY, SELL_VALUE, MAX_LEVEL, MERGE_COST_COPIES } from './tcgShared';
 import { atomicSpend, atomicEarn } from './atomicPulse';
@@ -18,7 +18,7 @@ export interface CardBattleRow {
 }
 
 export async function getRecentCardBattles(discordId: string, limit = 10): Promise<CardBattleRow[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('tcg_battles')
     .select('id, attacker_id, defender_id, winner_id, attacker_card, defender_card, pulse_wagered, created_at')
     .or(`attacker_id.eq.${discordId},defender_id.eq.${discordId}`)
@@ -32,14 +32,14 @@ const WEIGHTS: Record<Rarity, number> = {
 };
 
 export async function loadCatalog(): Promise<Card[]> {
-  const { data } = await supabase.from('tcg_cards').select('*').eq('is_active', true);
+  const { data } = await sb().from('tcg_cards').select('*').eq('is_active', true);
   return (data ?? []) as Card[];
 }
 
 // Per-level ownership map: (cardId → (level → quantity)). The web app uses
 // this to render each equipment stack at its actual level.
 export async function loadCollectionLevels(discordId: string): Promise<Map<number, Map<number, number>>> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('tcg_collection')
     .select('card_id, level, quantity')
     .eq('discord_id', discordId);
@@ -98,10 +98,10 @@ export async function openPack(discordId: string): Promise<{ ok: boolean; error?
   }
 
   const ids = [...new Set(pulls.map(p => p.card.id))];
-  const { data: anyLevel } = await supabase.from('tcg_collection').select('card_id').eq('discord_id', discordId).in('card_id', ids);
+  const { data: anyLevel } = await sb().from('tcg_collection').select('card_id').eq('discord_id', discordId).in('card_id', ids);
   const knewBefore = new Set<number>((anyLevel ?? []).map(r => r.card_id as number));
 
-  const { data: existingLv1 } = await supabase
+  const { data: existingLv1 } = await sb()
     .from('tcg_collection').select('card_id, quantity')
     .eq('discord_id', discordId).eq('level', 1).in('card_id', ids);
   const ownedLv1 = new Map<number, number>((existingLv1 ?? []).map(r => [r.card_id as number, r.quantity as number]));
@@ -110,11 +110,11 @@ export async function openPack(discordId: string): Promise<{ ok: boolean; error?
   for (const p of pulls) counts.set(p.card.id, (counts.get(p.card.id) ?? 0) + 1);
   for (const [cardId, qty] of counts) {
     if (ownedLv1.has(cardId)) {
-      await supabase.from('tcg_collection')
+      await sb().from('tcg_collection')
         .update({ quantity: (ownedLv1.get(cardId) ?? 0) + qty })
         .eq('discord_id', discordId).eq('card_id', cardId).eq('level', 1);
     } else {
-      await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: cardId, level: 1, quantity: qty });
+      await sb().from('tcg_collection').insert({ discord_id: discordId, card_id: cardId, level: 1, quantity: qty });
     }
   }
 
@@ -137,11 +137,11 @@ async function credit(discordId: string, amount: number, reason: string): Promis
 // last copy across all levels is always protected.
 export async function sellCards(discordId: string, cardId: number, quantity: number): Promise<SellResult> {
   const qty = Math.max(1, Math.floor(quantity));
-  const { data: card } = await supabase.from('tcg_cards').select('*').eq('id', cardId).maybeSingle();
+  const { data: card } = await sb().from('tcg_cards').select('*').eq('id', cardId).maybeSingle();
   if (!card) return { ok: false, error: 'card_not_found' };
   const rarity = (card as Card).rarity;
 
-  const { data: rows } = await supabase
+  const { data: rows } = await sb()
     .from('tcg_collection').select('quantity, level')
     .eq('discord_id', discordId).eq('card_id', cardId);
   const totalOwned = (rows ?? []).reduce((s, r) => s + (r.quantity as number), 0);
@@ -157,9 +157,9 @@ export async function sellCards(discordId: string, cardId: number, quantity: num
     const have = r.quantity as number;
     const take = Math.min(have, remaining);
     if (take === have) {
-      await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', cardId).eq('level', r.level);
+      await sb().from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', cardId).eq('level', r.level);
     } else {
-      await supabase.from('tcg_collection').update({ quantity: have - take }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', r.level);
+      await sb().from('tcg_collection').update({ quantity: have - take }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', r.level);
     }
     remaining -= take;
   }
@@ -186,7 +186,7 @@ export async function fuse(discordId: string, cardIds: number[]): Promise<FuseRe
   const counts = new Map<number, number>();
   for (const c of inputs) counts.set(c.id, (counts.get(c.id) ?? 0) + 1);
   const ids = [...counts.keys()];
-  const { data: owned } = await supabase.from('tcg_collection')
+  const { data: owned } = await sb().from('tcg_collection')
     .select('card_id, quantity')
     .eq('discord_id', discordId).eq('level', 1).in('card_id', ids);
   const ownedMap = new Map((owned ?? []).map(r => [r.card_id, r.quantity as number]));
@@ -196,17 +196,17 @@ export async function fuse(discordId: string, cardIds: number[]): Promise<FuseRe
   for (const [id, need] of counts) {
     const cur = ownedMap.get(id)!;
     const next = cur - need;
-    if (next <= 0) await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', id).eq('level', 1);
-    else await supabase.from('tcg_collection').update({ quantity: next }).eq('discord_id', discordId).eq('card_id', id).eq('level', 1);
+    if (next <= 0) await sb().from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', id).eq('level', 1);
+    else await sb().from('tcg_collection').update({ quantity: next }).eq('discord_id', discordId).eq('card_id', id).eq('level', 1);
   }
   const targetPool = catalog.filter(c => c.rarity === target && c.card_kind === 'character');
   if (!targetPool.length) return { ok: false, error: 'no_target_pool' };
   const rolled = targetPool[Math.floor(Math.random() * targetPool.length)];
-  const { data: existing } = await supabase.from('tcg_collection')
+  const { data: existing } = await sb().from('tcg_collection')
     .select('quantity')
     .eq('discord_id', discordId).eq('card_id', rolled.id).eq('level', 1).maybeSingle();
-  if (existing) await supabase.from('tcg_collection').update({ quantity: (existing.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', rolled.id).eq('level', 1);
-  else await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: rolled.id, level: 1, quantity: 1 });
+  if (existing) await sb().from('tcg_collection').update({ quantity: (existing.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', rolled.id).eq('level', 1);
+  else await sb().from('tcg_collection').insert({ discord_id: discordId, card_id: rolled.id, level: 1, quantity: 1 });
   return { ok: true, consumed: inputs, result: rolled };
 }
 
@@ -214,14 +214,14 @@ export async function fuse(discordId: string, cardIds: number[]): Promise<FuseRe
 export interface UpgradeResult { ok: boolean; error?: string; card?: Card; fromLevel?: number; toLevel?: number; }
 
 export async function upgradeEquipment(discordId: string, cardId: number, fromLevel: number): Promise<UpgradeResult> {
-  const { data: card } = await supabase.from('tcg_cards').select('*').eq('id', cardId).maybeSingle();
+  const { data: card } = await sb().from('tcg_cards').select('*').eq('id', cardId).maybeSingle();
   if (!card) return { ok: false, error: 'card_not_found' };
   if ((card as Card).card_kind !== 'equipment') return { ok: false, error: 'not_an_equipment' };
   const from = Math.floor(fromLevel);
   if (from < 1 || from >= MAX_LEVEL) return { ok: false, error: 'bad_level' };
   const to = from + 1;
 
-  const { data: row } = await supabase.from('tcg_collection')
+  const { data: row } = await sb().from('tcg_collection')
     .select('quantity')
     .eq('discord_id', discordId).eq('card_id', cardId).eq('level', from).maybeSingle();
   const have = (row?.quantity as number) ?? 0;
@@ -229,17 +229,17 @@ export async function upgradeEquipment(discordId: string, cardId: number, fromLe
 
   const newFromQty = have - MERGE_COST_COPIES;
   if (newFromQty <= 0) {
-    await supabase.from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', cardId).eq('level', from);
+    await sb().from('tcg_collection').delete().eq('discord_id', discordId).eq('card_id', cardId).eq('level', from);
   } else {
-    await supabase.from('tcg_collection').update({ quantity: newFromQty }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', from);
+    await sb().from('tcg_collection').update({ quantity: newFromQty }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', from);
   }
-  const { data: dest } = await supabase.from('tcg_collection')
+  const { data: dest } = await sb().from('tcg_collection')
     .select('quantity')
     .eq('discord_id', discordId).eq('card_id', cardId).eq('level', to).maybeSingle();
   if (dest) {
-    await supabase.from('tcg_collection').update({ quantity: (dest.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', to);
+    await sb().from('tcg_collection').update({ quantity: (dest.quantity as number) + 1 }).eq('discord_id', discordId).eq('card_id', cardId).eq('level', to);
   } else {
-    await supabase.from('tcg_collection').insert({ discord_id: discordId, card_id: cardId, level: to, quantity: 1 });
+    await sb().from('tcg_collection').insert({ discord_id: discordId, card_id: cardId, level: to, quantity: 1 });
   }
   return { ok: true, card: card as Card, fromLevel: from, toLevel: to };
 }

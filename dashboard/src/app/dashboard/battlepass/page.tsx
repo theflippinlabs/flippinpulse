@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 
 export const dynamic = 'force-dynamic';
@@ -26,14 +26,14 @@ interface ProgressRow {
 }
 
 async function load() {
-  const { data: season } = await supabase
+  const { data: season } = await sb()
     .from('battle_pass_seasons')
     .select('*').eq('is_active', true).order('id', { ascending: false }).limit(1).maybeSingle();
   const seasonRow = season as Season | null;
   if (!seasonRow) return null;
   const [{ data: progress }, { data: members }] = await Promise.all([
-    supabase.from('battle_pass_progress').select('*').eq('season_id', seasonRow.id).order('xp', { ascending: false }).limit(50),
-    supabase.from('discord_users').select('discord_id, username, avatar_url'),
+    sb().from('battle_pass_progress').select('*').eq('season_id', seasonRow.id).order('xp', { ascending: false }).limit(50),
+    sb().from('discord_users').select('discord_id, username, avatar_url'),
   ]);
   const memberMap = new Map((members ?? []).map(m => [m.discord_id, m as { username: string; avatar_url: string | null }]));
   const rows = (progress ?? []) as ProgressRow[];

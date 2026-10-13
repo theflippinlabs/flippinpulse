@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { sb } from './guildScopedSupabase';
 import { ADOPTION_COST, FEED_COST, TRAIN_COST, SPECIES, type Pet, type SpeciesKey } from './petsShared';
 import { atomicSpend, atomicEarn } from './atomicPulse';
 
@@ -19,12 +19,12 @@ function decay(p: Pet): Pet {
 }
 
 export async function getActivePet(discordId: string): Promise<Pet | null> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('pets').select('*').eq('discord_id', discordId).eq('is_active', true).limit(1).maybeSingle();
   if (!data) return null;
   const p = decay(data as Pet);
   if (p.hunger !== data.hunger || p.energy !== data.energy || p.happiness !== data.happiness || p.health !== data.health) {
-    await supabase.from('pets').update({
+    await sb().from('pets').update({
       hunger: p.hunger, energy: p.energy, happiness: p.happiness, health: p.health, last_ticked_at: p.last_ticked_at,
     }).eq('id', p.id).then(() => null, () => null);
   }
@@ -61,7 +61,7 @@ export async function adoptPet(discordId: string, species: SpeciesKey, name: str
   if (trimmed.length < 2) return { ok: false, error: 'name_too_short' };
   const d = await debit(discordId, ADOPTION_COST, `Pet adoption: ${trimmed}`);
   if (!d.ok) return { ok: false, error: d.error };
-  const { data, error } = await supabase.from('pets').insert({ discord_id: discordId, name: trimmed, species: sp.key, emoji: sp.emoji }).select('*').single();
+  const { data, error } = await sb().from('pets').insert({ discord_id: discordId, name: trimmed, species: sp.key, emoji: sp.emoji }).select('*').single();
   if (error || !data) return { ok: false, error: error?.message ?? 'adoption_failed' };
   return { ok: true, pet: data as Pet };
 }
@@ -69,7 +69,7 @@ export async function adoptPet(discordId: string, species: SpeciesKey, name: str
 export async function retirePet(discordId: string): Promise<{ ok: boolean; refund: number; error?: string }> {
   const p = await getActivePet(discordId);
   if (!p) return { ok: false, refund: 0, error: 'no_pet' };
-  await supabase.from('pets').update({ is_active: false }).eq('id', p.id);
+  await sb().from('pets').update({ is_active: false }).eq('id', p.id);
   const refund = Math.floor(ADOPTION_COST / 4);
   await credit(discordId, refund, `Pet retirement: ${p.name}`);
   return { ok: true, refund };
@@ -93,7 +93,7 @@ export async function actionOnPet(discordId: string, action: 'feed' | 'play' | '
     const d = await debit(discordId, FEED_COST, `Feed pet ${p.name}`);
     if (!d.ok) return { ok: false, error: d.error };
     const next = gainXP({ ...p, hunger: Math.min(100, p.hunger + 30), happiness: Math.min(100, p.happiness + 5), last_fed_at: new Date().toISOString() }, 5);
-    await supabase.from('pets').update({ hunger: next.hunger, happiness: next.happiness, xp: next.xp, level: next.level, health: next.health, last_fed_at: next.last_fed_at }).eq('id', p.id);
+    await sb().from('pets').update({ hunger: next.hunger, happiness: next.happiness, xp: next.xp, level: next.level, health: next.health, last_fed_at: next.last_fed_at }).eq('id', p.id);
     return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: FEED_COST,
       delta: { hunger: next.hunger - p.hunger, happiness: next.happiness - p.happiness, xp: 5 } };
   }
@@ -101,7 +101,7 @@ export async function actionOnPet(discordId: string, action: 'feed' | 'play' | '
     if (cooldownRemaining(p.last_played_at, 60) > 0) return { ok: false, error: 'cooldown' };
     if (p.energy < 20) return { ok: false, error: 'too_tired' };
     const next = gainXP({ ...p, happiness: Math.min(100, p.happiness + 25), energy: Math.max(0, p.energy - 15), last_played_at: new Date().toISOString() }, 8);
-    await supabase.from('pets').update({ happiness: next.happiness, energy: next.energy, xp: next.xp, level: next.level, health: next.health, last_played_at: next.last_played_at }).eq('id', p.id);
+    await sb().from('pets').update({ happiness: next.happiness, energy: next.energy, xp: next.xp, level: next.level, health: next.health, last_played_at: next.last_played_at }).eq('id', p.id);
     return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: 0,
       delta: { happiness: next.happiness - p.happiness, energy: next.energy - p.energy, xp: 8 } };
   }
@@ -111,7 +111,7 @@ export async function actionOnPet(discordId: string, action: 'feed' | 'play' | '
     const d = await debit(discordId, TRAIN_COST, `Train pet ${p.name}`);
     if (!d.ok) return { ok: false, error: d.error };
     const next = gainXP({ ...p, energy: Math.max(0, p.energy - 20), last_trained_at: new Date().toISOString() }, 30);
-    await supabase.from('pets').update({ energy: next.energy, xp: next.xp, level: next.level, health: next.health, last_trained_at: next.last_trained_at }).eq('id', p.id);
+    await sb().from('pets').update({ energy: next.energy, xp: next.xp, level: next.level, health: next.health, last_trained_at: next.last_trained_at }).eq('id', p.id);
     return { ok: true, pet: next, leveledUp: next.level > prevLevel, cost: TRAIN_COST,
       delta: { energy: next.energy - p.energy, xp: 30 } };
   }
@@ -119,7 +119,7 @@ export async function actionOnPet(discordId: string, action: 'feed' | 'play' | '
 }
 
 export async function getRecentBattles(petId: number, limit = 10) {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('pet_battles').select('id, winner_pet_id, pulse_wagered, log_json, created_at')
     .or(`attacker_pet_id.eq.${petId},defender_pet_id.eq.${petId}`)
     .order('created_at', { ascending: false })

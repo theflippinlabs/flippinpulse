@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import BackLink from '../BackLink';
 
 export const dynamic = 'force-dynamic';
@@ -16,14 +16,14 @@ interface CompanionRow {
 interface MessageCountRow { discord_id: string; count: number; }
 
 async function load() {
-  const { data: companions } = await supabase.from('ai_companions').select('*').eq('is_active', true).order('created_at', { ascending: false });
+  const { data: companions } = await sb().from('ai_companions').select('*').eq('is_active', true).order('created_at', { ascending: false });
   const rows = (companions ?? []) as CompanionRow[];
-  const { data: members } = await supabase.from('discord_users').select('discord_id, username');
+  const { data: members } = await sb().from('discord_users').select('discord_id, username');
   const memberMap = new Map((members ?? []).map(m => [m.discord_id, (m as { username: string }).username]));
 
   // Message volume per companion (client-side aggregation, since Supabase JS
   // doesn't easily expose group-by counts).
-  const { data: msgs } = await supabase.from('ai_companion_messages').select('discord_id').limit(10_000);
+  const { data: msgs } = await sb().from('ai_companion_messages').select('discord_id').limit(10_000);
   const msgCount = new Map<string, number>();
   for (const m of (msgs ?? [])) msgCount.set(m.discord_id as string, (msgCount.get(m.discord_id as string) ?? 0) + 1);
   const messageRows: MessageCountRow[] = rows.map(r => ({ discord_id: r.discord_id, count: msgCount.get(r.discord_id) ?? 0 }));

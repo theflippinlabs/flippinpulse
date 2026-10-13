@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import NovusForm, { type PulsarConfig } from './NovusForm';
@@ -22,7 +22,7 @@ const DEFAULTS: PulsarConfig = {
 };
 
 async function load(): Promise<PulsarConfig> {
-  const { data } = await supabase.from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle();
+  const { data } = await sb().from('settings').select('value_json').eq('key', 'pulsar_config').maybeSingle();
   const stored = (data?.value_json as Partial<PulsarConfig>) ?? {};
   return { ...DEFAULTS, ...stored };
 }

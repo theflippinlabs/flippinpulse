@@ -1,21 +1,23 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { scopedSupabase } from '@/lib/guildScopedSupabase';
+import { currentGuildId } from '@/lib/guildContext';
 import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
 async function loadMemberStats(discordId: string) {
+  const sb = scopedSupabase(currentGuildId());
   const [me, activeTournois, lotteryRound, activeMissions, activeGiveaways, activeSagas, activeHunts, upcomingEvents] = await Promise.all([
-    supabase.from('discord_users').select('username, balance_pulse, points_total, points_week, rank_name, streak').eq('discord_id', discordId).maybeSingle(),
-    supabase.from('tournaments').select('*', { count: 'exact', head: true }).in('status', ['open', 'running']),
-    supabase.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
-    supabase.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('giveaways').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('sagas').select('*', { count: 'exact', head: true }).eq('status', 'running'),
-    supabase.from('treasure_hunts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('server_events').select('*', { count: 'exact', head: true }).eq('status', 'scheduled'),
+    sb.from('discord_users').select('username, balance_pulse, points_total, points_week, rank_name, streak').eq('discord_id', discordId).maybeSingle(),
+    sb.from('tournaments').select('*', { count: 'exact', head: true }).in('status', ['open', 'running']),
+    sb.from('lottery_rounds').select('pot_pulse').eq('status', 'active').maybeSingle(),
+    sb.from('pulse_challenges').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    sb.from('giveaways').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    sb.from('sagas').select('*', { count: 'exact', head: true }).eq('status', 'running'),
+    sb.from('treasure_hunts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    sb.from('server_events').select('*', { count: 'exact', head: true }).eq('status', 'scheduled'),
   ]);
   return {
     me: (me.data as { username: string; balance_pulse: number; points_total: number; points_week: number; rank_name: string | null; streak: number } | null) ?? null,

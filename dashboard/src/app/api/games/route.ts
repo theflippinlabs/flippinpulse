@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'game_key and enabled required' }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { error } = await sb()
     .from('games_config')
     .update({ is_enabled: enabled, updated_at: new Date().toISOString() })
     .eq('game_key', key);

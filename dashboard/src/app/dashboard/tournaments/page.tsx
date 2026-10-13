@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { sb } from '@/lib/guildScopedSupabase';
 import { loadChannels } from '@/lib/channels';
 import BackLink from '../BackLink';
 import LaunchForm from './LaunchForm';
@@ -18,7 +18,7 @@ interface Tour {
 }
 
 async function loadTournaments(): Promise<Tour[]> {
-  const { data } = await supabase
+  const { data } = await sb()
     .from('tournaments')
     .select('id, title, status, buy_in, pot_pulse, max_players, winner_id, created_at, ended_at')
     .order('created_at', { ascending: false })
@@ -28,7 +28,7 @@ async function loadTournaments(): Promise<Tour[]> {
 
 async function playerCounts(ids: string[]): Promise<Map<string, number>> {
   if (!ids.length) return new Map();
-  const { data } = await supabase
+  const { data } = await sb()
     .from('tournament_players')
     .select('tournament_id')
     .in('tournament_id', ids);
