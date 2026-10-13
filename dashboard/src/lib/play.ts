@@ -1,12 +1,12 @@
 import { supabase } from './supabase';
+import { tryCurrentGuildId } from './guildContext';
 
-// Fetch balance for a member.
+// Fetch balance for a member in the current guild context.
 export async function getBalance(discordId: string): Promise<number> {
-  const { data } = await supabase
-    .from('discord_users')
-    .select('balance_pulse')
-    .eq('discord_id', discordId)
-    .maybeSingle();
+  const guildId = tryCurrentGuildId();
+  let q = supabase.from('discord_users').select('balance_pulse').eq('discord_id', discordId);
+  if (guildId) q = q.eq('guild_id', guildId);
+  const { data } = await q.maybeSingle();
   return (data as { balance_pulse?: number } | null)?.balance_pulse ?? 0;
 }
 
@@ -25,6 +25,7 @@ export async function settleBet(
     p_game_key: gameKey,
     p_bet: Math.max(0, Math.floor(bet)),
     p_payout: Math.max(0, Math.floor(payout)),
+    p_guild_id: tryCurrentGuildId(),
   });
   if (error) {
     return { ok: false, error: error.message, balance: 0 };
