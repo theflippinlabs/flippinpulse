@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { timingSafeEqual } from 'node:crypto';
 import { isAdmin, setSessionCookie, type SessionGuild } from '@/lib/auth';
+import { GUILD_COOKIE } from '@/lib/guildContext';
+import { resolveMemberGuild } from '@/lib/memberGuild';
 
 const STATE_COOKIE = 'novarys_oauth_state';
 // Discord permission bit — leave in hex for readability. 0x20 = MANAGE_GUILD.
@@ -123,6 +125,25 @@ export async function GET(req: NextRequest) {
     iat: Date.now(),
     adminGuilds,
   });
+
+  // Seed the active-guild cookie right now, in a Route Handler where
+  // cookies().set() is allowed (a Server Component layout can't do it).
+  //   - Lord with admin guilds → first one.
+  //   - Pure member → their most-recently-active discord_users row.
+  // Falls through silently if we can't resolve either; currentGuildId()'s
+  // own env fallback kicks in on the next request.
+  let activeGuild: string | null = adminGuilds[0]?.id ?? null;
+  if (!activeGuild) {
+    try { activeGuild = await resolveMemberGuild(user.id); } catch { /* ignore */ }
+  }
+  if (activeGuild) {
+    cookies().set({
+      name: GUILD_COOKIE, value: activeGuild,
+      httpOnly: true, sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/', maxAge: 60 * 60 * 24 * 30,
+    });
+  }
 
   // Routing priority: legacy env Lord → /dashboard. New Lord with at least
   // one admin guild → /dashboard (so they can install the bot there). Pure
