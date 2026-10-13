@@ -4,11 +4,22 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 const COOKIE_NAME = 'novarys_session';
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+export interface SessionGuild {
+  id: string;
+  name: string;
+  icon: string | null;
+}
+
 export interface SessionPayload {
   id: string;
   username: string;
   avatar: string | null;
   iat: number;
+  // Guilds where the user has MANAGE_GUILD (or is owner). Populated at
+  // OAuth callback from /users/@me/guilds, filtered to admin guilds only
+  // to keep the cookie under the 4 KB limit. Members (non-admin) aren't
+  // stored here — they land on /app and don't need guild awareness yet.
+  adminGuilds?: SessionGuild[];
 }
 
 function secret(): string {
@@ -68,6 +79,23 @@ export function getSession(): SessionPayload | null {
 export function isAdmin(userId: string): boolean {
   const ids = (process.env.DASHBOARD_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
   return ids.includes(userId);
+}
+
+// Returns true when the current session can administrate the given guild.
+// A session can administrate a guild when the guild appears in its
+// adminGuilds list — which only ever contains guilds where the user is
+// the owner or holds MANAGE_GUILD. The legacy env-based isAdmin() is kept
+// as a fallback so the original single-tenant hard-coded Lord ids still
+// pass; new Lords get in strictly through the per-guild gate.
+export function canManageGuild(session: SessionPayload | null, guildId: string | null | undefined): boolean {
+  if (!session || !guildId) return false;
+  if (isAdmin(session.id)) return true;
+  return (session.adminGuilds ?? []).some(g => g.id === guildId);
+}
+
+// All guilds the current session can administrate. For the guild switcher.
+export function sessionAdminGuilds(session: SessionPayload | null): SessionGuild[] {
+  return session?.adminGuilds ?? [];
 }
 
 // Any signed-in Discord user is a member. Used by the /app member area and

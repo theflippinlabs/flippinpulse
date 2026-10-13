@@ -79,6 +79,35 @@ client.once('ready', async () => {
   startDashboardBridge(client);
   startChannelSync(client);
 
+  // Backfill guild_installs for every guild the bot is already in on
+  // startup. guildCreate only fires on a NEW install; without this the
+  // original single-tenant deployment would never appear in the dashboard
+  // guild switcher.
+  void (async () => {
+    try {
+      const { supabase: db } = await import('./supabase.js');
+      for (const [, g] of client.guilds.cache) {
+        try {
+          const owner = await g.fetchOwner().catch(() => null);
+          if (!owner) continue;
+          await db.from('guild_installs').upsert({
+            guild_id:     g.id,
+            owner_id:     owner.id,
+            guild_name:   g.name,
+            guild_icon:   g.iconURL({ size: 128 }),
+            member_count: g.memberCount,
+            is_active:    true,
+            removed_at:   null,
+          }, { onConflict: 'guild_id' });
+        } catch (err) {
+          log('WARN', `guild_installs backfill failed for ${g.id}`, err);
+        }
+      }
+    } catch (err) {
+      log('ERROR', 'guild_installs startup backfill crashed', err);
+    }
+  })();
+
   // Birthday sweep: runs once at startup and then every hour. The service
   // internally skips members already celebrated for the current year, so
   // hourly ticks are cheap and cost nothing if nobody has a birthday today.

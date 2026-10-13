@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LocaleContext, type Locale } from '@/lib/i18n-client';
 import LocaleToggle from '../app/LocaleToggle';
+import GuildSwitcher, { type GuildOption } from './GuildSwitcher';
 
 const NAV_LEFT = [
   { href: '/dashboard', label: 'Home', emoji: '🏠' },
@@ -39,6 +40,9 @@ interface Props {
   username: string;
   avatarUrl: string | null;
   locale: Locale;
+  guilds: GuildOption[];
+  activeGuildId: string | null;
+  installUrlBase?: string | null;
   children: React.ReactNode;
 }
 
@@ -51,15 +55,30 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-export default function DashboardShell({ username, avatarUrl, locale, children }: Props) {
+export default function DashboardShell({ username, avatarUrl, locale, guilds, activeGuildId, installUrlBase, children }: Props) {
   return (
     <LocaleContext.Provider value={locale}>
-      <ShellInner username={username} avatarUrl={avatarUrl}>{children}</ShellInner>
+      <ShellInner
+        username={username}
+        avatarUrl={avatarUrl}
+        guilds={guilds}
+        activeGuildId={activeGuildId}
+        installUrlBase={installUrlBase ?? null}
+      >
+        {children}
+      </ShellInner>
     </LocaleContext.Provider>
   );
 }
 
-function ShellInner({ username, avatarUrl, children }: { username: string; avatarUrl: string | null; children: React.ReactNode }) {
+function ShellInner({ username, avatarUrl, guilds, activeGuildId, installUrlBase, children }: {
+  username: string;
+  avatarUrl: string | null;
+  guilds: GuildOption[];
+  activeGuildId: string | null;
+  installUrlBase: string | null;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
 
   const NavItem = ({ href, label, emoji }: { href: string; label: string; emoji: string }) => {
@@ -103,6 +122,11 @@ function ShellInner({ username, avatarUrl, children }: { username: string; avata
             </a>
           </div>
         </div>
+        {guilds.length > 0 && (
+          <div className="px-4 pb-3">
+            <GuildSwitcher guilds={guilds} activeGuildId={activeGuildId} installUrlBase={installUrlBase} />
+          </div>
+        )}
       </header>
 
       {/* Desktop sidebar */}
@@ -127,6 +151,11 @@ function ShellInner({ username, avatarUrl, children }: { username: string; avata
           ))}
         </nav>
         <div className="px-4 py-4 border-t border-pulse-border">
+          {guilds.length > 0 && (
+            <div className="mb-3">
+              <GuildSwitcher guilds={guilds} activeGuildId={activeGuildId} installUrlBase={installUrlBase} />
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-3">
             <LocaleToggle />
             <Link href="/app" className="text-[10px] px-2 py-1 rounded-lg bg-pulse-border/40 text-pulse-mute border border-pulse-border font-semibold">

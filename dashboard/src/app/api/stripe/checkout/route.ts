@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, isAdmin } from '@/lib/auth';
+import { getSession, canManageGuild } from '@/lib/auth';
 import { stripe, priceIdForPlan, type Plan } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { currentGuildId } from '@/lib/guildContext';
@@ -13,7 +13,6 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!isAdmin(session.id)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const plan = String(body.plan ?? '') as Plan;
@@ -24,6 +23,9 @@ export async function POST(req: NextRequest) {
   if (!priceId) return NextResponse.json({ error: 'plan_not_configured' }, { status: 503 });
 
   const guildId = currentGuildId();
+  // Per-guild admin check — the Lord must own OR have MANAGE_GUILD on the
+  // target guild. Prevents a signed-in user from buying someone else's plan.
+  if (!canManageGuild(session, guildId)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const origin = req.nextUrl.origin;
 
   // Reuse an existing Stripe customer if we've already created one for

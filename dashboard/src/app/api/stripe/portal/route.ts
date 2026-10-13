@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, isAdmin } from '@/lib/auth';
+import { getSession, canManageGuild } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { currentGuildId } from '@/lib/guildContext';
@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!isAdmin(session.id)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
   const guildId = currentGuildId();
+  if (!canManageGuild(session, guildId)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { data } = await supabase
     .from('subscriptions')
     .select('stripe_customer_id')

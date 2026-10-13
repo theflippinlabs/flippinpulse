@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getPublicLocale } from '@/lib/publicLocale';
 import { LanguageSwitch } from './LanguageSwitch';
+import { botInstallUrl } from '@/lib/botInstall';
 
 const ERRORS: Record<string, { en: string; fr: string }> = {
   missing_code: { en: 'Discord did not send back a code. Try again.', fr: 'Discord n\'a pas renvoyé de code. Réessaie.' },
@@ -22,7 +23,8 @@ const COPY = {
     heroLine1: 'Your Discord server,',
     heroLine2: 'alive 24/7.',
     heroDesc: 'Novarys turns your community into a game. AI moderation, a seasonal Battle Pass, trading cards with PvP duels, adoptable pets, live stream alerts, and a full web dashboard — everything runs from your server without you lifting a finger.',
-    ctaSignIn: 'Sign in with Discord',
+    ctaAddBot: 'Add Novarys to your server',
+    ctaSignIn: 'Sign in',
     ctaSeePlans: 'See plans',
     ctaBadge: 'Free plan available · No credit card to start · Cancel anytime',
     featuresTitle: 'Everything a modern community needs',
@@ -85,7 +87,8 @@ const COPY = {
     heroLine1: 'Ton serveur Discord,',
     heroLine2: 'vivant 24/7.',
     heroDesc: 'Novarys transforme ta communauté en jeu. Modération IA, Battle Pass saisonnier, cartes à collectionner avec duels PvP, pets adoptables, alertes de live, et un dashboard web complet — tout tourne depuis ton serveur sans que tu lèves le petit doigt.',
-    ctaSignIn: 'Se connecter avec Discord',
+    ctaAddBot: 'Ajouter Novarys à ton serveur',
+    ctaSignIn: 'Se connecter',
     ctaSeePlans: 'Voir les plans',
     ctaBadge: 'Plan gratuit dispo · Aucune carte requise · Annulable à tout moment',
     featuresTitle: 'Tout ce qu\'une communauté moderne attend',
@@ -143,10 +146,15 @@ const COPY = {
 
 export default function Landing({ searchParams }: { searchParams: { error?: string } }) {
   const session = getSession();
-  if (session) redirect(isAdmin(session.id) ? '/dashboard' : '/app');
+  // Logged-in: Lord (env id OR has admin guilds) → /dashboard, else /app.
+  if (session) {
+    const hasAdmin = isAdmin(session.id) || (session.adminGuilds ?? []).length > 0;
+    redirect(hasAdmin ? '/dashboard' : '/app');
+  }
   const locale = getPublicLocale();
   const c = COPY[locale];
   const err = searchParams.error ? ERRORS[searchParams.error]?.[locale] ?? (locale === 'fr' ? 'Connexion échouée.' : 'Login failed.') : null;
+  const installUrl = botInstallUrl();
 
   return (
     <main className="min-h-screen text-pulse-text">
@@ -198,9 +206,19 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
             {c.heroDesc}
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-3">
+            {installUrl && (
+              <a
+                href={installUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-center px-6 py-3 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90 shadow-brand"
+              >
+                ➕ {c.ctaAddBot}
+              </a>
+            )}
             <a
               href="/api/auth/login"
-              className="text-center px-6 py-3 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90 shadow-brand"
+              className="text-center px-6 py-3 rounded-lg border border-pulse-border hover:border-pulse-gold text-pulse-text"
             >
               {c.ctaSignIn}
             </a>
@@ -317,12 +335,23 @@ export default function Landing({ searchParams }: { searchParams: { error?: stri
         <div className="max-w-4xl mx-auto px-6 py-24 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">{c.ctaTitle}</h2>
           <p className="text-pulse-mute mb-8">{c.ctaSub}</p>
-          <a
-            href="/api/auth/login"
-            className="inline-block px-8 py-4 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90 shadow-brand"
-          >
-            {c.ctaButton}
-          </a>
+          {installUrl ? (
+            <a
+              href={installUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-8 py-4 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90 shadow-brand"
+            >
+              ➕ {c.ctaAddBot}
+            </a>
+          ) : (
+            <a
+              href="/api/auth/login"
+              className="inline-block px-8 py-4 rounded-lg bg-pulse-gold text-black font-semibold hover:opacity-90 shadow-brand"
+            >
+              {c.ctaButton}
+            </a>
+          )}
         </div>
       </section>
 
