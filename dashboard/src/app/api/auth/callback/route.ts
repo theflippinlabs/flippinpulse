@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { timingSafeEqual } from 'node:crypto';
-import { isAdmin, setSessionCookie } from '@/lib/auth';
+import { isAdmin, setSessionCookie, type SessionGuild } from '@/lib/auth';
 
 const STATE_COOKIE = 'novarys_oauth_state';
+// Discord permission bit — leave in hex for readability. 0x20 = MANAGE_GUILD.
+const PERM_MANAGE_GUILD = 0x20n;
+// Cap the stored admin-guild list; most users have <10 admin guilds, 25
+// keeps the session cookie well under 4 KB even for the heaviest cases.
+const MAX_ADMIN_GUILDS = 25;
 
 interface DiscordTokenResponse {
   access_token: string;
@@ -18,6 +23,23 @@ interface DiscordUser {
   username: string;
   global_name?: string;
   avatar: string | null;
+}
+
+interface DiscordGuild {
+  id: string;
+  name: string;
+  icon: string | null;
+  owner: boolean;
+  permissions: string; // decimal string of a permissions bitfield
+}
+
+function isAdminGuild(g: DiscordGuild): boolean {
+  if (g.owner) return true;
+  try {
+    return (BigInt(g.permissions) & PERM_MANAGE_GUILD) === PERM_MANAGE_GUILD;
+  } catch {
+    return false;
+  }
 }
 
 function clearStateCookie(): void {
@@ -74,11 +96,37 @@ export async function GET(req: NextRequest) {
   if (!userRes.ok) return NextResponse.redirect(new URL('/?error=userinfo', req.url));
 
   const user = (await userRes.json()) as DiscordUser;
+
+  // Pull the user's admin guilds — the ones they can actually install Novarys
+  // on and buy a plan for. Failure here is non-fatal: the user still signs
+  // in, their session just has no admin guilds and they land on /app.
+  let adminGuilds: SessionGuild[] = [];
+  try {
+    const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+      headers: { authorization: `Bearer ${tokens.access_token}` },
+    });
+    if (guildsRes.ok) {
+      const list = (await guildsRes.json()) as DiscordGuild[];
+      adminGuilds = list
+        .filter(isAdminGuild)
+        .slice(0, MAX_ADMIN_GUILDS)
+        .map(g => ({ id: g.id, name: g.name.slice(0, 60), icon: g.icon }));
+    }
+  } catch {
+    // Ignore — the user can still browse /app without an admin-guild list.
+  }
+
   await setSessionCookie({
     id: user.id,
     username: user.global_name ?? user.username,
     avatar: user.avatar,
     iat: Date.now(),
+    adminGuilds,
   });
-  return NextResponse.redirect(new URL(isAdmin(user.id) ? '/dashboard' : '/app', req.url));
+
+  // Routing priority: legacy env Lord → /dashboard. New Lord with at least
+  // one admin guild → /dashboard (so they can install the bot there). Pure
+  // member with nothing to manage → /app.
+  const hasAdmin = isAdmin(user.id) || adminGuilds.length > 0;
+  return NextResponse.redirect(new URL(hasAdmin ? '/dashboard' : '/app', req.url));
 }

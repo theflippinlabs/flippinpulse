@@ -29,7 +29,10 @@ export async function GET() {
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('redirect_uri', redirect);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', 'identify');
+  // identify = user id + name + avatar
+  // guilds   = list of servers the user is in (needed to know which ones they
+  //            can admin and which already have Novarys installed)
+  url.searchParams.set('scope', 'identify guilds');
   url.searchParams.set('state', state);
   return NextResponse.redirect(url.toString());
 }

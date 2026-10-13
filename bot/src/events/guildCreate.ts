@@ -1,4 +1,5 @@
 import { EmbedBuilder, Guild } from 'discord.js';
+import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 
 /**
@@ -19,6 +20,23 @@ export async function handleGuildCreate(guild: Guild): Promise<void> {
   log('INFO', `Bot joined guild ${guild.name} (${guild.id}) — ${guild.memberCount} members`);
 
   const owner = await guild.fetchOwner().catch(() => null);
+
+  // Persist the install so the dashboard can list every server this bot
+  // runs on, link an owner → guild → subscription, and know the join time.
+  // Fire-and-forget; a DB hiccup here must not block the welcome DM.
+  if (owner) {
+    void supabase.from('guild_installs').upsert({
+      guild_id:     guild.id,
+      owner_id:     owner.id,
+      guild_name:   guild.name,
+      guild_icon:   guild.iconURL({ size: 128 }),
+      member_count: guild.memberCount,
+      is_active:    true,
+      removed_at:   null,
+    }, { onConflict: 'guild_id' }).then(({ error }) => {
+      if (error) log('ERROR', `guild_installs upsert failed for ${guild.id}`, error);
+    }, () => null);
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0xF5B62E)
