@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { config } from '../config.js';
 import { log } from '../utils/logger.js';
 
 interface SpendResult {
@@ -46,29 +47,35 @@ export async function grantPulse(
   avatarUrl: string | null,
   amount: number,
   reason: string,
-  adminId: string
+  adminId: string,
+  guildIdOpt?: string,
 ): Promise<SpendResult> {
   if (amount <= 0) return { success: false, newBalance: 0, error: 'Amount must be positive' };
+  const guildId = guildIdOpt ?? config.GUILD_ID;
+  if (!guildId) return { success: false, newBalance: 0, error: 'No guild context' };
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse, lifetime_earned_pulse')
     .eq('discord_id', discordId)
-    .single();
+    .eq('guild_id', guildId)
+    .maybeSingle();
 
   const currentBalance = user?.balance_pulse ?? 0;
   const newBalance = currentBalance + amount;
 
   await supabase.from('discord_users').upsert({
     discord_id: discordId,
+    guild_id: guildId,
     username,
     avatar_url: avatarUrl,
     balance_pulse: newBalance,
     lifetime_earned_pulse: (user?.lifetime_earned_pulse ?? 0) + amount,
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'discord_id,guild_id' });
 
   await supabase.from('pulse_transactions').insert({
     discord_id: discordId,
+    guild_id: guildId,
     type: 'ADMIN_GRANT',
     amount,
     reason,
@@ -84,15 +91,19 @@ export async function revokePulse(
   discordId: string,
   amount: number,
   reason: string,
-  adminId: string
+  adminId: string,
+  guildIdOpt?: string,
 ): Promise<SpendResult> {
   if (amount <= 0) return { success: false, newBalance: 0, error: 'Amount must be positive' };
+  const guildId = guildIdOpt ?? config.GUILD_ID;
+  if (!guildId) return { success: false, newBalance: 0, error: 'No guild context' };
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse')
     .eq('discord_id', discordId)
-    .single();
+    .eq('guild_id', guildId)
+    .maybeSingle();
 
   if (!user) return { success: false, newBalance: 0, error: 'User has no account yet' };
 
@@ -102,10 +113,12 @@ export async function revokePulse(
   await supabase
     .from('discord_users')
     .update({ balance_pulse: newBalance })
-    .eq('discord_id', discordId);
+    .eq('discord_id', discordId)
+    .eq('guild_id', guildId);
 
   await supabase.from('pulse_transactions').insert({
     discord_id: discordId,
+    guild_id: guildId,
     type: 'ADMIN_REVOKE',
     amount: -removed,
     reason,
@@ -123,27 +136,33 @@ export async function setPulse(
   avatarUrl: string | null,
   amount: number,
   reason: string,
-  adminId: string
+  adminId: string,
+  guildIdOpt?: string,
 ): Promise<SpendResult> {
   if (amount < 0) return { success: false, newBalance: 0, error: 'Amount cannot be negative' };
+  const guildId = guildIdOpt ?? config.GUILD_ID;
+  if (!guildId) return { success: false, newBalance: 0, error: 'No guild context' };
 
   const { data: user } = await supabase
     .from('discord_users')
     .select('balance_pulse')
     .eq('discord_id', discordId)
-    .single();
+    .eq('guild_id', guildId)
+    .maybeSingle();
 
   const delta = amount - (user?.balance_pulse ?? 0);
 
   await supabase.from('discord_users').upsert({
     discord_id: discordId,
+    guild_id: guildId,
     username,
     avatar_url: avatarUrl,
     balance_pulse: amount,
-  }, { onConflict: 'discord_id' });
+  }, { onConflict: 'discord_id,guild_id' });
 
   await supabase.from('pulse_transactions').insert({
     discord_id: discordId,
+    guild_id: guildId,
     type: delta >= 0 ? 'ADMIN_GRANT' : 'ADMIN_REVOKE',
     amount: delta,
     reason,

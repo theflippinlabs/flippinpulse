@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { config } from '../config.js';
 import { aiChat, hasAI } from './ai.js';
 import { log } from '../utils/logger.js';
 
@@ -25,6 +26,7 @@ export async function getCompanion(discordId: string): Promise<AICompanion | nul
     .from('ai_companions')
     .select('*')
     .eq('discord_id', discordId)
+    .eq('guild_id', config.GUILD_ID)
     .maybeSingle();
   if (error) { log('ERROR', 'getCompanion failed', error); return null; }
   return (data as AICompanion) ?? null;
@@ -34,7 +36,7 @@ export async function upsertCompanion(patch: Partial<AICompanion> & { discord_id
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('ai_companions')
-    .upsert({ ...patch, updated_at: now }, { onConflict: 'discord_id' })
+    .upsert({ guild_id: config.GUILD_ID, ...patch, updated_at: now }, { onConflict: 'discord_id,guild_id' })
     .select('*')
     .maybeSingle();
   if (error) { log('ERROR', 'upsertCompanion failed', error); return null; }
@@ -42,7 +44,8 @@ export async function upsertCompanion(patch: Partial<AICompanion> & { discord_id
 }
 
 export async function deleteCompanion(discordId: string): Promise<boolean> {
-  const { error } = await supabase.from('ai_companions').delete().eq('discord_id', discordId);
+  const { error } = await supabase.from('ai_companions').delete()
+    .eq('discord_id', discordId).eq('guild_id', config.GUILD_ID);
   if (error) { log('ERROR', 'deleteCompanion failed', error); return false; }
   return true;
 }
