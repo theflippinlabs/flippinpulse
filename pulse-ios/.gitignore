@@ -1,0 +1,19 @@
+# Capacitor generates everything below locally on first `cap add ios`
+# — do not commit platform code, it has to be regenerated for signing
+# certificates that are specific to each developer machine.
+node_modules/
+ios/App/Pods/
+ios/App/build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/DerivedData/
+*.ipa
+*.dSYM.zip
+.DS_Store
+# cordova-res cached intermediates
+.cordova-res/
+
+# Keep ios/ when it exists: it carries the Xcode project. The pod lock
+# file travels with it so builds reproduce.
+!ios/App/Podfile.lock
