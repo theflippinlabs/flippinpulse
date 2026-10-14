@@ -15,6 +15,10 @@ export default function InstallHint({ fr }: { fr: boolean }) {
       if (localStorage.getItem(DISMISS_KEY)) return;
     } catch { /* noop */ }
     const ua = navigator.userAgent;
+    // Inside the native iOS wrapper (Capacitor appends Pulse-iOS/x.y to the
+    // UA) the user is already inside a "real app" — hide the install hint
+    // entirely to avoid asking them to install an app of an app.
+    if (/Pulse-iOS/.test(ua)) return;
     const isIOS = /iPhone|iPad|iPod/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
     if (!isIOS) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

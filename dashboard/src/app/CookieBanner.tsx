@@ -59,6 +59,9 @@ export function CookieBanner() {
 
   useEffect(() => {
     setLocale(readLocale());
+    // Inside the Pulse iOS app the cookie-consent banner is irrelevant
+    // (no browser-level cross-site cookies). Hide it unconditionally.
+    if (typeof navigator !== 'undefined' && /Pulse-iOS/.test(navigator.userAgent)) return;
     try {
       const v = localStorage.getItem(STORAGE_KEY);
       if (!v) setVisible(true);
