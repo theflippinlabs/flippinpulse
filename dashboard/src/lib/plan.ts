@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { planDefinition, type Plan, type PlanDefinition } from './stripe';
+import { getSession, isAdmin } from './auth';
 
 // Read the plan for a guild. Falls back to 'free' when no row exists yet.
 // This is the ONE function every feature-gating check should call — never
@@ -83,6 +84,13 @@ export function planIncludes(plan: Plan, feature: keyof typeof FEATURE_GATES): b
 }
 
 export async function guildCan(guildId: string, feature: keyof typeof FEATURE_GATES): Promise<boolean> {
+  // Env-pinned Lord (DASHBOARD_ADMIN_IDS) is the super-admin of the whole
+  // Novarys workspace — they always get Enterprise on every guild they
+  // visit, regardless of what the subscriptions table says. Keeps testing
+  // and operations friction-free.
+  const session = getSession();
+  if (session && isAdmin(session.id)) return planIncludes('enterprise', feature);
+
   const sub = await getSubscription(guildId);
   if (sub.status !== 'active' && sub.status !== 'trialing') return planIncludes('free', feature);
   return planIncludes(sub.plan, feature);
