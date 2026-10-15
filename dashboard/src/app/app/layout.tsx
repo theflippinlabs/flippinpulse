@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { getSession, isAdmin } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { getLocale } from '@/lib/i18n';
 import MemberShell from './MemberShell';
 import InstallHint from './InstallHint';
@@ -42,15 +41,44 @@ export const metadata: Metadata = {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const session = getSession();
-  if (!session) redirect('/');
+  // DO NOT redirect here. The individual pages under /app enforce auth
+  // themselves. If this layout did redirect() for unauthenticated requests,
+  // the Discord / Twitter / iMessage unfurl bots (which carry no session)
+  // would get a 307 to "/" and the LANDING metadata — hiding the
+  // member-facing openGraph card we export above.
+  // When there's no session we render a stripped-down shell that still
+  // carries the full metadata in <head>, so unfurlers get the right card
+  // and humans see a sign-in prompt.
 
-  // Note: `novarys_guild` cookie bootstrap happens in middleware.ts — a
-  // Server Component layout can't call cookies().set() during render.
+  const locale = getLocale();
+
+  if (!session) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-6 bg-pulse-bg">
+        <div className="max-w-sm w-full text-center">
+          <div className="text-5xl text-pulse-gold mb-2">⚡</div>
+          <h1 className="text-2xl font-bold mb-1 tracking-wider">
+            PULSE
+          </h1>
+          <p className="text-pulse-mute text-sm mb-6">
+            {locale === 'fr'
+              ? 'Connecte-toi avec Discord pour ouvrir l\'app.'
+              : 'Sign in with Discord to open the app.'}
+          </p>
+          <a
+            href="/api/auth/login"
+            className="block w-full rounded-lg bg-pulse-gold text-black font-semibold py-3 hover:opacity-90 shadow-brand"
+          >
+            {locale === 'fr' ? 'Se connecter avec Discord' : 'Sign in with Discord'}
+          </a>
+        </div>
+      </main>
+    );
+  }
 
   const avatarUrl = session.avatar
     ? `https://cdn.discordapp.com/avatars/${session.id}/${session.avatar}.png?size=64`
     : null;
-  const locale = getLocale();
 
   return (
     <MemberShell
