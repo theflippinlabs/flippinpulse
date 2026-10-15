@@ -18,6 +18,7 @@ const COPY = {
       { h: '3. Subscriptions and billing', items: [
         'The free plan ("Free") is provided with no commitment.',
         'Paid plans (Starter €29/month, Pro €79/month, Enterprise on quote) are billed monthly by Stripe.',
+        '<b>One subscription covers every member of the Lord\'s Discord server.</b> There is no per-seat fee: once the server is on a paid plan, every member of that server gets free access to the plan\'s features (web and mobile) for as long as the subscription stays active.',
         'Prices are shown exclusive of tax; applicable VAT is added at checkout when relevant.',
         'The subscription renews automatically at the end of the period and can be cancelled at any time via the Stripe customer portal accessible from <code>/dashboard/billing</code>. Access to paid features remains active until the end of the paid period.',
         'In accordance with article L. 221-28 of the French Consumer Code, by starting to use a paid feature upon subscribing, you waive your 14-day right of withdrawal for the portion already performed.',
@@ -47,6 +48,7 @@ const COPY = {
       { h: '3. Abonnements et facturation', items: [
         'Le plan gratuit (« Free ») est fourni sans engagement.',
         'Les plans payants (Starter 29 €/mois, Pro 79 €/mois, Enterprise sur devis) sont facturés mensuellement par Stripe.',
+        '<b>Un seul abonnement couvre tous les membres du serveur Discord du Lord.</b> Il n\'y a pas de tarif par utilisateur : dès que le serveur est sur un plan payant, chaque membre de ce serveur accède gratuitement aux fonctionnalités de ce plan (web et mobile) tant que l\'abonnement reste actif.',
         'Les prix sont indiqués hors taxes ; la TVA applicable est ajoutée à la facturation le cas échéant.',
         'L\'abonnement se renouvelle automatiquement à l\'échéance et peut être annulé à tout moment via le portail client Stripe accessible depuis <code>/dashboard/billing</code>. L\'accès aux fonctionnalités payantes reste actif jusqu\'à la fin de la période payée.',
         'Conformément à l\'article L. 221-28 du Code de la consommation, en démarrant l\'utilisation d\'une fonctionnalité payante dès la souscription, vous renoncez à votre droit de rétractation de 14 jours pour la partie déjà exécutée.',
