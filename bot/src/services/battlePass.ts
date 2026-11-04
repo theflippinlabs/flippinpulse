@@ -65,7 +65,11 @@ export async function getProgress(discordId: string, seasonId: number): Promise<
 }
 
 async function upsertProgress(p: Progress): Promise<void> {
-  await supabase.from('battle_pass_progress').upsert({ ...p, updated_at: new Date().toISOString() }, { onConflict: 'discord_id,season_id' });
+  const { config } = await import('../config.js');
+  await supabase.from('battle_pass_progress').upsert(
+    { ...p, guild_id: (p as { guild_id?: string }).guild_id ?? config.GUILD_ID, updated_at: new Date().toISOString() },
+    { onConflict: 'discord_id,guild_id,season_id' },
+  );
 }
 
 export function tierFromXP(xp: number, season: Season): number {
@@ -152,12 +156,14 @@ async function grantReward(
     const label = String(value.label ?? cosmeticKey);
     if (cosmeticKey) {
       try {
+        const { config } = await import('../config.js');
         await supabase.from('member_owned_cosmetics').upsert({
           discord_id: discordId,
+          guild_id: config.GUILD_ID,
           cosmetic_key: cosmeticKey,
           label,
           source: 'battle_pass',
-        }, { onConflict: 'discord_id,cosmetic_key' });
+        }, { onConflict: 'discord_id,guild_id,cosmetic_key' });
         await supabase.from('reward_grants_ledger').insert({
           discord_id: discordId,
           source: 'battle_pass',
