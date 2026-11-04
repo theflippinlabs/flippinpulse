@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { config } from '../config.js';
 import { log } from '../utils/logger.js';
 
 export interface PointsConfig {
@@ -113,7 +114,13 @@ const defaults = {
 const cache = new Map<string, unknown>();
 
 export async function loadSettings(): Promise<void> {
-  const { data, error } = await supabase.from('settings').select('key, value_json');
+  // Multi-tenancy: scope to this bot instance's main guild. The settings
+  // cache is global by `key` — one bot process serves one guild in
+  // practice today. A future multi-guild bot will need a `(key, guildId)`
+  // cache; for now this unblocks the Phase 3 NOT NULL guild_id constraint
+  // without redesigning every getXxxConfig() consumer.
+  const q = supabase.from('settings').select('key, value_json');
+  const { data, error } = await (config.GUILD_ID ? q.eq('guild_id', config.GUILD_ID) : q);
   if (error) {
     log('ERROR', 'Failed to load settings', error);
     return;
@@ -179,9 +186,12 @@ export function getRawSetting<T = Record<string, unknown>>(key: string): T | und
 }
 
 export async function setSetting(key: string, value: unknown): Promise<void> {
+  if (!config.GUILD_ID) {
+    throw new Error('setSetting: no GUILD_ID configured — cannot write a tenant-scoped setting.');
+  }
   const { error } = await supabase
     .from('settings')
-    .upsert({ key, value_json: value }, { onConflict: 'key' });
+    .upsert({ key, guild_id: config.GUILD_ID, value_json: value }, { onConflict: 'key,guild_id' });
   if (error) {
     log('ERROR', `Failed to save setting ${key}`, error);
     throw error;

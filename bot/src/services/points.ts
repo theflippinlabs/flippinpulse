@@ -62,7 +62,7 @@ export async function awardPoints(opts: AwardOptions): Promise<void> {
       balance_pulse: newBalance,
       lifetime_earned_pulse: currentLifetimeEarned + pulseEarned,
       last_activity_at: new Date().toISOString(),
-    }, { onConflict: 'discord_id' });
+    }, { onConflict: 'discord_id,guild_id' });
 
     // Insert activity event
     await supabase.from('activity_events').insert({
